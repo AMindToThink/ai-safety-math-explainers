@@ -194,13 +194,75 @@ notation; deviations get rows here with a reason.
 
 ## Module breakdown
 
-To populate after Chapter 1 of the Grey Book has been read end-to-end.
-Initial empty state; first concrete rows will land in the next session
-or two.
+The distillation arc (DSLT 0–4 by Liam Carroll) is the on-ramp; we
+treat it as the project's "Chapter 1" for SLT, as recommended in
+`math-heavy-texts-for-explanations.md`. Watanabe Grey/Green chapters
+will be threaded in once the corresponding distillation modules exist.
+
+**First batch (DSLT 1: "The RLCT Measures the Effective Dimension of
+Neural Networks").** All rows below are proposed by the autonomous
+session on 2026-05-05; see "Proposed for approval" in the next
+SESSIONS.md entry. Each row's justification appears immediately below
+the table. Toy system column lists the *primary* toy for the widget;
+secondary toys are noted in the justification.
 
 | Source location | Module slug | Toy system | Active check | Status | Human Review |
 |-----------------|-------------|------------|--------------|--------|--------------|
-|                 |             |            |              |        |              |
+| DSLT 1 §Preliminaries (Carroll thesis Ch 2) | `dslt1-bayes-loss-landscape` | 1D & 2D polynomial K(w) (Examples 1.1, 1.2) | Pan a 2D K(w); identify W₀; predict whether it is a point, a curve, or an intersecting arrangement | not started | |
+| DSLT 1 §"What is a singular model?" | `dslt1-fisher-degeneracy` | Same polynomial K family + a 1-hidden-unit ReLU regressor for contrast | Compute I(w₀); classify regular vs strictly singular by det I(w₀) = 0 | not started | |
+| DSLT 1 §"Classical Bayesian inference breaks down" | `dslt1-bic-derivation` | Comparison K = w² (regular) vs K = w⁴ (singular) | Step through the BIC derivation; pinpoint the line that fails under degenerate I(w₀) | not started | |
+| DSLT 1 §"Dimensionality as a volume co-dimension" | `dslt1-volume-scaling-rlct` | 1D K(w) = w^(2k) and 2D normal-crossing K | Scrub ε; plot log V(ε) vs log ε; read slope = λ. Tune k so 2λ matches a target effective dimension | not started | |
+| DSLT 1 §"The RLCT can be read off when K(w) is in normal crossing form" (one- and multi-dim cases) | `dslt1-normal-crossing-game` | Polynomial K in normal crossing form, 1D/2D | Game: given K(w) = ∏ w_i^(2k_i) (possibly with shifted critical points, à la Example 1.5), read off the local and global RLCT and multiplicity | not started | |
+| DSLT 1 §"Resolution of Singularities" | `dslt1-resolution-primer` | Real plane curves V(xy), V(x²−y³), V(x²−y²) | Animated blow-up: see how (M, g) puts K(g(u)) into normal crossing form. Active: pick the blow-up centre that resolves a given singularity | not started | |
+| DSLT 1 §"The RLCT measures the effective dimensionality" + WBIC | `dslt1-wbic-vs-bic` | Toy regular K = w² + w² vs toy singular K = w₁² w₂² | Side-by-side BIC vs WBIC as n grows; predict-then-reveal which model "wins" at each n | not started | |
+
+### Module justifications
+
+- `dslt1-bayes-loss-landscape` — anchors the chapter's notation
+  (K(w), W₀, posterior, free energy) before any RLCT machinery. Lets
+  the reader internalise that the loss landscape's *level sets*, not
+  just its *minima*, carry the information.
+- `dslt1-fisher-degeneracy` — makes the operational definition of
+  "singular" tangible: the reader computes a small Fisher matrix and
+  reads off its rank. Includes a 1-hidden-unit ReLU example as a
+  forward pointer to DSLT 3.
+- `dslt1-bic-derivation` — Carroll's step-by-step BIC derivation
+  becomes a guided walk-through where the reader has to identify the
+  one step that requires det I(w₀) ≠ 0. This is the single most
+  important "why does the classical theory fail?" moment in the
+  chapter.
+- `dslt1-volume-scaling-rlct` — the central widget for the chapter.
+  V(ε) ∝ ε^λ is the cleanest construct-an-X check in DSLT 1 (target
+  an effective dimension, find a polynomial K that achieves it). The
+  geometric framing (volume scaling) and the algebraic framing
+  (zeta-function poles, in Appendix 1) both flow from this widget.
+- `dslt1-normal-crossing-game` — once the volume formula is in hand,
+  monomial K(w) makes λ a *calculation* rather than an asymptotic.
+  Lean-Game-Server-shaped: a sequence of small problems with
+  progressively richer scoring (multiple critical points → global vs
+  local RLCT, multiplicity).
+- `dslt1-resolution-primer` — Hironaka's theorem is the conceptual
+  bridge from "compute RLCT only for normal-crossing K" to "compute
+  it for any analytic K". A short, visual primer on real blow-ups
+  (no AG prerequisites assumed) earns its keep here.
+- `dslt1-wbic-vs-bic` — closes DSLT 1 by replacing d/2 with λ in the
+  free-energy formula and previewing DSLT 2's accuracy-complexity
+  reading. Doubles as a sanity check that everything earlier in the
+  chapter assembles into a single quantity.
+
+### Notes on toys and framings
+
+- **Default DSLT-1 toy family:** real polynomial K(w) drawn from
+  Carroll's worked examples in DSLT 1 (w², w⁴, ½ w₁² w₂², (w+1)² w⁴,
+  (w₁+1)² w₁⁴ w₂²). One toy family carried across the chapter, with
+  the 1-hidden-unit ReLU network introduced as a forward-pointer
+  contrast in `dslt1-fisher-degeneracy` only.
+- **Framings used in DSLT 1:** algebraic-geometric (RLCT as a
+  geometric invariant of W₀) and Bayesian (effective dimension as
+  the rate at which the posterior concentrates). The
+  statistical-physical framing (free energy as
+  −log Z) is introduced but its weight lands in DSLT 2's `wbic`
+  modules.
 
 ## Pedagogical decisions
 
@@ -247,7 +309,8 @@ Empty for now. Populate as we encounter them.
 
 - **Last updated:** 2026-05-05
 - **Chapters complete:** 0
-- **Currently being drafted:** none — scaffold only
+- **Currently being drafted:** DSLT 1 module breakdown proposed,
+  awaiting human approval; no module yet at "in progress"
 - **Blockers:** none
 
 ## Cross-references
