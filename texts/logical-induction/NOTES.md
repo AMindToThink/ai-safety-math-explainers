@@ -445,8 +445,18 @@ multiple arXiv revisions; we pin v3 (2020-09) for citation.
   with a five-trader catalogue (canonical $\varphi$-buy exploit;
   $\psi$-sell exploit; $\chi$-Goldbach bet that does not exploit;
   combined exploits; combined exploit-plus-bet that ruins the
-  exploit). Smoke-tested clean. Lean Game Server scaffold queued
-  for next.
+  exploit). Smoke-tested clean.
+
+  **Lean Game Server scaffold landed** at
+  `texts/logical-induction/lean-game/` with `lakefile.lean` (verbatim
+  GameSkeleton template), `lean-toolchain` pinned to
+  `leanprover/lean4:v4.23.0`, `Game.lean`, two worlds, and five
+  levels: Markets/L1 buy-share warm-up, Markets/L2 sell-share,
+  Markets/L3 combined-net-worth, Exploits/L1 n-day buy with
+  induction, Exploits/L2 bounded-loss pre-resolution. **Build
+  not verified** in the autonomous sandbox (no `elan`); next
+  session or any local checkout should run `lake update -R && lake
+  build`. See `lean-game/README.md` for status notes.
 - **Blockers:** none
 
 ## Cross-references
