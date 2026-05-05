@@ -86,10 +86,10 @@
 </div>
 
 <div class="lede">
-  <p style="margin: 0 0 0.5rem;">In a <a href="https://en.wikipedia.org/wiki/Bayesian_statistics">Bayesian</a> setting the <a href="https://en.wikipedia.org/wiki/Posterior_probability">posterior</a> over parameters is
+  <p style="margin: 0 0 0.5rem;">In a <a href="https://www.yudkowsky.net/rational/bayes">Bayesian</a> setting the <a href="https://www.youtube.com/watch?v=HZGCoVF3YvM">posterior</a> over parameters is
   $$ p(w \mid D_n) \;=\; \frac{1}{Z_n}\, \varphi(w)\, e^{-n L_n(w)} \;\propto\; \varphi(w)\, e^{-n L_n(w)}, $$
   and as $n \to \infty$ this is dominated by the loss landscape $K(w)$ (the limit of $L_n$): $p(w \mid D_n) \,\propto\, \varphi(w)\, e^{-n K(w)}$.</p>
-  <p style="margin: 0;">For a <strong>regular</strong> model $K$ has a single non-degenerate minimum, so the posterior tightens to a multivariate <a href="https://en.wikipedia.org/wiki/Multivariate_normal_distribution">Gaussian</a> with covariance $\frac{1}{n}\, I^{-1}$ &mdash; <a href="https://en.wikipedia.org/wiki/Asymptotic_distribution">asymptotic normality</a>. For a <strong>singular</strong> model the picture is funkier: the posterior trails along the <a href="https://en.wikipedia.org/wiki/Algebraic_variety">variety</a> $W_0$, splits unevenly between competing singularities, and (in general) is <em>not</em> Gaussian even at $n = 10^6$. This widget lets you see that funkiness directly: pick a $K$, drag $n$, watch the posterior.</p>
+  <p style="margin: 0;">For a <strong>regular</strong> model $K$ has a single non-degenerate minimum, so the posterior tightens to a multivariate Gaussian with covariance $\frac{1}{n}\, I^{-1}$ &mdash; <a href="https://www.stat.cmu.edu/~cshalizi/ADAfaEPoV/">asymptotic normality</a>. For a <strong>singular</strong> model the picture is funkier: the posterior trails along the <a href="http://therisingsea.org/notes/MSc-Carroll.pdf">variety</a> $W_0$, splits unevenly between competing singularities, and (in general) is <em>not</em> Gaussian even at $n = 10^6$. This widget lets you see that funkiness directly: pick a $K$, drag $n$, watch the posterior.</p>
 </div>
 
 <h2>Pick a loss landscape</h2>
@@ -161,12 +161,14 @@ function typeset(el) {
 
 const DSLT1 = 'https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural';
 const DSLT2 = 'https://www.alignmentforum.org/posts/CZHwwDd7t9aYra5HN/dslt-2-why-neural-networks-obey-occam-s-razor';
+// Project policy: do NOT link math/stats terms to Wikipedia (see
+// CONTRIBUTING.md "Linking"). Prefer 3Blue1Brown / Olah / Shalizi / Yudkowsky /
+// Murfet / Nielsen / DSLT itself.
 const LINK = {
   rlct:        DSLT1 + '#The_Real_Log_Canonical_Threshold__aka_the_Learning_Coefficient_',
-  fisher:      'https://en.wikipedia.org/wiki/Fisher_information',
-  hessian:     'https://en.wikipedia.org/wiki/Hessian_matrix',
-  multivarGauss:'https://en.wikipedia.org/wiki/Multivariate_normal_distribution',
-  asympNormal: 'https://en.wikipedia.org/wiki/Asymptotic_distribution',
+  fisher:      DSLT1 + '#What_is_a_singular_model_',                                                     // SLT-specific framing of Fisher info
+  hessian:     'https://www.khanacademy.org/math/multivariable-calculus/applications-of-multivariable-derivatives/quadratic-approximations/v/the-hessian',  // Khan Academy
+  asympNormal: 'https://www.stat.cmu.edu/~cshalizi/ADAfaEPoV/',                                          // Cosma Shalizi
   potential:   DSLT2 + '#K_w__is_like_a_potential_well__where_a_lower_RLCT_means_a_flatter_floor',
   freeEnergy:  DSLT2 + '#Free_Energy__Generalisation_and_Model_Selection',
 };
@@ -188,7 +190,7 @@ const MODELS = [
     note: `A regular model. ${a(LINK.fisher, 'Fisher information')} is positive definite at $(0,0)$.`,
     W0: { type: 'points', pts: [[0, 0]] },
     correct: 'gauss-spike-2d',
-    explanation: `As $n \\to \\infty$, the posterior tightens to a 2D ${a(LINK.multivarGauss, 'Gaussian')} centred at $(0,0)$ with covariance $\\frac{1}{n}\\, I^{-1} = \\frac{1}{2n}\\, \\mathrm{diag}(1,1)$. This is ${a(LINK.asympNormal, 'asymptotic normality')} &mdash; the regular Bayesian story.`,
+    explanation: `As $n \\to \\infty$, the posterior tightens to a 2D Gaussian centred at $(0,0)$ with covariance $\\frac{1}{n}\\, I^{-1} = \\frac{1}{2n}\\, \\mathrm{diag}(1,1)$. This is ${a(LINK.asympNormal, 'asymptotic normality')} &mdash; the regular Bayesian story.`,
     sourceUrl: DSLT1 + '#What_is_a_singular_model_',
     sourceLabel: 'DSLT 1 §"What is a singular model?"',
   },
@@ -247,7 +249,7 @@ const MODELS = [
     note: 'The simplest regular model. Watch for the textbook Gaussian.',
     W0: { type: 'points', pts: [0] },
     correct: 'gauss-spike',
-    explanation: `As $n$ grows the posterior approaches $\\mathcal{N}(0, 1/(2n))$ &mdash; an exact ${a(LINK.multivarGauss, 'Gaussian')} centred at $0$, width shrinking like $1/\\sqrt{n}$. ${a(LINK.asympNormal, 'Asymptotic normality')}: the regular case.`,
+    explanation: `As $n$ grows the posterior approaches $\\mathcal{N}(0, 1/(2n))$ &mdash; an exact Gaussian centred at $0$, width shrinking like $1/\\sqrt{n}$. ${a(LINK.asympNormal, 'Asymptotic normality')}: the regular case.`,
     sourceUrl: DSLT1 + '#What_is_a_singular_model_',
     sourceLabel: 'DSLT 1 §"What is a singular model?"',
   },

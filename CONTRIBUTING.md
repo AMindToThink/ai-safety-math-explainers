@@ -199,11 +199,36 @@ come back without losing place. Be generous with them.
 - **Tricky terms link to a helpful explanation.** Anything a
   reader might not know — RLCT, KL divergence, Fisher information,
   Hessian, posterior, BIC/WBIC, partition function, normal-crossing
-  form, blow-up, algebraic variety, ReLU — gets an `<a>`. Wikipedia
-  is the default target for general math/statistics terms; for
-  SLT-specific terms (RLCT, WBIC, free energy of singular models)
-  link to the relevant DSLT post anchor. Don't link the same term
-  five times in one page; once near its first appearance is enough.
+  form, blow-up, algebraic variety, ReLU — gets an `<a>`. Don't
+  link the same term five times in one page; once near its first
+  appearance is enough.
+- **Do *not* link to Wikipedia for math.** Wikipedia math articles
+  are written for completeness and formality, not pedagogy, and
+  Matthew has flagged this explicitly: a Wikipedia link for "Fisher
+  information" in an early widget triggered the rewrite. Prefer:
+  - **3Blue1Brown** (YouTube + 3blue1brown.com) for visual calculus,
+    linear algebra, probability, Bayes-theorem intuition, neural
+    networks.
+  - **Chris Olah** (colah.github.io) — "Visual Information Theory"
+    is the canonical KL-divergence explainer.
+  - **Cosma Shalizi's lecture notes** (stat.cmu.edu/~cshalizi/) for
+    asymptotic statistics, MLE, Fisher information, information
+    criteria.
+  - **LessWrong / Alignment Forum** for Bayesian / decision-theoretic
+    / AI-safety-adjacent topics.
+  - **Daniel Murfet's metauni / therisingsea** for SLT-specific
+    algebraic geometry (resolution, blow-ups, normal crossings).
+  - **Carroll's MSc thesis** (committed to `texts/slt/source/`) for
+    the same content in book form.
+  - **math3ma** (Tai-Danae Bradley) for accessible AG / category
+    theory.
+  - **Khan Academy** for basics (multivariable calculus, Hessian).
+  - **distill.pub** / **transformer-circuits.pub** for ML
+    interpretability and visualization.
+  For SLT-specific terms link back to the relevant DSLT post anchor
+  before reaching for any external reference. If you genuinely
+  cannot find a non-Wikipedia explainer, leave the term unlinked
+  rather than ship a Wikipedia URL.
 - **Each widget ships a "Sources for this widget" panel** near the
   top, listing the primary source sections it draws from with
   hyperlinks. The dslt1-bayes-loss-landscape widget is a

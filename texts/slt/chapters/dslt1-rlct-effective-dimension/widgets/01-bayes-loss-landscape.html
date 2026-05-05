@@ -84,11 +84,11 @@
 </div>
 
 <div class="lede">
-  <p style="margin: 0 0 0.5rem;">In the Bayesian setup of SLT, the <a href="https://en.wikipedia.org/wiki/Posterior_probability">posterior</a> $p(w \mid D_n) = \frac{1}{Z_n}\,\varphi(w)\, e^{-n L_n(w)}$ concentrates as $n \to \infty$ on parameters that minimise the empirical loss $L_n(w)$. The infinite-data limit of this loss is the <a href="https://en.wikipedia.org/wiki/Kullback%E2%80%93Leibler_divergence">Kullback&ndash;Leibler divergence</a> between truth and model,
+  <p style="margin: 0 0 0.5rem;">In the Bayesian setup of SLT, the <a href="https://www.yudkowsky.net/rational/bayes">posterior</a> $p(w \mid D_n) = \frac{1}{Z_n}\,\varphi(w)\, e^{-n L_n(w)}$ concentrates as $n \to \infty$ on parameters that minimise the empirical loss $L_n(w)$. The infinite-data limit of this loss is the <a href="https://colah.github.io/posts/2015-09-Visual-Information/">Kullback&ndash;Leibler divergence</a> between truth and model,
   $$ K(w) \;=\; \iint q(y \mid x)\, q(x)\, \log \frac{q(y \mid x)}{p(y \mid x, w)}\, dx\, dy \;\geq\; 0, $$
   which we call the <em>loss landscape</em>. Its zero set
   $$ W_0 \;=\; \{ w \in W : K(w) = 0 \} $$
-  is the <em>set of true parameters</em>. In <strong>regular</strong> models $W_0$ is a single point and the <a href="https://en.wikipedia.org/wiki/Fisher_information">Fisher information</a> is non-degenerate there; in <strong>singular</strong> models $W_0$ can be a curve, an arrangement of curves, or a higher-dimensional <a href="https://en.wikipedia.org/wiki/Algebraic_variety">variety</a>. That difference is the entire reason <a href="https://en.wikipedia.org/wiki/Asymptotic_distribution">classical Bayesian asymptotics</a> break.</p>
+  is the <em>set of true parameters</em>. In <strong>regular</strong> models $W_0$ is a single point and the <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#What_is_a_singular_model_">Fisher information</a> is non-degenerate there; in <strong>singular</strong> models $W_0$ can be a curve, an arrangement of curves, or a higher-dimensional <a href="http://therisingsea.org/notes/MSc-Carroll.pdf">variety</a>. That difference is the entire reason <a href="https://www.stat.cmu.edu/~cshalizi/ADAfaEPoV/">classical Bayesian asymptotics</a> break.</p>
 </div>
 
 <h2>Pick a loss landscape</h2>
@@ -163,27 +163,32 @@ const DSLT2 = 'https://www.alignmentforum.org/posts/CZHwwDd7t9aYra5HN/dslt-2-why
 // External references for "tricky terms" in the prose. Used as hover-link
 // targets so a reader who has never met (say) Fisher information can bounce
 // out, read a paragraph, and bounce back.
+//
+// Project policy: do NOT link math/stats terms to Wikipedia (see
+// CONTRIBUTING.md "Linking"). Prefer 3Blue1Brown / Olah / Shalizi / Yudkowsky /
+// Murfet / Nielsen / DSLT itself.
 const LINK = {
-  // Wikipedia
-  kl:           'https://en.wikipedia.org/wiki/Kullback%E2%80%93Leibler_divergence',
-  fisher:       'https://en.wikipedia.org/wiki/Fisher_information',
-  hessian:      'https://en.wikipedia.org/wiki/Hessian_matrix',
-  bic:          'https://en.wikipedia.org/wiki/Bayesian_information_criterion',
-  bayesPost:    'https://en.wikipedia.org/wiki/Posterior_probability',
-  partition:    'https://en.wikipedia.org/wiki/Partition_function_(statistical_mechanics)',
-  asympNormal:  'https://en.wikipedia.org/wiki/Asymptotic_distribution',
-  resolution:   'https://en.wikipedia.org/wiki/Resolution_of_singularities',
-  normalCross:  'https://en.wikipedia.org/wiki/Normal_crossings',
-  blowup:       'https://en.wikipedia.org/wiki/Blowing_up',
-  variety:      'https://en.wikipedia.org/wiki/Algebraic_variety',
-  relu:         'https://en.wikipedia.org/wiki/Rectifier_(neural_networks)',
-  multivarGauss:'https://en.wikipedia.org/wiki/Multivariate_normal_distribution',
-  // SLT-specific (DSLT subsections)
+  // Pedagogical explainers
+  kl:           'https://colah.github.io/posts/2015-09-Visual-Information/',                                              // Olah, "Visual Information Theory"
+  hessian:      'https://www.khanacademy.org/math/multivariable-calculus/applications-of-multivariable-derivatives/quadratic-approximations/v/the-hessian',  // 3B1B Khan Academy
+  bayesPost:    'https://www.yudkowsky.net/rational/bayes',                                                               // Yudkowsky's intuitive Bayes
+  asympNormal:  'https://www.stat.cmu.edu/~cshalizi/ADAfaEPoV/',                                                          // Cosma Shalizi
+  relu:         'http://neuralnetworksanddeeplearning.com/chap1.html',                                                    // Michael Nielsen NN&DL Ch 1
+  bayesIntro:   'https://www.youtube.com/watch?v=HZGCoVF3YvM',                                                            // 3B1B Bayes theorem
+  // SLT-context defns: link back to DSLT 1 / DSLT 2 / Carroll thesis where
+  // these concepts are defined for the SLT setting we actually care about.
   rlct:         DSLT1 + '#The_Real_Log_Canonical_Threshold__aka_the_Learning_Coefficient_',
+  fisher:       DSLT1 + '#What_is_a_singular_model_',
+  bic:          DSLT1 + '#Deriving_the_Bayesian_Information_Criterion_only_works_for_regular_models',
+  partition:    DSLT1 + '#Preliminaries_of_SLT',
+  resolution:   DSLT1 + '#Resolution_of_Singularities',
+  normalCross:  DSLT1 + '#The_RLCT_can_be_read_off_when_K_w__is_in_normal_crossing_form',
   fractDim:     DSLT1 + '#An_example_of_fractional_dimension',
   freeEnergy:   DSLT1 + '#Preliminaries_of_SLT',
   wbic:         DSLT2 + '#The_Widely_Applicable_Bayesian_Information_Criterion',
   potentialWell:DSLT2 + '#K_w__is_like_a_potential_well__where_a_lower_RLCT_means_a_flatter_floor',
+  blowup:       'http://therisingsea.org/notes/MSc-Carroll.pdf',                                                          // Carroll thesis (Ch 2 covers blow-ups)
+  variety:      'http://therisingsea.org/notes/MSc-Carroll.pdf',                                                          // Carroll thesis
 };
 
 // Convenience: <a href="X">Y</a>.
@@ -201,7 +206,7 @@ const MODELS = [
     note: `A regular model. The ${a(LINK.fisher, 'Fisher information')} $I(w^{(0)}) = 2\\cdot\\mathrm{diag}(1, 1)$ is positive definite at the unique minimum.`,
     W0: { type: 'points', pts: [[0, 0]] },
     correct: 'point',
-    explanation: `$W_0 = \\{(0,0)\\}$ &mdash; a single point. The ${a(LINK.hessian, 'Hessian')} at the origin is non-degenerate, so the model is <em>regular</em>. The posterior concentrates as a ${a(LINK.multivarGauss, 'Gaussian')} centred at the origin with covariance $\\frac{1}{n}\\,I^{-1}$, exactly as ${a(LINK.asympNormal, 'classical Bayesian asymptotics')} predicts. Local ${a(LINK.rlct, 'RLCT')} $\\lambda = d/2 = 1$.`,
+    explanation: `$W_0 = \\{(0,0)\\}$ &mdash; a single point. The ${a(LINK.hessian, 'Hessian')} at the origin is non-degenerate, so the model is <em>regular</em>. The posterior concentrates as a Gaussian centred at the origin with covariance $\\frac{1}{n}\\,I^{-1}$, exactly as ${a(LINK.asympNormal, 'classical Bayesian asymptotics')} predicts. Local ${a(LINK.rlct, 'RLCT')} $\\lambda = d/2 = 1$.`,
     sourceUrl: DSLT1 + '#What_is_a_singular_model_',
     sourceLabel: 'DSLT 1 §"What is a singular model?"',
   },
@@ -274,7 +279,7 @@ const MODELS = [
     note: `Carroll Example 1.3. Same zero set as the quadratic, but flatter &mdash; and the ${a(LINK.rlct, 'RLCT')} is fractional.`,
     W0: { type: 'points', pts: [0] },
     correct: 'point-1d-flat',
-    explanation: `$W_0 = \\{0\\}$, same as the quadratic, <em>but</em> the volume of $\\{K < \\varepsilon\\}$ scales like $\\varepsilon^{1/4}$ rather than $\\varepsilon^{1/2}$. So the local ${a(LINK.rlct, 'RLCT')} is $\\lambda = 1/4$, and the "effective dimension" $2\\lambda = 1/2$ &mdash; half a dimension. The posterior near $0$ does <em>not</em> converge to a ${a(LINK.multivarGauss, 'Gaussian')}.`,
+    explanation: `$W_0 = \\{0\\}$, same as the quadratic, <em>but</em> the volume of $\\{K < \\varepsilon\\}$ scales like $\\varepsilon^{1/4}$ rather than $\\varepsilon^{1/2}$. So the local ${a(LINK.rlct, 'RLCT')} is $\\lambda = 1/4$, and the "effective dimension" $2\\lambda = 1/2$ &mdash; half a dimension. The posterior near $0$ does <em>not</em> converge to a Gaussian.`,
     sourceUrl: LINK.fractDim,
     sourceLabel: 'DSLT 1 §"An example of fractional dimension"',
   },
