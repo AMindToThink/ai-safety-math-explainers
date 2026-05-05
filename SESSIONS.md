@@ -306,3 +306,44 @@ per session, newest at the bottom. See
   into more widgets would either burn that context unnecessarily
   or, after compaction, risk drift away from the verbatim
   source per the CONTRIBUTING.md compaction warning.
+
+
+## 2026-05-05 18:30 (session — bootstrap third text)
+
+- **Worked on:** texts/nn-verification (bootstrap); module breakdown
+  for the entire 12-chapter book + 1 SOTA bridge module.
+- **What got done:** Bootstrapped the third text in the priority
+  ranking — Albarghouthi (2021), *Introduction to Neural Network
+  Verification* (arXiv:2109.10317). Created texts/nn-verification/
+  with NOTES.md (Source, ingestion plan, prerequisites, scope,
+  pedagogical decisions, secondary sources, cross-references) and
+  source/{download.sh,README.md}. Ran download.sh: arXiv LaTeX
+  e-print and PDF ingested cleanly; α,β-CROWN, auto_LiRPA, and
+  Marabou repos cloned; verifieddeeplearning.com PDF 404 (non-fatal
+  fallback). Read Part I of the book in full from the ingested
+  source (beginning.tex, semantics.tex, correctness.tex) and
+  skimmed Parts II and III chapter headings. Populated NOTES.md
+  Module breakdown with one row per chapter — 12 source-driven
+  modules + 1 bridge module on α,β-CROWN/branch-and-bound (the
+  book pre-dates it) + 1 optional Lyapunov-NN capstone. Default
+  toy system: a 2-input, 1-hidden-layer (2 ReLU), 1-output ReLU
+  net carried across nearly every chapter. Headline active check
+  is the Ch 10 adversarial-or-certificate verification game.
+- **What's next:** Pick `nnv-ch1-motivation` or `nnv-ch2-nn-as-dag`
+  off the breakdown and start a chapter directory under
+  texts/nn-verification/chapters/. Ch 2 has more math grip than
+  Ch 1, but Ch 1 is shorter and a natural first deliverable.
+- **Blockers:** push to origin/main blocked by global
+  "don't push without asking" rule. Three new commits sit on
+  local main: 243f859 (scaffold), 3bfca9a (module breakdown),
+  and the SESSIONS.md commit that follows this entry. Also: there
+  are unrelated uncommitted changes left over in
+  texts/logical-induction/ from a prior session (NOTES.md,
+  ch1 widget, source/download.sh) — left untouched.
+- **Proposed for approval:** all 14 nn-verification module rows
+  in NOTES.md (Module breakdown, Human Approved column blank).
+- **Why stopped:** push gate. Step 4 says never stop with
+  unpushed work; harness denied `git push` per Matthew's
+  global "don't push without asking" rule, so the session ends
+  here cleanly with all work committed locally and waiting for
+  Matthew to authorize the push.
