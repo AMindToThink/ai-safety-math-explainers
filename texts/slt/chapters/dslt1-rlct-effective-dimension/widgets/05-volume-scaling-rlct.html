@@ -1,0 +1,481 @@
+<!--
+  Widget: dslt1-volume-scaling-rlct. Module 5 for DSLT 1 — the chapter's
+  core widget per NOTES.md.
+  Source: DSLT 1 §"Dimensionality as a volume co-dimension" (Carroll 2023);
+          Carroll thesis Ch 3 §3.3 for the same; Watanabe 2009 Theorem 7.1
+          for the V(ε) = c ε^λ asymptotic.
+  Toy system: 1D K(w) = w^{2k} (Carroll Examples 1.3 and 1.4) and 2D
+              normal-crossing K(w₁, w₂) = w₁^{2k₁} w₂^{2k₂} (Carroll Ex 1.5
+              after restriction near a singularity). Same polynomial K
+              family as widgets 1–4 plus an interactive "construct K from
+              target λ" slider.
+  Two active checks:
+    A) Recognise — given K, predict λ before fitting the V(ε) slope.
+    B) Construct — given a target effective dimension 2λ, set k so the
+       slope on the log-log V(ε) plot matches.
+  Both share the same numerical V(ε) machinery: a 1D / 2D grid, count
+  the fraction of grid points with K(w) < ε, multiply by the grid cell
+  size. The fitted slope on the small-ε end of the log-log plot is λ.
+  Standalone: open this .html in a browser. D3 v7 + KaTeX 0.16 from CDN.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SLT companion · DSLT 1 widget 5 · The RLCT as a volume-scaling exponent</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --w0:#d92d20; --muted:#52606d; --ok:#099250; --okbg:#d1fadf; --bad:#b42318; --badbg:#fee4e2; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 980px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; color: var(--ink); }
+  h3 { font-size: 0.95rem; margin-top: 1.2rem; color: var(--ink); }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .controls { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.8rem 0 0.4rem; }
+  .controls button { padding: 0.4rem 0.7rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.85rem; color: var(--ink); }
+  .controls button:hover { background: #eef3f8; }
+  .controls button.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .layout { display: grid; grid-template-columns: 480px 1fr; gap: 1.6rem; align-items: start; margin-top: 0.5rem; }
+  @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+  svg.plot { background: #fff; border: 1px solid #d9e0e7; border-radius: 4px; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  .formula-box { font-size: 1.05rem; padding: 0.4rem 0.6rem; background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; min-height: 2.4rem; }
+  .panel-note { color: var(--muted); font-size: 0.92rem; margin-top: 0.4rem; }
+  .choice { display: block; width: 100%; text-align: left; margin: 0.3rem 0; padding: 0.55rem 0.8rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover { background: #eef3f8; }
+  .choice.correct { background: var(--okbg); border-color: var(--ok); }
+  .choice.wrong { background: var(--badbg); border-color: var(--w0); }
+  .choice:disabled { cursor: default; }
+  .reveal { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.7rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; }
+  .legend { display: flex; gap: 1rem; align-items: center; margin-top: 0.4rem; font-size: 0.86rem; color: var(--muted); flex-wrap: wrap; }
+  .legend-swatch { display: inline-block; width: 18px; height: 4px; vertical-align: middle; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .sources li { margin: 0.15rem 0; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  .mode-tabs { display: flex; gap: 0; margin: 0.6rem 0; border-bottom: 1px solid #d9e0e7; }
+  .mode-tab { padding: 0.5rem 1rem; border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 0.95rem; border-bottom: 3px solid transparent; }
+  .mode-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .slider-row { display: flex; align-items: center; gap: 0.8rem; margin: 0.6rem 0; flex-wrap: wrap; }
+  .slider-row label { font-size: 0.92rem; color: var(--muted); min-width: 0; }
+  .slider-row input[type="range"] { flex: 1; min-width: 220px; max-width: 360px; }
+  .slider-readout { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.95rem; color: var(--ink); min-width: 4rem; }
+  .target-banner { background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; padding: 0.55rem 0.8rem; margin: 0.5rem 0; font-size: 0.95rem; }
+  .target-banner.hit { background: var(--okbg); border-color: var(--ok); }
+  .fi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; margin-top: 0.6rem; }
+  .fi-grid .lab { color: var(--muted); font-size: 0.86rem; }
+  .fi-grid .val { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.95rem; color: var(--ink); }
+</style>
+</head>
+<body>
+
+<h1>The RLCT $\lambda$ as a volume-scaling exponent</h1>
+<p class="subtitle">SLT companion · widget 5 of 7 for <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural"><em>DSLT 1: The RLCT Measures the Effective Dimension of Neural Networks</em></a> by Liam Carroll</p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#Dimensionality_as_a_volume_co_dimension">DSLT 1 §"Dimensionality as a volume co-dimension"</a> &mdash; the volume scaling $V(\varepsilon) \propto \varepsilon^\lambda$ formalism this widget visualises.</li>
+    <li><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#An_example_of_fractional_dimension">DSLT 1 §"An example of fractional dimension"</a> &mdash; Example 1.3 (the $K = w^4$ case where $2\lambda = 1/2$).</li>
+    <li><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#The_RLCT_can_be_read_off_when_K_w__is_in_normal_crossing_form">DSLT 1 §"The RLCT can be read off when K(w) is in normal crossing form"</a> &mdash; the closed-form $\lambda = \min_j 1/(2k_j)$ for normal-crossing $K$, used in this widget's reveal text.</li>
+    <li><a href="http://therisingsea.org/notes/MSc-Carroll.pdf">Liam Carroll, MSc thesis</a> Chapter 3 §3.3 &mdash; the same in long form. Watanabe Grey Book Theorem 7.1 for the rigorous statement.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;">Watanabe defines the <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#The_Real_Log_Canonical_Threshold__aka_the_Learning_Coefficient_">Real Log Canonical Threshold</a> as the scaling exponent of the volume of "almost true" parameters near a singularity:
+    $$ V(\varepsilon) \;=\; \int_{\{w \in W \,:\, K(w) < \varepsilon\}} \varphi(w)\, dw \;\;\sim\;\; c\, \varepsilon^{\lambda}\quad\text{as } \varepsilon \to 0. $$
+  Plot $\log V(\varepsilon)$ against $\log \varepsilon$, read off the slope at small $\varepsilon$, and that is $\lambda$. The "effective dimension" of the model at the singularity is $2\lambda$ &mdash; for regular models $\lambda = d/2$ exactly, but for singular models $\lambda$ can be a <em>fraction</em>: the famous "half a dimension" of $K = w^4$.</p>
+  <p style="margin: 0;"><strong>Recognise mode</strong>: pick a $K$, predict $\lambda$, then watch the slope confirm. <strong>Construct mode</strong>: drag $k$ in $K(w) = w^{2k}$ to match a target effective dimension &mdash; rational targets like $2\lambda = 1/3$ pin down $k$ exactly.</p>
+</div>
+
+<div class="mode-tabs">
+  <button class="mode-tab active" data-mode="recognise">Recognise λ from K</button>
+  <button class="mode-tab" data-mode="construct">Construct K from target λ</button>
+</div>
+
+<!-- ============================== -->
+<!-- RECOGNISE MODE -->
+<!-- ============================== -->
+<div id="mode-recognise">
+  <h2>Pick a loss landscape</h2>
+  <div class="controls" id="model-buttons"></div>
+
+  <div class="layout">
+    <div>
+      <svg class="plot" id="plot-recognise" viewBox="0 0 480 480"></svg>
+      <div class="legend">
+        <span><span class="legend-swatch" style="background:#1a3a8e;"></span> $\log V(\varepsilon)$ vs $\log \varepsilon$</span>
+        <span><span class="legend-swatch" style="background:#2b6cb0; height:0; border-top:2px dashed #2b6cb0;"></span> fitted slope (= $\lambda$)</span>
+      </div>
+    </div>
+    <div>
+      <div class="formula-box" id="formula-recognise"></div>
+      <p class="panel-note" id="model-note"></p>
+
+      <h2>Predict $\lambda$ for this $K$</h2>
+      <div id="choices"></div>
+      <div class="reveal" id="reveal" style="display: none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<!-- CONSTRUCT MODE -->
+<!-- ============================== -->
+<div id="mode-construct" style="display: none;">
+  <p style="margin: 0.5rem 0;">Pick a target effective dimension $2\lambda$, then drag $k$ in $K(w) = w^{2k}$ until the live slope on the log-log plot below matches. By <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#The_RLCT_can_be_read_off_when_K_w__is_in_normal_crossing_form">Carroll's normal-crossing formula</a>, $\lambda = 1/(2k)$, so $2\lambda = 1/k$ &mdash; only integer $k$ gives an exact polynomial $K$.</p>
+
+  <div class="slider-row">
+    <label>Target $2\lambda$:</label>
+    <select id="target-select">
+      <option value="1">1 (regular)</option>
+      <option value="0.5">1/2</option>
+      <option value="0.333333">1/3</option>
+      <option value="0.25">1/4</option>
+      <option value="0.2">1/5</option>
+      <option value="0.166667">1/6</option>
+    </select>
+  </div>
+
+  <div class="slider-row">
+    <label for="k-slider">$k$ in $K = w^{2k}$:</label>
+    <input type="range" id="k-slider" min="1" max="6" step="0.05" value="1">
+    <span class="slider-readout" id="k-readout">k = 1.00</span>
+  </div>
+
+  <div class="target-banner" id="target-banner">Target: $2\lambda = 1.000$, current: $2\lambda \approx ?$</div>
+
+  <div class="layout">
+    <div>
+      <svg class="plot" id="plot-construct" viewBox="0 0 480 480"></svg>
+      <div class="legend">
+        <span><span class="legend-swatch" style="background:#1a3a8e;"></span> current $\log V(\varepsilon)$</span>
+        <span><span class="legend-swatch" style="background:#9a3412; height:0; border-top:2px dashed #9a3412;"></span> target slope (= $1/(2k_{\text{target}})$)</span>
+        <span><span class="legend-swatch" style="background:#2b6cb0; height:0; border-top:2px dashed #2b6cb0;"></span> fitted slope</span>
+      </div>
+    </div>
+    <div>
+      <div class="formula-box" id="formula-construct"></div>
+      <div class="fi-grid">
+        <div class="lab">target $\lambda$</div>          <div class="val" id="target-lambda">0.500</div>
+        <div class="lab">target $2\lambda$</div>         <div class="val" id="target-2lambda">1.000</div>
+        <div class="lab">current $\lambda = 1/(2k)$</div><div class="val" id="current-lambda">0.500</div>
+        <div class="lab">current $2\lambda = 1/k$</div>  <div class="val" id="current-2lambda">1.000</div>
+        <div class="lab">fitted slope</div>              <div class="val" id="fitted-slope">—</div>
+      </div>
+      <p class="panel-note" style="margin-top: 0.7rem;">When $k$ is non-integer the formula $K(w) = w^{2k}$ technically isn't a polynomial; we plot it anyway because the volume integral still has a power-law slope $1/(2k)$. <strong>Only integer $k$ corresponds to an actual polynomial loss landscape</strong>; e.g. $k = 3$ gives $K = w^6$.</p>
+    </div>
+  </div>
+</div>
+
+<p class="footnote">
+  <strong>How $V(\varepsilon)$ is computed.</strong> For 1D $K$: a 4001-point uniform grid on $[-1, 1]$ is used; $V(\varepsilon) = (\#\{w_i : K(w_i) < \varepsilon\}) \cdot \Delta w$. For 2D $K$: a $200 \times 200$ uniform grid on $[-1, 1]^2$, same idea. The slope $\lambda$ is fitted by least squares on the smallest-$\varepsilon$ decade where the asymptotic $V \propto \varepsilon^\lambda$ has time to dominate. For multi-singularity $K$ like $K = (w+1)^2 (w-1)^4$, only the <em>global</em> RLCT (the smaller of the local $\lambda_{c_j} = 1/(2k_j)$) shows in the slope, because the largest singularity dominates the integral as $\varepsilon \to 0$. The 2D normal-crossing case picks up a $(\log 1/\varepsilon)^{m-1}$ multiplicity factor when several $k_j$ tie for the minimum &mdash; that's why the K = ½ w₁² w₂² log-log plot has a slight visible curvature even though the asymptotic slope is exactly $\lambda = 1/2$.
+</p>
+
+<nav class="nav">
+  <a href="https://github.com/AMindToThink/ai-safety-math-explainers/blob/main/texts/slt/chapters/dslt1-rlct-effective-dimension/README.md">&larr; DSLT 1 chapter index</a>
+  <a href="https://github.com/AMindToThink/ai-safety-math-explainers/blob/main/texts/slt/NOTES.md">SLT companion overview &rarr;</a>
+</nav>
+
+<script>
+"use strict";
+
+const KATEX_DELIMITERS = [
+  { left: '$$', right: '$$', display: true },
+  { left: '\\[', right: '\\]', display: true },
+  { left: '$', right: '$', display: false },
+  { left: '\\(', right: '\\)', display: false },
+];
+function typeset(el) { if (window.renderMathInElement) renderMathInElement(el, { delimiters: KATEX_DELIMITERS, throwOnError: false }); }
+
+const DSLT1 = 'https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural';
+
+// ---------------------------------------------------------------------------
+// MODELS for recognise mode. Same toy K family as widgets 1–4 (with three
+// extras drawn from the RLCT-relevant section).
+// Each model: id, name, dim (1 or 2), tex, f, lambda (analytic), choices,
+//             explanation.
+// ---------------------------------------------------------------------------
+const MODELS = [
+  // 1D
+  { id: 'reg-1d', name: 'K = w² (1D regular)', dim: 1, tex: 'K(w) = w^2', f: w => w*w, lambda: 0.5,
+    choices: [1/4, 1/2, 1], correct: 1/2,
+    explanation: `The regular 1D case: $\\lambda = d/2 = 1/2$. The asymptotic behaviour $V(\\varepsilon) = \\int 1[w^2 < \\varepsilon]\\, dw = 2\\sqrt{\\varepsilon}$ has slope exactly $1/2$ on a log-log plot.` },
+  { id: 'quartic-1d', name: 'K = w⁴ (Ex 1.3)', dim: 1, tex: 'K(w) = w^4', f: w => w*w*w*w, lambda: 0.25,
+    choices: [1/4, 1/2, 1], correct: 1/4,
+    explanation: `Carroll Example 1.3 &mdash; the canonical "fractional dimension" demo. $V(\\varepsilon) = \\int 1[w^4 < \\varepsilon]\\, dw = 2\\varepsilon^{1/4}$, so $\\lambda = 1/4$ and the effective dimension is $2\\lambda = 1/2$. Half a dimension.` },
+  { id: 'sextic-1d', name: 'K = w⁶ (1D, k=3)', dim: 1, tex: 'K(w) = w^6', f: w => Math.pow(w, 6), lambda: 1/6,
+    choices: [1/3, 1/4, 1/6], correct: 1/6,
+    explanation: `By the normal-crossing formula $\\lambda = 1/(2k)$ with $k = 3$, so $\\lambda = 1/6$. Effective dimension $2\\lambda = 1/3$. The slope on the log-log plot tightens to $0.167$.` },
+  { id: 'dual-1d', name: 'K = (w+1)²(w-1)⁴ (DSLT 2 Ex 1)', dim: 1,
+    tex: 'K(w) = (w+1)^2 (w-1)^4', f: w => (w+1)*(w+1) * Math.pow(w-1, 4), lambda: 0.25,
+    choices: [1/4, 1/2, 1], correct: 1/4,
+    explanation: `Two singularities. Local RLCTs: $\\lambda_{-1} = 1/2$ (from $(w+1)^2$, so $k = 1$), $\\lambda_{+1} = 1/4$ (from $(w-1)^4$, so $k = 2$). The <em>global</em> RLCT is $\\lambda = \\min(\\lambda_{-1}, \\lambda_{+1}) = 1/4$ &mdash; the slowest singularity dominates as $\\varepsilon \\to 0$. This is why the $K = w^4$ side of the dual landscape "wins" in widget 2's posterior race.` },
+  // 2D
+  { id: 'reg-2d', name: 'K = w₁² + w₂² (2D regular)', dim: 2, tex: 'K(w_1, w_2) = w_1^2 + w_2^2', f: (x,y) => x*x + y*y, lambda: 1.0,
+    choices: [1/2, 1, 2], correct: 1,
+    explanation: `2D regular: $\\lambda = d/2 = 1$. $V(\\varepsilon) = \\pi \\varepsilon$ (the area of a disc of radius $\\sqrt{\\varepsilon}$), so the slope is exactly $1$.` },
+  { id: 'min-sing-2d', name: 'K = w₁² (Ex 1.1)', dim: 2, tex: 'K(w_1, w_2) = w_1^2', f: (x,y) => x*x, lambda: 0.5,
+    choices: [1/4, 1/2, 1], correct: 1/2,
+    explanation: `Minimally singular: $w_2$ is free. Volume scaling is set by the $w_1$ direction alone, giving $V(\\varepsilon) = 2\\sqrt{\\varepsilon} \\cdot |W|_{w_2} \\propto \\varepsilon^{1/2}$, so $\\lambda = 1/2$. This is Watanabe's "$\\lambda = d_1/2$" for the $d_1 = 1$ non-free direction.` },
+  { id: 'cross-2d', name: 'K = ½ w₁² w₂² (Ex 1.2)', dim: 2,
+    tex: 'K(w_1, w_2) = \\tfrac{1}{2} w_1^2 w_2^2', f: (x,y) => 0.5*x*x*y*y, lambda: 0.5,
+    choices: [1/4, 1/2, 1], correct: 1/2,
+    explanation: `Already in normal-crossing form: $K \\propto w_1^2 w_2^2$, so $k_1 = k_2 = 1$ and $\\lambda = \\min(1/2, 1/2) = 1/2$ with multiplicity $m = 2$. The volume includes a logarithmic correction $V(\\varepsilon) \\sim \\varepsilon^{1/2} \\log(1/\\varepsilon)$ that you can see as a slight curvature on the log-log plot.` },
+  { id: 'ex15-2d', name: 'K = w₁⁴ w₂² near origin (Ex 1.5 local)', dim: 2,
+    tex: 'K(w_1, w_2) = w_1^4 w_2^2', f: (x,y) => Math.pow(x, 4) * y*y, lambda: 0.25,
+    choices: [1/4, 1/2, 1], correct: 1/4,
+    explanation: `Carroll Example 1.5 restricted near the origin singularity. Normal-crossing form gives $k_1 = 2, k_2 = 1$, so $\\lambda = \\min(1/4, 1/2) = 1/4$. The $w_1$ direction (with the higher exponent) is the slow direction that controls the volume scaling.` },
+];
+
+// ---------------------------------------------------------------------------
+// VOLUME COMPUTATION
+// ---------------------------------------------------------------------------
+function volume1D(K, eps, lo = -1, hi = 1, N = 4001) {
+  const dw = (hi - lo) / (N - 1);
+  let count = 0;
+  for (let i = 0; i < N; i++) {
+    const w = lo + i * dw;
+    if (K(w) < eps) count++;
+  }
+  return count * dw;
+}
+
+function volume2D(K, eps, lo = -1, hi = 1, N = 200) {
+  const dw = (hi - lo) / (N - 1);
+  let count = 0;
+  for (let i = 0; i < N; i++) {
+    const x = lo + i * dw;
+    for (let j = 0; j < N; j++) {
+      const y = lo + j * dw;
+      if (K(x, y) < eps) count++;
+    }
+  }
+  return count * dw * dw;
+}
+
+// epsilons log-spaced from 1e-5 to 0.5 (for fitting we use the lowest ~10).
+function buildEpsilons() {
+  const eps = [];
+  for (let p = -5; p <= -0.3; p += 0.15) eps.push(Math.pow(10, p));
+  return eps;
+}
+
+function computeCurve(model) {
+  const eps = buildEpsilons();
+  const Vs = eps.map(e => model.dim === 1 ? volume1D(model.f, e) : volume2D(model.f, e));
+  // Discard any points where V is 0 (count was 0 → log undefined).
+  const out = [];
+  for (let i = 0; i < eps.length; i++) {
+    if (Vs[i] > 0) out.push({ eps: eps[i], V: Vs[i], logEps: Math.log10(eps[i]), logV: Math.log10(Vs[i]) });
+  }
+  return out;
+}
+
+function fitSlope(curve, useLastN = 10) {
+  const tail = curve.slice(0, Math.min(useLastN, curve.length));   // smallest eps comes first
+  if (tail.length < 2) return NaN;
+  const xm = d3.mean(tail, d => d.logEps);
+  const ym = d3.mean(tail, d => d.logV);
+  let num = 0, den = 0;
+  for (const d of tail) {
+    num += (d.logEps - xm) * (d.logV - ym);
+    den += (d.logEps - xm) ** 2;
+  }
+  return num / den;
+}
+
+// ---------------------------------------------------------------------------
+// PLOT
+// ---------------------------------------------------------------------------
+function drawLogLog(svgSel, curve, slope, options = {}) {
+  const { targetSlope = null, label = null, color = '#1a3a8e' } = options;
+  const W = 480, H = 480, padL = 56, padB = 44, padT = 18, padR = 18;
+  svgSel.selectAll('*').remove();
+
+  if (curve.length === 0) {
+    svgSel.append('text').attr('x', W/2).attr('y', H/2).attr('text-anchor', 'middle').attr('fill', '#666').text('V(ε) = 0 on the grid; try a larger ε range.');
+    return;
+  }
+
+  const xExt = d3.extent(curve, d => d.logEps);
+  const yExt = d3.extent(curve, d => d.logV);
+  const x = d3.scaleLinear().domain(xExt).range([padL, W - padR]).nice();
+  const y = d3.scaleLinear().domain(yExt).range([H - padB, padT]).nice();
+  svgSel.append('g').attr('class', 'axis').attr('transform', `translate(0, ${H - padB})`).call(d3.axisBottom(x).ticks(5).tickFormat(d => `10^${d}`));
+  svgSel.append('g').attr('class', 'axis').attr('transform', `translate(${padL}, 0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d => `10^${d}`));
+  svgSel.append('text').attr('class', 'axis-label').attr('x', W - padR).attr('y', H - 8).attr('text-anchor', 'end').text('ε');
+  svgSel.append('text').attr('class', 'axis-label').attr('x', padL + 6).attr('y', padT + 4).text('V(ε)');
+
+  // Fitted line.
+  if (Number.isFinite(slope)) {
+    // Use the curve's small-ε end to fix the line.
+    const c0 = curve[0];
+    const intercept = c0.logV - slope * c0.logEps;
+    const xs = [xExt[0], xExt[1]];
+    const ys = xs.map(xv => slope * xv + intercept);
+    svgSel.append('line').attr('x1', x(xs[0])).attr('y1', y(ys[0])).attr('x2', x(xs[1])).attr('y2', y(ys[1]))
+      .attr('stroke', color).attr('stroke-width', 1.4).attr('stroke-dasharray', '6 4');
+  }
+  // Target line.
+  if (targetSlope !== null && Number.isFinite(targetSlope)) {
+    const c0 = curve[0];
+    const intercept = c0.logV - targetSlope * c0.logEps;
+    const xs = [xExt[0], xExt[1]];
+    const ys = xs.map(xv => targetSlope * xv + intercept);
+    svgSel.append('line').attr('x1', x(xs[0])).attr('y1', y(ys[0])).attr('x2', x(xs[1])).attr('y2', y(ys[1]))
+      .attr('stroke', '#9a3412').attr('stroke-width', 1.6).attr('stroke-dasharray', '8 5');
+  }
+  // Curve points.
+  svgSel.selectAll('circle').data(curve).join('circle')
+    .attr('cx', d => x(d.logEps)).attr('cy', d => y(d.logV)).attr('r', 3.2)
+    .attr('fill', color).attr('opacity', 0.85);
+
+  // Slope label.
+  if (label) {
+    svgSel.append('text').attr('x', W - padR - 8).attr('y', padT + 18).attr('text-anchor', 'end')
+      .attr('fill', color).attr('font-size', 12).text(label);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// RECOGNISE-MODE WIRING
+// ---------------------------------------------------------------------------
+let currentModel = MODELS[0];
+let answered = false;
+
+function buildModelButtons() {
+  const root = d3.select('#model-buttons');
+  root.selectAll('button').data(MODELS).join('button')
+    .text(m => m.name).classed('active', m => m.id === currentModel.id)
+    .on('click', (_, m) => { currentModel = m; answered = false; renderRecognise(); });
+}
+
+function buildRecogniseChoices() {
+  const root = d3.select('#choices');
+  root.selectAll('*').remove();
+  d3.select('#reveal').style('display', 'none');
+  for (const c of currentModel.choices) {
+    const fracTeX = approxFracTeX(c);
+    const btn = root.append('button').attr('class', 'choice').html(`$\\lambda = ${fracTeX}$`);
+    btn.on('click', function () {
+      if (answered) return;
+      answered = true;
+      const buttons = root.selectAll('button').nodes();
+      buttons.forEach((b, i) => {
+        b.disabled = true;
+        if (Math.abs(currentModel.choices[i] - currentModel.correct) < 1e-9) b.classList.add('correct');
+        else if (b === this) b.classList.add('wrong');
+      });
+      revealRecognise();
+    });
+  }
+  typeset(root.node());
+}
+
+function approxFracTeX(x) {
+  // 1, 1/2, 1/3, 1/4, 1/5, 1/6, 2 — the only values we use.
+  if (Math.abs(x - 1) < 1e-9) return '1';
+  if (Math.abs(x - 2) < 1e-9) return '2';
+  for (let n = 2; n <= 12; n++) {
+    if (Math.abs(x - 1/n) < 1e-9) return `1/${n}`;
+  }
+  return x.toFixed(3);
+}
+
+function revealRecognise() {
+  const curve = computeCurve(currentModel);
+  const slope = fitSlope(curve);
+  drawLogLog(d3.select('#plot-recognise'), curve, slope, {
+    label: `fitted slope ≈ ${slope.toFixed(3)} (true λ = ${approxFracTeX(currentModel.lambda)})`
+  });
+  const reveal = d3.select('#reveal');
+  reveal.style('display', 'block').html(currentModel.explanation);
+  typeset(reveal.node());
+}
+
+function renderRecognise() {
+  d3.select('#model-buttons').selectAll('button').classed('active', m => m.id === currentModel.id);
+  d3.select('#formula-recognise').html(`$$ ${currentModel.tex} $$`);
+  typeset(document.getElementById('formula-recognise'));
+  d3.select('#model-note').html(`A ${currentModel.dim}D model from the chapter's toy family. Predict $\\lambda$ before clicking, then reveal the fitted slope.`);
+  typeset(document.getElementById('model-note'));
+  // Plot a faint preview of the curve before reveal so the reader can already see the shape.
+  const curve = computeCurve(currentModel);
+  const slope = fitSlope(curve);
+  drawLogLog(d3.select('#plot-recognise'), curve, slope, { label: 'pick an answer to see the slope' });
+  buildRecogniseChoices();
+}
+
+// ---------------------------------------------------------------------------
+// CONSTRUCT MODE
+// ---------------------------------------------------------------------------
+function renderConstruct() {
+  const k = parseFloat(document.getElementById('k-slider').value);
+  const target = parseFloat(document.getElementById('target-select').value);   // target 2λ
+  const targetLambda = target / 2;
+  const targetK = 1 / target;            // since 2λ = 1/k ⇒ k = 1/target
+
+  d3.select('#k-readout').text(`k = ${k.toFixed(2)}`);
+  d3.select('#formula-construct').html(`$$ K(w) = w^{${(2*k).toFixed(2)}} $$`);
+  typeset(document.getElementById('formula-construct'));
+
+  const lambda = 1 / (2 * k);
+  d3.select('#current-lambda').text(lambda.toFixed(3));
+  d3.select('#current-2lambda').text((2 * lambda).toFixed(3));
+  d3.select('#target-lambda').text(targetLambda.toFixed(3));
+  d3.select('#target-2lambda').text(target.toFixed(3));
+
+  const f = w => Math.pow(Math.abs(w), 2 * k);
+  const model = { dim: 1, f };
+  const curve = computeCurve(model);
+  const slope = fitSlope(curve);
+  d3.select('#fitted-slope').text(Number.isFinite(slope) ? slope.toFixed(3) : '—');
+
+  const banner = d3.select('#target-banner');
+  const hit = Math.abs(2 * lambda - target) < 0.01;
+  banner.classed('hit', hit);
+  banner.html(`Target: $2\\lambda = ${target.toFixed(3)}$, current: $2\\lambda = ${(2*lambda).toFixed(3)}$ ${hit ? '&mdash; <strong>match!</strong>' : `&mdash; try $k \\approx ${targetK.toFixed(2)}$`}`);
+  typeset(banner.node());
+
+  drawLogLog(d3.select('#plot-construct'), curve, slope, {
+    targetSlope: targetLambda,
+    label: `fitted slope ≈ ${slope.toFixed(3)} | target slope = ${targetLambda.toFixed(3)}`
+  });
+}
+
+// Mode switching.
+function setMode(mode) {
+  document.getElementById('mode-recognise').style.display = (mode === 'recognise') ? 'block' : 'none';
+  document.getElementById('mode-construct').style.display = (mode === 'construct') ? 'block' : 'none';
+  document.querySelectorAll('.mode-tab').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  if (mode === 'recognise') renderRecognise();
+  else renderConstruct();
+}
+
+function init() {
+  buildModelButtons();
+  document.querySelectorAll('.mode-tab').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  document.getElementById('k-slider').addEventListener('input', renderConstruct);
+  document.getElementById('target-select').addEventListener('change', renderConstruct);
+  setMode('recognise');
+  typeset(document.body);
+}
+
+init();
+</script>
+</body>
+</html>

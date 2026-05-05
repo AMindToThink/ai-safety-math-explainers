@@ -60,7 +60,7 @@ Status definitions match `texts/slt/NOTES.md`:
 | 2 | [`dslt1-singular-posterior`](widgets/02-singular-posterior.html) | drafted |
 | 3 | [`dslt1-fisher-degeneracy`](widgets/03-fisher-degeneracy.html) | drafted |
 | 4 | [`dslt1-bic-derivation`](widgets/04-bic-derivation.html) | drafted |
-| 5 | `dslt1-volume-scaling-rlct` | not started |
+| 5 | [`dslt1-volume-scaling-rlct`](widgets/05-volume-scaling-rlct.html) | drafted |
 | 6 | `dslt1-normal-crossing-game` | not started |
 | 7 | `dslt1-resolution-primer` | not started |
 | 8 | `dslt1-wbic-vs-bic` | not started |
@@ -120,6 +120,32 @@ A 1-hidden-unit ReLU regressor (with target $0$ and $x \sim
 \mathcal{N}(0, 1)$) appears as a final preset and recovers Example
 1.2 verbatim, demonstrating the Carroll thesis Lemma 3.2 result that
 ReLU networks are strictly singular.
+
+### Module 5 — `dslt1-volume-scaling-rlct`
+
+[`widgets/05-volume-scaling-rlct.html`](widgets/05-volume-scaling-rlct.html)
+is the chapter's core widget. The RLCT $\lambda$ is defined as the
+scaling exponent of $V(\varepsilon) = \mathrm{vol}\{w : K(w) < \varepsilon\}$
+near a singularity: $V(\varepsilon) \sim c\, \varepsilon^{\lambda}$,
+so a log-log plot of $V$ against $\varepsilon$ has slope $\lambda$ at
+small $\varepsilon$. The widget computes $V(\varepsilon)$ numerically
+on a fine grid and fits the slope, matching Carroll's analytical
+$\lambda = 1/(2k)$ for $K = w^{2k}$ and the normal-crossing
+formula $\lambda = \min_j 1/(2k_j)$ for products.
+
+Two modes:
+
+1. <strong>Recognise.</strong> Eight presets (the chapter's toy K
+   family + Carroll Examples 1.3–1.5). Predict $\lambda$ from the
+   options before the slope is shown.
+2. <strong>Construct.</strong> Drag $k$ in $K(w) = w^{2k}$ to match
+   a target effective dimension $2\lambda \in \{1, 1/2, 1/3, 1/4, 1/5, 1/6\}$.
+   The fitted slope tracks $1/(2k)$ live, and only integer $k$
+   corresponds to an actual polynomial (e.g. $k = 3$ gives $K = w^6$).
+
+The "fractional dimension" intuition lands here: for $K = w^4$ the
+effective dimension is $2\lambda = 1/2$ &mdash; exactly the half-a-dimension
+that motivates the RLCT in the first place.
 
 ### Module 4 — `dslt1-bic-derivation`
 
