@@ -16,3 +16,6 @@ venv/
 node_modules/
 .DS_Store
 *.log
+
+# Smoke-test screenshots produced by scripts/widget-smoke-test.py
+*.smoke.png
