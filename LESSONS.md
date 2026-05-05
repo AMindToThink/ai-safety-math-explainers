@@ -199,19 +199,34 @@ current slug and update `download.sh`.
 
 ## Sandbox / environment
 
-### `git push` to GitHub does not work from this sandbox
+### `git push` to GitHub: token-based HTTPS auth
 
-As of session 2026-05-05 (the third on this repo), the autonomous
-environment has no GitHub credentials: no SSH keys in `~/.ssh`, no
-`gh` CLI installed, no `credential.helper` configured. `git push`
-fails with `could not read Username for 'https://github.com'`.
+As of session 2026-05-05 (fourth on this repo), Matthew configured
+a fine-grained Personal Access Token at `~/.git-credentials` with
+`credential.helper=store` (set globally in `~/.gitconfig`). `git
+push` from the sandbox now works.
 
-Commits accumulate locally and are pulled / pushed by Matthew or
-by the next session that runs in an environment with auth. *Don't*
-try to fix this from inside the session (no, you can't `gh auth
-login` non-interactively, and you should not be writing tokens to
-the filesystem). Document the unpushed-state in `SESSIONS.md` under
-"Why stopped" and move on.
+If a future session sees `could not read Username for
+'https://github.com'`:
+
+- Check `~/.git-credentials` exists and is `chmod 600`.
+- Check `git config --global credential.helper` returns `store`.
+- If the file is gone or the token was rotated, ask Matthew for a
+  new one rather than improvising.
+
+If `git push` returns `Permission ... denied to AMindToThink` (HTTP
+403) even though the token authenticates: the token is a
+fine-grained PAT and is missing **Repository permissions →
+Contents → Read and write**. The `permissions` block returned by
+`GET /repos/...` reports the *user's* role on the repo (which is
+admin for AMindToThink), not what the token itself may do; you
+need to inspect the token's own scopes via the GitHub UI. Ask
+Matthew to update the token; the same `~/.git-credentials` entry
+will then start working.
+
+The token is stored *outside* the repo (in `$HOME`) so it cannot
+be accidentally committed. Don't ever write the token into a
+file under the repo tree.
 
 ### apt mirror flakiness
 
