@@ -208,11 +208,175 @@ plan-approval gate. The "Human Review" column points to the GitHub
 issue tracking human review of the implementation, when one exists.
 See `CONTRIBUTING.md` for issue conventions.
 
+**First batch (Chapters 1–3 of the paper: motivation + the
+criterion + properties).** Rows below are proposed by the
+autonomous session on 2026-05-05; see "Proposed for approval" in
+the corresponding `SESSIONS.md` entry. The Toy system column lists
+the *primary* toy for the widget; secondaries appear in the
+justification. Section/page references are to arXiv:1609.03543v3.
+
 | Source location | Module slug | Toy system | Active check | Status | Human Review |
 |-----------------|-------------|------------|--------------|--------|--------------|
-|                 |             |            |              |        |              |
+| §1 Introduction (motivation, π-digit) | `li-ch1-pi-digit-paradox` | Bayesian forced into `P(π[87653]=7) ≥ P(1+1=2)` | Predict-then-reveal: pick the inequality the laws of probability force; build a logical inductor whose price for π[87653]=7 floats below 1 | proposed | |
+| §1 + Table 1 of desiderata | `li-ch1-desiderata-tour` | The 17 desiderata as nodes in a compatibility graph (Sawin impossibility, etc.) | Click any subset of desiderata; widget reports whether the subset is achievable, and if not, names the impossibility result | proposed | |
+| §3.1 Markets + Table 1 (worked bets) | `li-ch2-market-trader-sandbox` | The §3.5 market: prices on `1+1=2`, `1+1≠2`, "Goldbach" | Design a trader (linear combination of buy/sell features); widget steps through n days, animates net worth in plausible worlds | proposed | |
+| §3.2 Deductive processes | `li-ch2-deductive-process` | Tiny PA-fragment deductive process; `dt_n` as theorems-provable-in-≤n-chars | Drag n; predict which p.c.-worlds get ruled out at each step; identify the day at which `dt_n` rules out an irrational world | proposed | |
+| §3.4 Traders (continuity + the χ paradox) | `li-ch2-continuity-paradox` | The paradoxical sentence χ := "I am true iff my price < 50¢" | Toggle continuous vs discontinuous trading strategies; show the no-fixed-point failure for discontinuous, the fixed-point existence (Brouwer) for continuous | proposed | |
+| §3.5 Exploitation | `li-ch2-exploit-or-not` | Five toy markets, only some exploitable | Multiple-choice with verification: pick the trader (from 3 candidates) that exploits a given market; widget runs each and shows realised value over n | proposed | |
+| §3.5 Exploitation + arbitrage example | `li-ch2-arbitrage-pair` | The φ vs ¬¬φ arbitrage (paper p. 22) | Watch a trader profit by buying the cheaper of {φ, ¬¬φ} and selling the more expensive on each day; predict the day at which the arbitrage closes | proposed | |
+| §4.1 Convergence theorem | `li-ch3-convergence` | A market that oscillates `p_n(φ) ∈ [0.3, 0.7]` indefinitely | Sketch the buy-low/sell-high trader (the convergence proof); watch its net worth tend to ∞; conclude the market cannot be a logical inductor | proposed | |
+| §4.1 Limit coherence (the three Gaifman conditions) | `li-ch3-limit-coherence` | Three minimal counterexamples: T⊢φ but p<1; T⊢¬φ but p>0; T⊢¬(φ∧ψ) but linearity broken | Build a trader exploiting each violation; predict the order in which the three violations earn money | proposed | |
+| §4.2 Provability induction (Ramanujan/Hardy) | `li-ch3-provability-induction` | `prg(n) ∈ {0,1,2}` example: provable per-n, EC sequence, `dt_n` slow | Tune f(n) (the runtime of `prg`); watch p_n(φ_n) → 1 ahead of `dt_n` resolving each φ_n; identify the diagonal-day at which the inductor "trusts Ramanujan" | proposed | |
+| §4.4 Calibration + correlated-cluster example | `li-ch3-calibration-cluster` | The `clusters_n` sequence with cluster sizes 1, 10, 100, 1000, ... | Drag cluster ratios; observe that empirical-frequency calibration oscillates eternally; the inductor's *marginal* p_n stays at 50% throughout — the right answer | proposed | |
+| §4.3 Statistical-pattern learning | `li-ch3-pi-statistical` | π-digit prediction; `(π[Ack(n,n)]=7)_n` | Compare three hypothetical reasoners' price trajectories; predict the limit price (≈ 0.1) of the inductor when digits are pseudorandom | proposed | |
+| §5.1–§5.4 LIA construction (MarketMaker → Budgeter → TradingFirm → LIA) | `li-ch4-lia-walkthrough` | Tiny PA-fragment + 3-trader enumeration | Step-through animator: pick a day, see MarketMaker's fixed-point search, Budgeter cap, TradingFirm aggregation, and the resulting belief state | proposed | |
+| §6.12 Self-trust (Löb-shaped) | `li-ch3-self-trust` | "$\\mathbb{P}_n(\\phi) \\to \\mathbb{P}_n(\\mathbb{P}_m(\\phi))$" trust statements | Predict-then-reveal: which Löb-style fixed-point obstructs naive self-reference, and how does an inductor route around it? Stretch module — depends on §6.10/§6.12 read. | proposed | |
 
-(Module rows will be proposed after the §1–§3 read.)
+### Module justifications
+
+- `li-ch1-pi-digit-paradox` — anchors Chapter 1's central claim:
+  classical probability *forces* a perfect Bayesian to be at least
+  as confident in `π[87653]=7` as in `1+1=2`, because in fact
+  `(1+1=2) ⇒ π[87653]=7`. Most readers do not feel the bite of
+  this until they see it as a forced inequality. Builds the
+  Bayesianism-over-mathematics framing and exposes the logical-
+  uncertainty problem before any new formalism appears.
+- `li-ch1-desiderata-tour` — the introduction lists 17 desiderata
+  (Computable Approximability, Coherence, Approximate Coherence,
+  Statistical Patterns, Calibration, Non-Dogmatism, Uniform
+  Non-Dogmatism, Universal Inductivity, Approximate Bayesianism,
+  Introspection, Self-Trust, Approximate Inexploitability,
+  Gaifman Inductivity, Efficiency, Decision Rationality,
+  Counterpossibles, Old Evidence). Many are jointly incompatible
+  (Sawin: 1+6+13+weak-2 are inconsistent). A clickable
+  "compatibility graph" lets the reader feel which desiderata LI
+  actually meets and why a few must be dropped. Exits the
+  introduction with an honest map of the design space.
+- `li-ch2-market-trader-sandbox` — *the* central widget for the
+  paper. The Table 1 toy market (φ:=1+1=2 at 90¢, ψ:=1+1≠2 at 5¢,
+  χ:="Goldbach" at 98¢) is exactly the worked example in §3.4
+  (paper p. 19). Reader writes a trading strategy as a small
+  affine combination of price features and watches realized value
+  evolve in plausible worlds. This widget is where the
+  trader-market framing lands; reused by exploitation / arbitrage
+  / convergence widgets downstream. One toy carried across the
+  chapter, per project policy.
+- `li-ch2-deductive-process` — `D` is one of two new objects in
+  §3 (the other is the trader). A small PA-fragment example with
+  `dt_n` = theorems-provable-in-≤n-characters lets the reader
+  *see* `pcworlds(dt_n)` shrink. Sets up the "exploitation
+  relative to a deductive process" framing used later.
+- `li-ch2-continuity-paradox` — the paragraph at p. 18 about the
+  paradoxical χ := "I am true iff my price < 50¢" is one of the
+  most frequently misunderstood corners of the paper. A widget
+  that lets the reader toggle continuous vs discontinuous trading
+  and see the no-fixed-point failure / Brouwer success makes the
+  motivation for the continuity constraint visceral. Connects
+  forward to §6.11 introspection.
+- `li-ch2-exploit-or-not` — multiple-choice with verification; a
+  good warm-up before the sandbox. Three candidate traders, one
+  market; learner picks the exploiting trader; widget runs each
+  and animates plausible-world bounds. Active-check pattern from
+  the project's pedagogy section.
+- `li-ch2-arbitrage-pair` — the (φ ∨ ψ)-but-neither-decidable
+  example on p. 22 is the cleanest demonstration that
+  exploitation does *not* require any sentence to ever resolve.
+  Widget shows two prices drifting until provability of (φ ∨ ψ)
+  collapses the bound. Gateway to limit-coherence intuition.
+- `li-ch3-convergence` — the convergence theorem's proof sketch
+  (p. 24) is the cleanest "exploit the inefficiency" argument in
+  the paper. Animating an oscillating market and showing the
+  buy-low/sell-high trader earning ε every cycle nails the
+  pedagogical pattern that recurs throughout §4: every property
+  is enforced because its violation is exploitable.
+- `li-ch3-limit-coherence` — the three Gaifman conditions
+  (T⊢φ→p_∞=1; T⊢¬φ→p_∞=0; T⊢¬(φ∧ψ)→linearity) each have a clean
+  exploit-on-violation. Build all three traders, watch them earn,
+  conclude the prices must be coherent in the limit. Three
+  framings of one theorem reinforces the project's
+  "multiple-framings" rule.
+- `li-ch3-provability-induction` — §4.2 Theorem `provind` is the
+  paper's signature result. Ramanujan/Hardy is the right
+  metaphor; the `prg(n)∈{0,1,2}` example is the right toy.
+  Reader tunes the runtime of `prg`; the inductor's diagonal
+  `p_n(φ_n)` rises to 1 ahead of the deductive process. The
+  "outpacing deduction" claim becomes visceral.
+- `li-ch3-calibration-cluster` — the `clusters_n` example on
+  p. 35 is the paper's most pedagogically valuable demonstration
+  of a counter-intuitive fact: you can be *correct* (assigning
+  50% to coin-flip-like sequences) while being *miscalibrated*
+  in the empirical-frequency sense. Drag the cluster ratio;
+  watch calibration oscillate between 1 and 0; the inductor's
+  marginal stays right.
+- `li-ch3-pi-statistical` — §4.3 Theorem `prand` is the paper's
+  formal statement of "if a sequence is pseudorandom relative
+  to all polynomial-time predictors of comparable complexity,
+  the inductor will price it at the empirical frequency." The
+  π-Ackermann-digit example is the running canonical case; this
+  widget makes the convergence to 0.1 visible.
+- `li-ch4-lia-walkthrough` — the construction chapter (§5) is
+  the algorithmic heart of the paper. Most readers stall here
+  because MarketMaker, Budgeter, and TradingFirm are introduced
+  in tight succession without a worked example. A
+  step-through-an-animator widget on a tiny PA-fragment + 3
+  enumerated traders earns its keep more than any other module.
+  Capstone for chapter 4.
+- `li-ch3-self-trust` — Stretch. §6.12 introduces a Löb-shaped
+  self-trust statement that has its own decade-long literature.
+  Worth a widget eventually, but only after §4 + §5 are in.
+  Marked proposed so the row exists; implementation deferred.
+
+### Lean Game Server module (`lean-game/`)
+
+Per Matthew's explicit ask this session: scaffold a Lean 4 +
+GameServer project where the central skill is "construct a trader
+that exploits a Dutch-bookable market." Initial level slate:
+
+- **World 1: Buying and selling (warm-up).** Net cash + share value
+  is invariant under "fair" trades at the listed prices. Reader
+  proves the basic conservation law for a single trade.
+- **World 2: Persistent mispricing.** The 1+1=2 market priced at
+  50¢ forever. Reader constructs an explicit trader that earns
+  unbounded plausible value, and Lean checks the proof.
+- **World 3: Arbitrage.** Reader constructs the φ vs ¬¬φ
+  arbitrage trader and proves it has bounded losses but
+  unbounded gains.
+- **World 4: Coherence enforcement.** Reader proves that if a
+  market satisfies p(φ) + p(¬φ) = 1 in the limit, no naive
+  arbitrage trader of the kind built in World 3 can exploit it.
+  (Optional / stretch.)
+
+Lean game lives at `texts/logical-induction/lean-game/` until it's
+ready to publish on `adam.math.hhu.de`, at which point it moves
+to its own GitHub repo per `CONTRIBUTING.md`.
+
+### Notes on toys and framings
+
+- **Default chapter-level toys:**
+  - **π-digit toy:** the `(π[n]=k)` family (and its Ackermann
+    cousin for the pseudorandom-statistics modules). Used in
+    `li-ch1-pi-digit-paradox`, `li-ch3-pi-statistical`, and a
+    cameo in `li-ch3-provability-induction`.
+  - **PA-fragment toy:** a small Peano-arithmetic-fragment
+    deductive process where `dt_n` = theorems-provable-in-≤n-chars.
+    Used in `li-ch2-deductive-process`, `li-ch2-market-trader-
+    sandbox`, `li-ch3-convergence`, `li-ch4-lia-walkthrough`.
+- **Framings used in this batch:**
+  1. **Trader-market** (algorithmic) — ch2-market-trader-sandbox,
+     ch2-exploit-or-not, ch2-arbitrage-pair, ch3-convergence,
+     ch3-limit-coherence (each "exploit the violation"
+     construction), ch4-lia-walkthrough.
+  2. **Dutch-book / coherence** (decision-theoretic) —
+     ch1-desiderata-tour (Approximate Inexploitability),
+     ch3-limit-coherence.
+  3. **Probability over mathematics** —
+     ch1-pi-digit-paradox (the "P(A) ≤ P(B) when A ⇒ B" trap),
+     ch3-pi-statistical, ch3-calibration-cluster.
+  4. **Untrollability / robustness** — ch2-continuity-paradox,
+     ch3-self-trust.
+  All four framings are exercised in the first batch. Per project
+  policy each central concept gets ≥ 2; the central concept
+  here ("the LI criterion") gets all four.
 
 ## Pedagogical decisions
 
