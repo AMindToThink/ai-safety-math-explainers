@@ -101,7 +101,7 @@ You may NOT autonomously:
 
 If two tasks tie at the same priority, prefer the text with the fewest
 completed modules (favor breadth across the project). If still tied,
-prefer the alphabetically first text slug.
+take your pick based on your own interests.
 
 ## Step 3: Do the work
 
@@ -176,22 +176,5 @@ Don't:
 
 When you need human eyes on something, open a GitHub issue rather than
 blocking. See `CONTRIBUTING.md` for issue conventions.
-
-## Voice reminder
-
-When writing prose for the explainers, Matthew's voice preferences (from
-his standing instructions) apply:
-
-- Avoid em dashes in any text that might be shared. Use periods,
-  semicolons, or parentheses instead.
-- Avoid colons in inline prose where a period or comma would do. (Field
-  labels and list-introductions are fine.)
-- Use formulas freely; the reader can read them. LaTeX inline is `$...$`,
-  display is `$$` on its own line. Don't use `\(...\)` or `\[...\]`.
-  Avoid `\!`. Use `E_\tau` rather than `\mathbb{E}_\tau`.
-- When stating a confidence in the explainer's own voice, mark it
-  explicitly (e.g., `$_{80\%}$` or `(~80%)`).
-- No flattery toward the reader. No "great question!" energy. Direct,
-  technically precise, willing to say "this is hard" or "I don't know."
 
 ## End of prompt
