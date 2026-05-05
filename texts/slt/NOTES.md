@@ -208,7 +208,7 @@ secondary toys are noted in the justification.
 
 | Source location | Module slug | Toy system | Active check | Status | Human Review |
 |-----------------|-------------|------------|--------------|--------|--------------|
-| DSLT 1 §Preliminaries (Carroll thesis Ch 2) | `dslt1-bayes-loss-landscape` | 1D & 2D polynomial K(w) (Examples 1.1, 1.2) | Pan a 2D K(w); identify W₀; predict whether it is a point, a curve, or an intersecting arrangement | not started | |
+| DSLT 1 §Preliminaries (Carroll thesis Ch 2) | `dslt1-bayes-loss-landscape` | 1D & 2D polynomial K(w) (Examples 1.1, 1.2) | Pan a 2D K(w); identify W₀; predict whether it is a point, a curve, or an intersecting arrangement | in progress | |
 | DSLT 1 §"What is a singular model?" | `dslt1-fisher-degeneracy` | Same polynomial K family + a 1-hidden-unit ReLU regressor for contrast | Compute I(w₀); classify regular vs strictly singular by det I(w₀) = 0 | not started | |
 | DSLT 1 §"Classical Bayesian inference breaks down" | `dslt1-bic-derivation` | Comparison K = w² (regular) vs K = w⁴ (singular) | Step through the BIC derivation; pinpoint the line that fails under degenerate I(w₀) | not started | |
 | DSLT 1 §"Dimensionality as a volume co-dimension" | `dslt1-volume-scaling-rlct` | 1D K(w) = w^(2k) and 2D normal-crossing K | Scrub ε; plot log V(ε) vs log ε; read slope = λ. Tune k so 2λ matches a target effective dimension | not started | |
@@ -309,8 +309,9 @@ Empty for now. Populate as we encounter them.
 
 - **Last updated:** 2026-05-05
 - **Chapters complete:** 0
-- **Currently being drafted:** DSLT 1 module breakdown proposed,
-  awaiting human approval; no module yet at "in progress"
+- **Currently being drafted:** `dslt1-bayes-loss-landscape` (DSLT 1
+  module 1 of 7); rest of DSLT 1 module breakdown still proposed
+  pending human approval
 - **Blockers:** none
 
 ## Cross-references
