@@ -129,3 +129,61 @@ per session, newest at the bottom. See
   diminishing return on continuing without Matthew's reaction to
   the proposed module set. Continuing into module 2 risks doing
   several widgets only to have the proposal restructured.
+
+## 2026-05-05 14:59 (session by autonomous Claude)
+
+- **Worked on:** texts/slt, modules `dslt1-fisher-degeneracy` (3),
+  `dslt1-bic-derivation` (4), `dslt1-volume-scaling-rlct` (5),
+  `dslt1-normal-crossing-game` (6), `dslt1-resolution-primer` (7),
+  and `dslt1-wbic-vs-bic` (8). Plus end-of-loop housekeeping on
+  modules 1 and 2 (Wikipedia link sweep) and tooling
+  (`scripts/widget-smoke-test.py`, `scripts/widget-interactive-test.py`).
+- **What got done:**
+  1. Cleared the carry-over Wikipedia-link audit from the previous
+     session: replaced every `en.wikipedia.org` reference in widgets
+     1 and 2 with curated alternatives (3B1B / Olah / Shalizi /
+     Yudkowsky / Khan Academy / Carroll thesis), fixed the
+     `LINK.multivarGauss` undefined-reference regression in widget
+     1, and codified the no-Wikipedia rule in CONTRIBUTING.md.
+  2. Built modules 3 through 8 — all six remaining DSLT 1 widgets —
+     as single-file standalone HTML with D3 + KaTeX from CDN.
+     Module 3 (Fisher / singularity) features a Fisher-level-set
+     ellipse that degenerates as rank drops, plus a 1-hidden-unit
+     ReLU example recovering Carroll Example 1.2; module 4 (BIC
+     breakdown) walks the six-step derivation and verifies
+     numerically that K=w⁴ peels away from BIC at slope ¼·ln10;
+     module 5 (volume scaling) has both "recognise λ from K" and
+     "construct K from target 2λ" modes; module 6 (normal-crossing
+     game) is a six-round live-scored game on (λ, m) for monomial
+     and product K; module 7 (resolution primer) shows side-by-side
+     contour plots of K(x,y) and K(u,uv) for four toy K's, with
+     the cusp K=(x³−y²)² as the one that needs more than one
+     blow-up; module 8 (capstone) plots truth vs BIC vs WBIC for
+     five matched-pair K's and confirms WBIC matches truth in
+     every case while BIC overshoots singular models.
+  3. Added a reusable `scripts/widget-smoke-test.py` (Playwright +
+     uv PEP-723) that loads every widget, captures console errors,
+     and saves screenshots — written specifically to catch the
+     "missing LINK constant" / "deferred KaTeX never ran" bug class.
+     Used it to verify all eight widgets render clean.
+- **What's next:** Have Matthew approve / adjust the eight DSLT 1
+  module rows now all marked `drafted`. Once approved, the natural
+  next step is to scaffold DSLT 2 (slug `dslt2-occams-razor` or
+  similar — Carroll's "Why Neural Networks Obey Occam's Razor")
+  and propose its first batch of modules. Widget 2 already
+  forward-references DSLT 2's free-energy framing, so DSLT 1's
+  capstone (module 8) lands the reader exactly at DSLT 2's
+  starting point.
+- **Blockers:** None.
+- **Proposed for approval:** No new module rows in this session.
+  All work was on previously-proposed modules (claimed → drafted
+  flow). The eight DSLT 1 rows in `texts/slt/NOTES.md` Module
+  breakdown remain `drafted` with blank `Human Approved`.
+- **Why stopped:** Step-4 criterion #1 (no more tractable work on
+  the priority list — all eight DSLT 1 modules drafted, no
+  blockers, source ingestion done). Walking item 5 ("propose new
+  modules") would mean reading DSLT 2 and proposing its modules,
+  which is reasonable but the post-compact warning suggests the
+  next session should re-read DSLT 2 from scratch with fresh
+  context anyway, so no padding gained from doing it now. Repo
+  state is clean and pushed.
