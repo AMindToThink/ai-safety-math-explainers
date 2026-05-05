@@ -228,7 +228,7 @@ secondary toys are noted in the justification.
 | DSLT 1 §Preliminaries (Carroll thesis Ch 2) | `dslt1-bayes-loss-landscape` | 1D & 2D polynomial K(w) (Examples 1.1, 1.2) | Pan a 2D K(w); identify W₀; predict whether it is a point, a curve, or an intersecting arrangement | drafted | |
 | DSLT 1 §Preliminaries + DSLT 2 §"Free Energy, Generalisation and Model Selection" / §"Animation 1" | `dslt1-singular-posterior` | Same polynomial K family from widget 1; slider on n | Drag n; predict the asymptotic posterior shape (Gaussian spike vs spread along W₀ vs preference for the lowest-local-RLCT singularity) | drafted | |
 | DSLT 1 §"What is a singular model?" | `dslt1-fisher-degeneracy` | Same polynomial K family + a 1-hidden-unit ReLU regressor for contrast | Compute I(w₀); classify regular vs strictly singular by det I(w₀) = 0 | drafted | |
-| DSLT 1 §"Classical Bayesian inference breaks down" | `dslt1-bic-derivation` | Comparison K = w² (regular) vs K = w⁴ (singular) | Step through the BIC derivation; pinpoint the line that fails under degenerate I(w₀) | in progress | |
+| DSLT 1 §"Classical Bayesian inference breaks down" | `dslt1-bic-derivation` | Comparison K = w² (regular) vs K = w⁴ (singular) | Step through the BIC derivation; pinpoint the line that fails under degenerate I(w₀) | drafted | |
 | DSLT 1 §"Dimensionality as a volume co-dimension" | `dslt1-volume-scaling-rlct` | 1D K(w) = w^(2k) and 2D normal-crossing K | Scrub ε; plot log V(ε) vs log ε; read slope = λ. Tune k so 2λ matches a target effective dimension | not started | |
 | DSLT 1 §"The RLCT can be read off when K(w) is in normal crossing form" (one- and multi-dim cases) | `dslt1-normal-crossing-game` | Polynomial K in normal crossing form, 1D/2D | Game: given K(w) = ∏ w_i^(2k_i) (possibly with shifted critical points, à la Example 1.5), read off the local and global RLCT and multiplicity | not started | |
 | DSLT 1 §"Resolution of Singularities" | `dslt1-resolution-primer` | Real plane curves V(xy), V(x²−y³), V(x²−y²) | Animated blow-up: see how (M, g) puts K(g(u)) into normal crossing form. Active: pick the blow-up centre that resolves a given singularity | not started | |
@@ -337,11 +337,12 @@ Empty for now. Populate as we encounter them.
 
 - **Last updated:** 2026-05-05
 - **Chapters complete:** 0
-- **Currently being drafted:** Three DSLT 1 widgets shipped as
+- **Currently being drafted:** Four DSLT 1 widgets shipped as
   single-file standalone HTML and marked drafted —
   `dslt1-bayes-loss-landscape` (module 1),
-  `dslt1-singular-posterior` (module 2), and
-  `dslt1-fisher-degeneracy` (module 3). Five remaining DSLT 1
+  `dslt1-singular-posterior` (module 2),
+  `dslt1-fisher-degeneracy` (module 3), and
+  `dslt1-bic-derivation` (module 4). Four remaining DSLT 1
   modules still proposed and awaiting human approval.
 - **Blockers:** none
 

@@ -1,0 +1,343 @@
+<!--
+  Widget: dslt1-bic-derivation. Module 4 for DSLT 1.
+  Source: DSLT 1 §"Classical Bayesian inference breaks down for singular models"
+          and §"Deriving the Bayesian Information Criterion only works for
+          regular models" (Carroll 2023, AlignmentForum). Carroll thesis Ch 3
+          §"Asymptotic Normality and the BIC" for the full derivation.
+  Toy system: K = w² (regular, λ = d/2 = 1/2) vs K = w⁴ (singular, λ = 1/4) —
+              two 1D models with the same true parameter w⁰ = 0 but
+              radically different free-energy scaling.
+  Active check: pick which step of the BIC derivation first invokes the
+              "I(w⁰) is non-degenerate" assumption. The trap: the term
+              ½ log det I appears later in the formula, so it is tempting
+              to say "step 5"; but the assumption is actually invoked at
+              step 4, where the d-dimensional Gaussian integral formula is
+              applied. Below the choice we plot -log Z_n vs log n
+              numerically for K=w² and K=w⁴, with the BIC's (d/2) log n
+              prediction overlaid: regular case fits perfectly, singular
+              case has slope 1/4 not 1/2.
+  Standalone: open this .html in a browser. D3 v7 + KaTeX 0.16 from CDN.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SLT companion · DSLT 1 widget 4 · Where the BIC derivation breaks</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --w0:#d92d20; --muted:#52606d; --ok:#099250; --okbg:#d1fadf; --bad:#b42318; --badbg:#fee4e2; --reg:#0b6f3a; --sing:#9a3412; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 980px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; color: var(--ink); }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .layout { display: grid; grid-template-columns: 1.05fr 1fr; gap: 1.6rem; align-items: start; margin-top: 0.8rem; }
+  @media (max-width: 850px) { .layout { grid-template-columns: 1fr; } }
+  .step { padding: 0.55rem 0.8rem; margin: 0.45rem 0; background: #fff; border: 1px solid #e0e6ed; border-radius: 4px; }
+  .step.crux { border-color: var(--accent); border-width: 1.5px; }
+  .step .num { color: var(--accent); font-weight: 600; }
+  .step .body { font-size: 0.95rem; margin-top: 0.25rem; }
+  .step .math { display: block; padding: 0.3rem 0; overflow-x: auto; }
+  .choice { display: block; width: 100%; text-align: left; margin: 0.3rem 0; padding: 0.55rem 0.8rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover { background: #eef3f8; }
+  .choice.correct { background: var(--okbg); border-color: var(--ok); }
+  .choice.wrong { background: var(--badbg); border-color: var(--w0); }
+  .choice:disabled { cursor: default; }
+  .reveal { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.7rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; }
+  svg.plot { background: #fff; border: 1px solid #d9e0e7; border-radius: 4px; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  .legend { display: flex; gap: 1rem; align-items: center; margin-top: 0.4rem; font-size: 0.86rem; color: var(--muted); flex-wrap: wrap; }
+  .legend-swatch { display: inline-block; width: 18px; height: 4px; vertical-align: middle; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .sources li { margin: 0.15rem 0; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  .badge { display: inline-block; padding: 0.18rem 0.55rem; border-radius: 999px; font-size: 0.82rem; font-weight: 600; margin-left: 0.4rem; vertical-align: middle; }
+  .badge.crux { background: rgba(43, 108, 176, 0.12); color: var(--accent); border: 1px solid var(--accent); }
+  .table-of-formulas { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92rem; }
+  .table-of-formulas th, .table-of-formulas td { text-align: left; padding: 0.3rem 0.6rem; border-bottom: 1px solid #e5eaf0; }
+  .reg-color { color: var(--reg); }
+  .sing-color { color: var(--sing); }
+</style>
+</head>
+<body>
+
+<h1>Where the BIC derivation breaks for singular models</h1>
+<p class="subtitle">SLT companion · widget 4 of 7 for <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural"><em>DSLT 1: The RLCT Measures the Effective Dimension of Neural Networks</em></a> by Liam Carroll</p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#Classical_Bayesian_inference_breaks_down_for_singular_models">DSLT 1 §"Classical Bayesian inference breaks down for singular models"</a> &mdash; the asymptotic-normality / BIC pair, both of which need $I(w^{(0)})$ non-degenerate.</li>
+    <li><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#Deriving_the_Bayesian_Information_Criterion_only_works_for_regular_models">DSLT 1 §"Deriving the Bayesian Information Criterion only works for regular models"</a> &mdash; the seven-step derivation this widget walks through.</li>
+    <li><a href="http://therisingsea.org/notes/MSc-Carroll.pdf">Liam Carroll, MSc thesis "Phase Transitions in Neural Networks"</a> (2021), Chapter 3 §3.2 &mdash; the same derivation in long form, with the crux step explicitly flagged.</li>
+    <li>G. Schwarz, "Estimating the Dimension of a Model" (1978) &mdash; the original BIC paper. The regularity assumption is buried; this widget exists in part to surface it.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;">The <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#Classical_Bayesian_inference_breaks_down_for_singular_models">Bayesian Information Criterion</a> says the asymptotic free energy of a $d$-parameter model is
+    $$ F_n \;=\; -\log Z_n \;\approx\; n\, L_n(w^{(0)}) \;+\; \tfrac{d}{2} \log n. $$
+  But every step of its derivation relies, somewhere, on $I(w^{(0)})$ being non-degenerate &mdash; on the model being <strong>regular</strong>. Identifying <em>where</em> the assumption is invoked is the moment that motivates singular learning theory.</p>
+  <p style="margin: 0;">Below is the derivation, lifted from <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#Deriving_the_Bayesian_Information_Criterion_only_works_for_regular_models">Carroll 2023</a>. <strong>Predict which step is the first to require $\det I(w^{(0)}) \neq 0$.</strong> Then the widget's lower panel computes $-\log Z_n$ numerically for $K = w^2$ (regular) and $K = w^4$ (singular) and overlays the BIC's prediction, so you can see exactly how much it lies for the singular case.</p>
+</div>
+
+<div class="layout">
+  <!-- Left: derivation steps -->
+  <div id="steps">
+    <div class="step" data-step="1">
+      <div class="num">Step 1.</div>
+      <div class="body">
+        Taylor-expand the empirical NLL $L_n(w) = -\tfrac{1}{n} \sum_i \log p(y_i \mid x_i, w)$ around a true parameter $w^{(0)} \in W_0$:
+        $$ L_n(w) \;=\; L_n(w^{(0)}) \;+\; (w - w^{(0)})^\top \nabla L_n\big|_{w^{(0)}} \;+\; \tfrac{1}{2}\,(w - w^{(0)})^\top J(w^{(0)})\, (w - w^{(0)}) \;+\; O\!\left(\|w - w^{(0)}\|^3\right). $$
+      </div>
+    </div>
+    <div class="step" data-step="2">
+      <div class="num">Step 2.</div>
+      <div class="body">
+        $w^{(0)}$ is a minimum, so $\nabla L_n\big|_{w^{(0)}} = 0$. As $n \to \infty$, the Hessian of $L_n$ converges to the Fisher information:
+        $$ J(w^{(0)}) \;=\; \partial^2_{w} L_n(w)\big|_{w^{(0)}} \;\xrightarrow{n \to \infty}\; \partial^2_{w} K(w)\big|_{w^{(0)}} \;=\; I(w^{(0)}). $$
+      </div>
+    </div>
+    <div class="step" data-step="3">
+      <div class="num">Step 3.</div>
+      <div class="body">
+        Substitute the truncated Taylor expansion into the partition function $Z_n = \int_W e^{-n L_n(w)}\, \varphi(w)\, dw$:
+        $$ Z_n \;\approx\; e^{-n L_n(w^{(0)})} \int_W \exp\!\Big(-\tfrac{n}{2} (w - w^{(0)})^\top I(w^{(0)})\, (w - w^{(0)})\Big)\, \varphi(w)\, dw. $$
+      </div>
+    </div>
+    <div class="step crux" data-step="4">
+      <div class="num">Step 4. <span class="badge crux">crux</span></div>
+      <div class="body">
+        <em>If</em> $I(w^{(0)})$ is non-degenerate, the Gaussian integral evaluates explicitly:
+        $$ \int_{\mathbb{R}^d} \exp\!\Big(-\tfrac{n}{2} u^\top I(w^{(0)})\, u\Big)\, du \;=\; \frac{(2\pi)^{d/2}}{n^{d/2}\,\sqrt{\det I(w^{(0)})}}. $$
+        The remaining $\varphi(w) \approx \varphi(w^{(0)})$ contribution rides along at $O(1)$.
+      </div>
+    </div>
+    <div class="step" data-step="5">
+      <div class="num">Step 5.</div>
+      <div class="body">
+        Read off $F_n = -\log Z_n$ from the result of step&nbsp;4:
+        $$ F_n \;=\; n\, L_n(w^{(0)}) \;+\; \tfrac{d}{2}\log n \;-\; \log \varphi(w^{(0)}) \;-\; \tfrac{d}{2}\log 2\pi \;+\; \tfrac{1}{2}\log \det I(w^{(0)}). $$
+      </div>
+    </div>
+    <div class="step" data-step="6">
+      <div class="num">Step 6.</div>
+      <div class="body">
+        Drop $O(1)$ terms and call what's left the BIC:
+        $$ \mathrm{BIC} \;=\; n\, L_n(w^{(0)}) \;+\; \tfrac{d}{2}\log n. $$
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: active check + reveal -->
+  <div>
+    <h2>Predict</h2>
+    <p style="font-size: 0.95rem; margin: 0 0 0.4rem;"><strong>Which step is the <em>first</em> in this derivation to require $\det I(w^{(0)}) \neq 0$?</strong></p>
+    <div id="choices"></div>
+    <div class="reveal" id="reveal" style="display: none;"></div>
+  </div>
+</div>
+
+<h2>The numerical receipt: BIC slope vs reality</h2>
+<p style="margin: 0.2rem 0 0.6rem;">For $K(w) = w^2$ and $K(w) = w^4$ (both with $w^{(0)} = 0$, both 1D so $d = 1$), the partition function $Z_n = \int_{-1}^{1} e^{-n K(w)}\, dw$ is computed numerically below. The BIC prediction $-\log Z_n \approx \tfrac{d}{2}\log n = \tfrac{1}{2}\log n$ is plotted as a dashed line. <span class="reg-color"><strong>Regular (slope ½)</strong></span> sits on it; <span class="sing-color"><strong>singular (slope ¼)</strong></span> peels away.</p>
+
+<svg class="plot" id="receipt" viewBox="0 0 920 360"></svg>
+<div class="legend">
+  <span><span class="legend-swatch" style="background:var(--reg)"></span> $-\log Z_n$ for $K = w^2$ (regular; truth slope $1/2$)</span>
+  <span><span class="legend-swatch" style="background:var(--sing)"></span> $-\log Z_n$ for $K = w^4$ (singular; truth slope $1/4 = $ <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#The_Real_Log_Canonical_Threshold__aka_the_Learning_Coefficient_">RLCT $\lambda$</a>)</span>
+  <span><span class="legend-swatch" style="background:#888; height:0; border-top:2px dashed #888;"></span> BIC prediction $\tfrac{1}{2} \log n$</span>
+</div>
+
+<p class="footnote">
+  <strong>How the receipt is computed.</strong> $Z_n^{(K)} = \int_{-1}^{1} e^{-n K(w)}\, dw$ via 8001-point trapezoid (uniform prior on $[-1,1]$).
+  Plotted as $-\log Z_n - n\, L_n(0)$ vs $\log n$ on a log-spaced grid of $n \in \{10, \ldots, 10^4\}$. The exact asymptotics
+  ($\int_{-\infty}^\infty e^{-n w^2}\, dw = \sqrt{\pi/n}$ and $\int_{-\infty}^\infty e^{-n w^4}\, dw = \tfrac{1}{2}\Gamma(\tfrac{1}{4})\, n^{-1/4}$)
+  give slopes $\tfrac{1}{2}$ and $\tfrac{1}{4}$ respectively &mdash; matching $\lambda = d/2$ for the regular case and Watanabe's RLCT $\lambda = 1/4$ for $K = w^{2k}$ with $k = 2$.
+</p>
+
+<nav class="nav">
+  <a href="https://github.com/AMindToThink/ai-safety-math-explainers/blob/main/texts/slt/chapters/dslt1-rlct-effective-dimension/README.md">&larr; DSLT 1 chapter index</a>
+  <a href="https://github.com/AMindToThink/ai-safety-math-explainers/blob/main/texts/slt/NOTES.md">SLT companion overview &rarr;</a>
+</nav>
+
+<script>
+"use strict";
+
+const KATEX_DELIMITERS = [
+  { left: '$$', right: '$$', display: true },
+  { left: '\\[', right: '\\]', display: true },
+  { left: '$', right: '$', display: false },
+  { left: '\\(', right: '\\)', display: false },
+];
+function typeset(el) {
+  if (window.renderMathInElement) renderMathInElement(el, { delimiters: KATEX_DELIMITERS, throwOnError: false });
+}
+
+// ---------------------------------------------------------------------------
+// Active check: identify the first step requiring det I ≠ 0.
+// Correct answer is step 4, where the d-dim Gaussian integral formula is
+// invoked. The trap is step 5, which is where (½ log det I) explicitly
+// appears in the formula — but that's just *reading off* the result of step 4.
+// ---------------------------------------------------------------------------
+const STEPS = [
+  { id: 1, summary: 'Taylor-expand $L_n$ to second order.' },
+  { id: 2, summary: 'Drop the gradient term; identify $J \\to I$.' },
+  { id: 3, summary: 'Substitute Taylor approximation into $Z_n$.' },
+  { id: 4, summary: 'Apply the $d$-dim Gaussian integral formula.' },
+  { id: 5, summary: 'Read $F_n = -\\log Z_n$.' },
+  { id: 6, summary: 'Drop $O(1)$ terms to recover BIC.' },
+];
+const CORRECT_STEP = 4;
+
+const EXPLANATIONS = {
+  1: `Step 1 only writes down a Taylor expansion. The expansion is meaningful for any twice-differentiable $L_n$; nothing here cares whether $I$ is degenerate. (For singular $K$, the Taylor expansion is still valid as a polynomial identity &mdash; it just isn't a good <em>approximation</em>, because the dropped higher-order terms are the leading ones along null directions of $I$.)`,
+  2: `Step 2 just notes that $w^{(0)}$ is a minimum (so $\\nabla L_n = 0$) and that $J \\to I$ in expectation. Both hold whether or not $I$ is degenerate. The "$J \\to I$" identity is exactly what links the empirical Hessian to the population Fisher info; it does not assume $I$ is invertible.`,
+  3: `Step 3 substitutes the truncated quadratic into the partition function. As a formal manipulation this is fine even when $I$ is degenerate &mdash; the integrand just stops being a Gaussian along null directions. The trouble starts when we try to <em>do the integral</em>, which is the next step.`,
+  4: `<strong>Correct.</strong> The formula $\\int_{\\mathbb{R}^d} e^{-\\frac{n}{2} u^\\top I u}\\, du = \\frac{(2\\pi)^{d/2}}{n^{d/2}\\sqrt{\\det I}}$ is the $d$-dimensional Gaussian integral, and it requires $I$ to be positive definite (so the integrand actually decays, and so $\\det I > 0$). When $I$ is degenerate (some eigenvalue $= 0$), the integrand is constant along the null eigenvector and the integral diverges. Geometrically: the truncated quadratic $-\\tfrac{n}{2} u^\\top I u$ is a <em>flat ridge</em> along null directions, so it cannot suppress the integral on its own. The leading contribution along null directions comes from higher-order terms in the Taylor expansion (e.g. $w^4$ instead of $w^2$), and integrating those gives a different power of $n$ &mdash; precisely the RLCT $\\lambda$ instead of the regular $d/2$. <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#The_Real_Log_Canonical_Threshold__aka_the_Learning_Coefficient_">This is the door into singular learning theory.</a>`,
+  5: `Step 5 just takes a logarithm of the formula in step 4. The factor $\\tfrac{1}{2}\\log \\det I$ <em>appears</em> here as a tempting "this is where $\\det I$ matters" sign, but its presence in the formula is a downstream consequence of the assumption being invoked at step 4. (If you stop the derivation at step 3, the assumption hasn't been used yet; once you do step 4, $\\det I \\neq 0$ has already been baked in.)`,
+  6: `Step 6 just drops $O(1)$ terms. By the time you get here, the assumption has been silently invoked two steps prior; the BIC formula itself <em>doesn't even mention</em> $\\det I$, which is part of why the regularity assumption gets forgotten in practice. <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#Deriving_the_Bayesian_Information_Criterion_only_works_for_regular_models">SLT replaces $\\tfrac{d}{2}$ with the RLCT $\\lambda$</a> in the leading term &mdash; that is the core upgrade.`,
+};
+
+function buildChoices() {
+  const root = d3.select('#choices');
+  let answered = false;
+  for (const s of STEPS) {
+    const btn = root.append('button').attr('class', 'choice')
+      .html(`<strong>Step ${s.id}.</strong> ${s.summary}`);
+    btn.on('click', function () {
+      if (answered) return;
+      answered = true;
+      const buttons = root.selectAll('button').nodes();
+      buttons.forEach((b, i) => {
+        b.disabled = true;
+        if (STEPS[i].id === CORRECT_STEP) b.classList.add('correct');
+        else if (b === this) b.classList.add('wrong');
+      });
+      const reveal = d3.select('#reveal');
+      const expl = EXPLANATIONS[s.id];
+      reveal.style('display', 'block').html(expl);
+      typeset(reveal.node());
+      // Highlight the correct step in the left column too.
+      d3.select(`.step[data-step="${CORRECT_STEP}"]`).style('background', 'rgba(43, 108, 176, 0.06)');
+    });
+  }
+  typeset(root.node());
+}
+
+// ---------------------------------------------------------------------------
+// The numerical receipt: -log Z_n vs log n for K=w² and K=w⁴.
+// Z_n^(K) = ∫_{-1}^{1} exp(-n K(w)) dw via fine trapezoid.
+// Plot: x = log10(n), y = -log Z_n.
+// ---------------------------------------------------------------------------
+function logZ(K, n, M = 8001) {
+  // Trapezoid integration of exp(-n K(w)) over [-1, 1].
+  // Use log-sum-exp on the integrand for stability at large n.
+  const lo = -1, hi = 1;
+  const h = (hi - lo) / (M - 1);
+  let lps = new Array(M);
+  let maxLp = -Infinity;
+  for (let i = 0; i < M; i++) {
+    const w = lo + h * i;
+    const lp = -n * K(w);
+    lps[i] = lp;
+    if (lp > maxLp) maxLp = lp;
+  }
+  let sum = 0;
+  for (let i = 0; i < M; i++) {
+    const wgt = (i === 0 || i === M - 1) ? 0.5 : 1.0;
+    sum += wgt * Math.exp(lps[i] - maxLp);
+  }
+  return maxLp + Math.log(sum) + Math.log(h);                       // log Z_n
+}
+
+function drawReceipt() {
+  const W = 920, H = 360, padL = 60, padB = 44, padT = 18, padR = 18;
+  const svg = d3.select('#receipt');
+  svg.selectAll('*').remove();
+
+  // Sample n on a log-spaced grid.
+  const ns = [];
+  for (let p = 1; p <= 4.001; p += 0.05) ns.push(Math.pow(10, p));
+
+  const Kreg = w => w * w;
+  const Ksing = w => w * w * w * w;
+
+  const negLogZreg = ns.map(n => -logZ(Kreg, n));
+  const negLogZsing = ns.map(n => -logZ(Ksing, n));
+  const bicPred = ns.map(n => 0.5 * Math.log(n));                   // (d/2) log n with d=1
+
+  const xs = ns.map(n => Math.log10(n));
+  const allY = [...negLogZreg, ...negLogZsing, ...bicPred];
+  const yLo = Math.min(...allY) - 0.4;
+  const yHi = Math.max(...allY) + 0.4;
+
+  const x = d3.scaleLinear().domain([1, 4]).range([padL, W - padR]);
+  const y = d3.scaleLinear().domain([yLo, yHi]).range([H - padB, padT]);
+
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${H - padB})`)
+    .call(d3.axisBottom(x).ticks(7).tickFormat(d => `10^${d}`));
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(${padL}, 0)`)
+    .call(d3.axisLeft(y).ticks(7));
+  svg.append('text').attr('class', 'axis-label').attr('x', W - padR).attr('y', H - 8).attr('text-anchor', 'end').text('n (sample size, log scale)');
+  svg.append('text').attr('class', 'axis-label').attr('x', padL + 8).attr('y', padT + 4).text('-log Z_n');
+
+  const line = d3.line().x((_, i) => x(xs[i])).y(d => y(d));
+
+  svg.append('path').datum(bicPred).attr('d', line)
+    .attr('fill', 'none').attr('stroke', '#888').attr('stroke-width', 1.4).attr('stroke-dasharray', '6 4');
+
+  svg.append('path').datum(negLogZreg).attr('d', line)
+    .attr('fill', 'none').attr('stroke', '#0b6f3a').attr('stroke-width', 2);
+  svg.append('path').datum(negLogZsing).attr('d', line)
+    .attr('fill', 'none').attr('stroke', '#9a3412').attr('stroke-width', 2);
+
+  // Annotate slopes by linear fit on the last decade of ns.
+  function fitSlope(yVals) {
+    const xLast = xs.slice(-20);
+    const yLast = yVals.slice(-20);
+    const xm = d3.mean(xLast), ym = d3.mean(yLast);
+    let num = 0, den = 0;
+    for (let i = 0; i < xLast.length; i++) {
+      num += (xLast[i] - xm) * (yLast[i] - ym);
+      den += (xLast[i] - xm) ** 2;
+    }
+    return num / den;
+  }
+  // Slope is dy/d(log10 n); BIC predicts (d/2)/log10(e) = ln(10)·(d/2) ≈ 1.151
+  // for d=1. Convert by multiplying by ln(10):
+  // -log Z_n = (d/2) log n ⇒ slope vs log10(n) is (d/2) * ln(10) ≈ 0.5 * 2.303 = 1.151.
+  // Truth for K=w^4: slope ≈ 0.25 * 2.303 ≈ 0.576.
+  const slopeReg = fitSlope(negLogZreg);
+  const slopeSing = fitSlope(negLogZsing);
+  const slopeBic = fitSlope(bicPred);
+
+  svg.append('text').attr('x', W - padR - 8).attr('y', y(negLogZreg[negLogZreg.length - 1]) - 6).attr('text-anchor', 'end')
+    .attr('fill', '#0b6f3a').attr('font-size', 12).text(`fitted slope ≈ ${slopeReg.toFixed(3)} (= ½·ln10)`);
+  svg.append('text').attr('x', W - padR - 8).attr('y', y(negLogZsing[negLogZsing.length - 1]) - 6).attr('text-anchor', 'end')
+    .attr('fill', '#9a3412').attr('font-size', 12).text(`fitted slope ≈ ${slopeSing.toFixed(3)} (= ¼·ln10)`);
+  svg.append('text').attr('x', W - padR - 8).attr('y', y(bicPred[bicPred.length - 1]) + 14).attr('text-anchor', 'end')
+    .attr('fill', '#666').attr('font-size', 12).text(`BIC prediction (slope ${slopeBic.toFixed(3)})`);
+}
+
+function init() {
+  buildChoices();
+  drawReceipt();
+  typeset(document.body);
+}
+
+init();
+</script>
+</body>
+</html>

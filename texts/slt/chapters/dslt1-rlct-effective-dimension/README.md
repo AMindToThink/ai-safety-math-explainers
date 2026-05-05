@@ -59,7 +59,7 @@ Status definitions match `texts/slt/NOTES.md`:
 | 1 | [`dslt1-bayes-loss-landscape`](widgets/01-bayes-loss-landscape.html) | drafted |
 | 2 | [`dslt1-singular-posterior`](widgets/02-singular-posterior.html) | drafted |
 | 3 | [`dslt1-fisher-degeneracy`](widgets/03-fisher-degeneracy.html) | drafted |
-| 4 | `dslt1-bic-derivation` | not started |
+| 4 | [`dslt1-bic-derivation`](widgets/04-bic-derivation.html) | drafted |
 | 5 | `dslt1-volume-scaling-rlct` | not started |
 | 6 | `dslt1-normal-crossing-game` | not started |
 | 7 | `dslt1-resolution-primer` | not started |
@@ -120,6 +120,22 @@ A 1-hidden-unit ReLU regressor (with target $0$ and $x \sim
 \mathcal{N}(0, 1)$) appears as a final preset and recovers Example
 1.2 verbatim, demonstrating the Carroll thesis Lemma 3.2 result that
 ReLU networks are strictly singular.
+
+### Module 4 — `dslt1-bic-derivation`
+
+[`widgets/04-bic-derivation.html`](widgets/04-bic-derivation.html)
+walks through the six-step derivation of the BIC and asks the reader
+to identify the first step that requires $\det I(w^{(0)}) \neq 0$.
+The trap is that $\tfrac{1}{2} \log \det I(w^{(0)})$ appears
+explicitly in the formula at step 5; but the assumption was actually
+invoked at step 4, where the $d$-dimensional Gaussian-integral
+formula was applied. After the active check, a numerical "receipt"
+plots $-\log Z_n$ on a log-spaced $n$ grid for $K = w^2$ (regular)
+and $K = w^4$ (singular), with the BIC prediction $\tfrac{1}{2}\log n$
+overlaid. The regular case sits on the BIC line; the singular case
+peels away to slope $\tfrac{1}{4} \cdot \ln 10$, exactly Watanabe's
+RLCT $\lambda = 1/4$ for $K = w^4$. This is the punchline that
+motivates module 5's RLCT machinery.
 
 ## Pedagogical decisions
 
