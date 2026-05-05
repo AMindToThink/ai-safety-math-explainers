@@ -1,0 +1,18 @@
+# macOS finder metadata
+.DS_Store
+
+# Source texts: gitignored per CONTRIBUTING.md (public repo, copyrighted source).
+# download.sh is whitelisted below so reconstruction recipes ship with the repo.
+texts/*/source/*
+!texts/*/source/download.sh
+!texts/*/source/README.md
+!texts/*/source/.gitkeep
+
+# Common Python / build droppings
+__pycache__/
+*.pyc
+.venv/
+venv/
+node_modules/
+.DS_Store
+*.log
