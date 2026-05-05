@@ -63,7 +63,7 @@ Status definitions match `texts/slt/NOTES.md`:
 | 5 | [`dslt1-volume-scaling-rlct`](widgets/05-volume-scaling-rlct.html) | drafted |
 | 6 | [`dslt1-normal-crossing-game`](widgets/06-normal-crossing-game.html) | drafted |
 | 7 | [`dslt1-resolution-primer`](widgets/07-resolution-primer.html) | drafted |
-| 8 | `dslt1-wbic-vs-bic` | not started |
+| 8 | [`dslt1-wbic-vs-bic`](widgets/08-wbic-vs-bic.html) | drafted |
 
 See `texts/slt/NOTES.md` for the full breakdown table with toy systems
 and active checks.
@@ -120,6 +120,22 @@ A 1-hidden-unit ReLU regressor (with target $0$ and $x \sim
 \mathcal{N}(0, 1)$) appears as a final preset and recovers Example
 1.2 verbatim, demonstrating the Carroll thesis Lemma 3.2 result that
 ReLU networks are strictly singular.
+
+### Module 8 — `dslt1-wbic-vs-bic`
+
+[`widgets/08-wbic-vs-bic.html`](widgets/08-wbic-vs-bic.html) is the
+chapter's capstone. Five matched K's (1D and 2D, regular and singular,
+plus a dual-singularity case) are plotted as $-\log Z_n$ vs $\log n$
+with the BIC's $\tfrac{d}{2} \log n$ and WBIC's $\lambda \log n$
+predictions overlaid. The verdict for each model is reported live:
+regular models show all three lines on top of each other (because
+$\lambda = d/2$); singular models show the truth tracking WBIC and
+BIC overshooting. Predict-then-reveal active check asks which two of
+{BIC, WBIC, truth} should agree — a direct test of whether the reader
+understood the chapter's central claim. The 2D singular case
+$K = w_1^2 w_2^2$ shows a small upward drift of truth above WBIC due
+to the multiplicity-2 logarithmic correction, foreshadowing DSLT 2's
+full second-order WBIC structure.
 
 ### Module 7 — `dslt1-resolution-primer`
 

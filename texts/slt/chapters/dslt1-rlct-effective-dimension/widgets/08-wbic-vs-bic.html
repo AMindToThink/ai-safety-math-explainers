@@ -1,0 +1,370 @@
+<!--
+  Widget: dslt1-wbic-vs-bic. Module 8 (final) for DSLT 1.
+  Source: DSLT 1 §"The RLCT measures the effective dimensionality of a
+          model" (Carroll 2023) — final paragraphs introducing the WBIC
+          F_n ≈ n L_n(w⁰) + λ log n. Watanabe Grey Book Theorem 6.7 for
+          the rigorous statement.
+  Purpose: chapter capstone. Compare BIC vs WBIC numerically for matched
+           pairs of regular and singular K's. Show that BIC overestimates
+           the complexity of singular models (uses d/2 instead of λ ≤ d/2).
+  Toy system: matched pairs from the chapter's K family —
+              (a) 1D regular K=w² (d=1, λ=1/2): BIC and WBIC agree
+              (b) 1D singular K=w⁴ (d=1, λ=1/4): BIC predicts slope 1/2,
+                  WBIC predicts 1/4
+              (c) 2D regular K=w₁²+w₂² (d=2, λ=1): agree
+              (d) 2D singular K=w₁²w₂² (d=2, λ=1/2 with mult 2):
+                  BIC predicts 1, WBIC predicts 1/2 + log correction
+  Active check: predict, for a given K, which line ("BIC says slope
+                d/2", "WBIC says slope λ", "truth from numerical -log Z_n")
+                will lie on top of the others. The reveal compares all
+                three numerically.
+  Standalone: open this .html in a browser. D3 v7 + KaTeX 0.16 from CDN.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SLT companion · DSLT 1 widget 8 · BIC vs WBIC</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --w0:#d92d20; --muted:#52606d; --ok:#099250; --okbg:#d1fadf; --bad:#b42318; --badbg:#fee4e2; --truth:#1a3a8e; --bic:#9a3412; --wbic:#0b6f3a; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 980px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; color: var(--ink); }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .sources li { margin: 0.15rem 0; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  .controls { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.8rem 0 0.4rem; }
+  .controls button { padding: 0.4rem 0.7rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.85rem; color: var(--ink); }
+  .controls button:hover { background: #eef3f8; }
+  .controls button.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .layout { display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.6rem; align-items: start; margin-top: 0.8rem; }
+  @media (max-width: 850px) { .layout { grid-template-columns: 1fr; } }
+  svg.plot { background: #fff; border: 1px solid #d9e0e7; border-radius: 4px; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  .formula-box { font-size: 1rem; padding: 0.4rem 0.6rem; background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; min-height: 2.2rem; }
+  .panel-note { color: var(--muted); font-size: 0.92rem; margin-top: 0.4rem; }
+  .legend { display: flex; gap: 1rem; align-items: center; margin-top: 0.4rem; font-size: 0.86rem; color: var(--muted); flex-wrap: wrap; }
+  .legend-swatch { display: inline-block; width: 22px; height: 4px; vertical-align: middle; }
+  .choice { display: block; width: 100%; text-align: left; margin: 0.3rem 0; padding: 0.55rem 0.8rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover:not(:disabled) { background: #eef3f8; }
+  .choice.correct { background: var(--okbg); border-color: var(--ok); }
+  .choice.wrong { background: var(--badbg); border-color: var(--w0); }
+  .choice:disabled { cursor: default; }
+  .reveal { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.7rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem 1.1rem; margin-top: 0.5rem; }
+  .stats-grid .lab { color: var(--muted); font-size: 0.86rem; }
+  .stats-grid .val { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.95rem; color: var(--ink); }
+  .badge { display: inline-block; padding: 0.18rem 0.55rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; margin-left: 0.4rem; }
+  .badge.ok { background: var(--okbg); color: var(--ok); }
+  .badge.bad { background: var(--badbg); color: var(--bad); }
+</style>
+</head>
+<body>
+
+<h1>BIC vs WBIC &mdash; the chapter's payoff</h1>
+<p class="subtitle">SLT companion · widget 8 of 8 (capstone) for <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural"><em>DSLT 1: The RLCT Measures the Effective Dimension of Neural Networks</em></a> by Liam Carroll</p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#The_RLCT_measures_the_effective_dimensionality_of_a_model">DSLT 1 §"The RLCT measures the effective dimensionality of a model"</a> &mdash; the closing claim that $d/2$ is replaced by $\lambda$ in the free-energy formula, defining the WBIC.</li>
+    <li><a href="https://www.alignmentforum.org/posts/CZHwwDd7t9aYra5HN/dslt-2-why-neural-networks-obey-occam-s-razor#The_Widely_Applicable_Bayesian_Information_Criterion">DSLT 2 §"The Widely Applicable Bayesian Information Criterion"</a> &mdash; the next-chapter expansion of WBIC and the accuracy-complexity reading.</li>
+    <li>Watanabe, <em>Algebraic Geometry and Statistical Learning Theory</em>, Cambridge 2009, §6.4 (Theorem 6.7) and §7.4 &mdash; the rigorous statement of the WBIC asymptotic. Library / institutional access required.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;"><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#Classical_Bayesian_inference_breaks_down_for_singular_models">Widget 4</a> showed that the classical
+    $$ \mathrm{BIC} \;=\; n\, L_n(w^{(0)}) \;+\; \tfrac{d}{2}\,\log n $$
+  is wrong for singular models &mdash; the slope $d/2$ overestimates the complexity. <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#The_Real_Log_Canonical_Threshold__aka_the_Learning_Coefficient_">Widgets 5 and 6</a> defined the RLCT $\lambda \leq d/2$ as the right replacement. <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#Resolution_of_Singularities">Widget 7</a> showed that <em>any</em> analytic $K$ can be put in normal-crossing form, so $\lambda$ is well-defined for any model. This widget is the chapter's payoff: the <strong>Widely Applicable Bayesian Information Criterion</strong>
+    $$ \mathrm{WBIC} \;=\; n\, L_n(w^{(0)}) \;+\; \lambda\, \log n. $$
+  Pick a $K$, predict which of $\{$BIC, WBIC, numerical truth$\}$ lie on top of each other in the limit, and watch the receipt match.</p>
+</div>
+
+<h2>Pick a loss landscape</h2>
+<div class="controls" id="model-buttons"></div>
+
+<div class="layout">
+  <div>
+    <svg class="plot" id="plot" viewBox="0 0 540 380"></svg>
+    <div class="legend">
+      <span><span class="legend-swatch" style="background:var(--truth)"></span> $-\log Z_n - n\, L_n(w^{(0)})$ (numerical truth)</span>
+      <span><span class="legend-swatch" style="background:var(--wbic)"></span> WBIC: $\lambda \log n$</span>
+      <span><span class="legend-swatch" style="background:var(--bic); height:0; border-top:2px dashed var(--bic)"></span> BIC: $\tfrac{d}{2} \log n$</span>
+    </div>
+  </div>
+  <div>
+    <div class="formula-box" id="formula"></div>
+    <div class="stats-grid">
+      <div class="lab">$d$ (parameters)</div>             <div class="val" id="d-val">—</div>
+      <div class="lab">$\lambda$ (RLCT)</div>             <div class="val" id="lambda-val">—</div>
+      <div class="lab">BIC slope ($d/2$)</div>            <div class="val" id="bic-slope">—</div>
+      <div class="lab">WBIC slope ($\lambda$)</div>       <div class="val" id="wbic-slope">—</div>
+      <div class="lab">numerical truth slope</div>        <div class="val" id="truth-slope">—</div>
+      <div class="lab">verdict</div>                      <div class="val" id="verdict">—</div>
+    </div>
+
+    <h2>Predict</h2>
+    <p style="font-size: 0.95rem; margin: 0 0 0.4rem;"><strong>For this $K$, which two of {BIC, WBIC, numerical truth} should asymptotically agree?</strong></p>
+    <div id="choices"></div>
+    <div class="reveal" id="reveal" style="display: none;"></div>
+  </div>
+</div>
+
+<p class="footnote">
+  <strong>How the receipt is computed.</strong> The "numerical truth" is $-\log Z_n - n\, L_n(w^{(0)})$ where $Z_n = \int_W e^{-n K(w)}\, dw$ over the unit cube (1D: $[-1, 1]$ at 8001 points; 2D: $[-1, 1]^2$ at $401 \times 401$, with log-sum-exp for stability). Since each preset has $L_n(w^{(0)}) = K(w^{(0)}) = 0$ (the toy K's all have minimum 0), the second term is zero and we plot $-\log Z_n$ directly. The BIC and WBIC are theoretical predictions: $\tfrac{d}{2} \log n$ and $\lambda \log n$ respectively. RLCTs $\lambda$ for the presets come from widgets 5 and 6 in closed form. For $K = w_1^2 w_2^2$ specifically, the multiplicity-2 logarithmic correction $\log(1/\varepsilon)$ shows up as a slow upward drift of the truth line above the WBIC line; that's expected, and the WBIC slope is still the dominant exponent.
+</p>
+
+<nav class="nav">
+  <a href="https://github.com/AMindToThink/ai-safety-math-explainers/blob/main/texts/slt/chapters/dslt1-rlct-effective-dimension/README.md">&larr; DSLT 1 chapter index</a>
+  <a href="https://github.com/AMindToThink/ai-safety-math-explainers/blob/main/texts/slt/NOTES.md">SLT companion overview &rarr;</a>
+</nav>
+
+<script>
+"use strict";
+
+const KATEX_DELIMITERS = [
+  { left: '$$', right: '$$', display: true },
+  { left: '\\[', right: '\\]', display: true },
+  { left: '$', right: '$', display: false },
+  { left: '\\(', right: '\\)', display: false },
+];
+function typeset(el) { if (window.renderMathInElement) renderMathInElement(el, { delimiters: KATEX_DELIMITERS, throwOnError: false }); }
+
+// ---------------------------------------------------------------------------
+// MODELS — matched pairs of regular and singular K's. Each carries:
+//   tex, dim (number of parameters d), f (numerical K), lambda (RLCT analytic).
+//   regular: bool — true if BIC and WBIC agree (i.e., λ = d/2).
+// ---------------------------------------------------------------------------
+const MODELS = [
+  { id: '1d-reg', name: '1D regular: K = w²', tex: 'K(w) = w^2', dim: 1, f: w => w*w, lambda: 0.5, regular: true },
+  { id: '1d-sing', name: '1D singular: K = w⁴', tex: 'K(w) = w^4', dim: 1, f: w => w*w*w*w, lambda: 0.25, regular: false },
+  { id: '2d-reg', name: '2D regular: K = w₁² + w₂²', tex: 'K(w_1, w_2) = w_1^2 + w_2^2', dim: 2, f: (x,y) => x*x + y*y, lambda: 1.0, regular: true },
+  { id: '2d-sing-deep', name: '2D singular: K = w₁² w₂²', tex: 'K(w_1, w_2) = w_1^2 w_2^2', dim: 2, f: (x,y) => x*x * y*y, lambda: 0.5, regular: false },
+  { id: '1d-dual', name: '1D dual: K = (w+1)²(w−1)⁴', tex: 'K(w) = (w + 1)^2 (w - 1)^4', dim: 1, f: w => (w+1)*(w+1) * Math.pow(w-1, 4), lambda: 0.25, regular: false },
+];
+
+// ---------------------------------------------------------------------------
+// Numerical -log Z_n
+// ---------------------------------------------------------------------------
+function logZ1D(K, n, M = 8001) {
+  const lo = -1, hi = 1, h = (hi - lo) / (M - 1);
+  let lps = new Array(M);
+  let maxLp = -Infinity;
+  for (let i = 0; i < M; i++) {
+    const w = lo + h * i;
+    const lp = -n * K(w);
+    lps[i] = lp;
+    if (lp > maxLp) maxLp = lp;
+  }
+  let sum = 0;
+  for (let i = 0; i < M; i++) {
+    const wgt = (i === 0 || i === M - 1) ? 0.5 : 1.0;
+    sum += wgt * Math.exp(lps[i] - maxLp);
+  }
+  return maxLp + Math.log(sum) + Math.log(h);
+}
+
+function logZ2D(K, n, M = 401) {
+  const lo = -1, hi = 1, h = (hi - lo) / (M - 1);
+  let maxLp = -Infinity;
+  // First pass: find max of -n K(x, y).
+  for (let i = 0; i < M; i++) {
+    const x = lo + h * i;
+    for (let j = 0; j < M; j++) {
+      const y = lo + h * j;
+      const lp = -n * K(x, y);
+      if (lp > maxLp) maxLp = lp;
+    }
+  }
+  let sum = 0;
+  for (let i = 0; i < M; i++) {
+    const x = lo + h * i;
+    const wi = (i === 0 || i === M - 1) ? 0.5 : 1.0;
+    for (let j = 0; j < M; j++) {
+      const y = lo + h * j;
+      const wj = (j === 0 || j === M - 1) ? 0.5 : 1.0;
+      sum += wi * wj * Math.exp(-n * K(x, y) - maxLp);
+    }
+  }
+  return maxLp + Math.log(sum) + 2 * Math.log(h);
+}
+
+// ---------------------------------------------------------------------------
+// Compute curves
+// ---------------------------------------------------------------------------
+function buildNs() {
+  const ns = [];
+  for (let p = 1; p <= 4.0; p += 0.1) ns.push(Math.pow(10, p));
+  return ns;
+}
+
+function fitSlope(xs, ys, useLast = 10) {
+  // xs and ys are log10-scale.
+  const n = xs.length;
+  const tail_x = xs.slice(n - useLast);
+  const tail_y = ys.slice(n - useLast);
+  const xm = d3.mean(tail_x), ym = d3.mean(tail_y);
+  let num = 0, den = 0;
+  for (let i = 0; i < tail_x.length; i++) {
+    num += (tail_x[i] - xm) * (tail_y[i] - ym);
+    den += (tail_x[i] - xm) ** 2;
+  }
+  return num / den;
+}
+
+// ---------------------------------------------------------------------------
+// Plot
+// ---------------------------------------------------------------------------
+function drawPlot(model) {
+  const W = 540, H = 380, padL = 60, padB = 44, padT = 20, padR = 18;
+  const svg = d3.select('#plot');
+  svg.selectAll('*').remove();
+
+  const ns = buildNs();
+  const log10n = ns.map(n => Math.log10(n));
+  const truth = ns.map(n => model.dim === 1 ? -logZ1D(model.f, n) : -logZ2D(model.f, n));
+  const bicLine = ns.map(n => (model.dim / 2) * Math.log(n));
+  const wbicLine = ns.map(n => model.lambda * Math.log(n));
+
+  // truth slope vs log10(n) is (d/2 or λ) * ln(10).
+  const truthSlope = fitSlope(log10n, truth);
+  const bicSlopeFitted = fitSlope(log10n, bicLine);
+  const wbicSlopeFitted = fitSlope(log10n, wbicLine);
+
+  const allY = [...truth, ...bicLine, ...wbicLine];
+  const yLo = Math.min(...allY) - 0.5;
+  const yHi = Math.max(...allY) + 0.5;
+
+  const x = d3.scaleLinear().domain([1, 4]).range([padL, W - padR]);
+  const y = d3.scaleLinear().domain([yLo, yHi]).range([H - padB, padT]);
+
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${H - padB})`)
+    .call(d3.axisBottom(x).ticks(7).tickFormat(d => `10^${d}`));
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(${padL}, 0)`)
+    .call(d3.axisLeft(y).ticks(6));
+  svg.append('text').attr('class', 'axis-label').attr('x', W - padR).attr('y', H - 6).attr('text-anchor', 'end').text('n (sample size, log scale)');
+  svg.append('text').attr('class', 'axis-label').attr('x', padL + 6).attr('y', padT - 4).text('-log Z_n (free energy excess over n L_n(w⁰))');
+
+  const line = d3.line().x((_, i) => x(log10n[i])).y(d => y(d));
+
+  svg.append('path').datum(bicLine).attr('d', line)
+    .attr('fill', 'none').attr('stroke', 'var(--bic)').attr('stroke-width', 1.7).attr('stroke-dasharray', '6 4');
+  svg.append('path').datum(wbicLine).attr('d', line)
+    .attr('fill', 'none').attr('stroke', 'var(--wbic)').attr('stroke-width', 2.2);
+  svg.append('path').datum(truth).attr('d', line)
+    .attr('fill', 'none').attr('stroke', 'var(--truth)').attr('stroke-width', 2.2);
+
+  // Slope readouts.
+  d3.select('#d-val').text(model.dim);
+  d3.select('#lambda-val').text(fmtFrac(model.lambda));
+  d3.select('#bic-slope').text((model.dim / 2).toFixed(3));
+  d3.select('#wbic-slope').text(model.lambda.toFixed(3));
+  d3.select('#truth-slope').text((truthSlope / Math.log(10)).toFixed(3));   // convert from log10-slope to ln-slope
+  // Verdict: BIC matches WBIC iff λ = d/2 iff regular.
+  const verdict = model.regular
+    ? `<span class="badge ok">BIC = WBIC = truth</span> (regular)`
+    : `<span class="badge bad">BIC overshoots</span> (singular: $\\lambda = ${fmtFrac(model.lambda)} < d/2 = ${fmtFrac(model.dim / 2)}$)`;
+  d3.select('#verdict').html(verdict);
+  typeset(document.getElementById('verdict'));
+
+  return { truthSlope, model };
+}
+
+// ---------------------------------------------------------------------------
+// Choices
+// ---------------------------------------------------------------------------
+function buildChoices(model) {
+  const root = d3.select('#choices');
+  root.selectAll('*').remove();
+  d3.select('#reveal').style('display', 'none');
+
+  // Three options: BIC=WBIC=truth, BIC=truth (WBIC alone), WBIC=truth (BIC alone)
+  const opts = [
+    { id: 'all',  html: 'BIC, WBIC, and truth all agree (no daylight between any two).' },
+    { id: 'bic-truth',  html: 'BIC matches truth; WBIC is the outlier.' },
+    { id: 'wbic-truth', html: 'WBIC matches truth; BIC is the outlier.' },
+  ];
+  // Correct answer:
+  //   model.regular = true  → 'all'
+  //   model.regular = false → 'wbic-truth'
+  const correct = model.regular ? 'all' : 'wbic-truth';
+  let answered = false;
+
+  for (const opt of opts) {
+    const btn = root.append('button').attr('class', 'choice').html(opt.html).attr('data-id', opt.id);
+    btn.on('click', function () {
+      if (answered) return;
+      answered = true;
+      root.selectAll('button').each(function () {
+        this.disabled = true;
+        if (this.dataset.id === correct) this.classList.add('correct');
+        else if (this === btn.node()) this.classList.add('wrong');
+      });
+      const reveal = d3.select('#reveal');
+      let html;
+      if (model.regular) {
+        html = `For a regular model, $\\lambda = d/2$, so the WBIC formula reduces to the BIC. Both predict slope $d/2 = ${fmtFrac(model.dim / 2)}$, and the numerical $-\\log Z_n$ confirms it (the green and red dashed lines overlap; the blue truth line sits on both). This is exactly Watanabe's reduction $\\mathrm{WBIC} \\to \\mathrm{BIC}$ in the regular case.`;
+      } else {
+        html = `Singular model: $\\lambda = ${fmtFrac(model.lambda)} < d/2 = ${fmtFrac(model.dim / 2)}$, so BIC overshoots. The truth (blue) sits on the WBIC (green) line, not the BIC (red dashed) line. This is the chapter's payoff: replacing $d/2$ with $\\lambda$ recovers the right asymptotic free energy. ${model.id === '2d-sing-deep' ? `For $K = w_1^2 w_2^2$ specifically, the multiplicity $m = 2$ adds a $\\log(1/\\varepsilon)$ correction, so the truth slowly drifts above the pure $\\lambda \\log n$ &mdash; a hint of the WBIC's full second-order structure (DSLT 2 territory).` : ''}`;
+      }
+      reveal.style('display', 'block').html(html);
+      typeset(reveal.node());
+    });
+  }
+  typeset(root.node());
+}
+
+function fmtFrac(x) {
+  if (Math.abs(x - 1) < 1e-9) return '1';
+  if (Math.abs(x - 2) < 1e-9) return '2';
+  if (Math.abs(x - 0.5) < 1e-9) return '1/2';
+  if (Math.abs(x - 0.25) < 1e-9) return '1/4';
+  return x.toFixed(3);
+}
+
+// ---------------------------------------------------------------------------
+// UI
+// ---------------------------------------------------------------------------
+let currentModel = MODELS[0];
+
+function buildButtons() {
+  const root = d3.select('#model-buttons');
+  root.selectAll('button').data(MODELS).join('button')
+    .text(m => m.name).classed('active', m => m.id === currentModel.id)
+    .on('click', (_, m) => { currentModel = m; render(); });
+}
+
+function render() {
+  d3.select('#model-buttons').selectAll('button').classed('active', m => m.id === currentModel.id);
+  d3.select('#formula').html(`$$ ${currentModel.tex} $$`);
+  typeset(document.getElementById('formula'));
+  drawPlot(currentModel);
+  buildChoices(currentModel);
+}
+
+function init() {
+  buildButtons();
+  render();
+  typeset(document.body);
+}
+
+init();
+</script>
+</body>
+</html>
