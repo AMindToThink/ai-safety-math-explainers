@@ -180,6 +180,49 @@ For each chapter inside a text already underway:
   guide, Carroll's DSLT, Shimi's Infra-Bayesianism Unwrapped, etc.),
   credit it explicitly in `NOTES.md` and in the chapter's intro.
 
+## Linking — make every reference clickable
+
+Hyperlinks are pulling double duty in this project: they make it
+easy to bounce between an explainer and the authoritative source,
+*and* they let a reader who has never seen a term ("RLCT", "KL
+divergence", "blow-up") jump out, read a paragraph elsewhere, and
+come back without losing place. Be generous with them.
+
+- **Source citations are always hyperlinks.** When prose says
+  "DSLT 1 §Preliminaries" or "Watanabe Theorem 7.1," that text
+  should be an `<a>` element pointing at the specific section
+  (post URL + `#anchor`), not just a name in italics. This applies
+  to widget reveals, chapter prose, the `note` text under each
+  preset, and any footnote citing a result. Find anchors by
+  grepping `id="..."` in the source HTML in
+  `texts/<slug>/source/`.
+- **Tricky terms link to a helpful explanation.** Anything a
+  reader might not know — RLCT, KL divergence, Fisher information,
+  Hessian, posterior, BIC/WBIC, partition function, normal-crossing
+  form, blow-up, algebraic variety, ReLU — gets an `<a>`. Wikipedia
+  is the default target for general math/statistics terms; for
+  SLT-specific terms (RLCT, WBIC, free energy of singular models)
+  link to the relevant DSLT post anchor. Don't link the same term
+  five times in one page; once near its first appearance is enough.
+- **Each widget ships a "Sources for this widget" panel** near the
+  top, listing the primary source sections it draws from with
+  hyperlinks. The dslt1-bayes-loss-landscape widget is a
+  reference implementation.
+- **Footer nav.** Each widget HTML ends with a small `<nav>` block
+  linking back to the chapter README and the per-text NOTES.md
+  on GitHub, so a reader can navigate the companion without an
+  index page.
+- **Don't fabricate URLs.** If you don't know whether an anchor
+  exists, grep the source HTML; if you don't know whether a
+  Wikipedia page exists, fetch it once before committing the link.
+  A 404 is a confidence killer.
+
+A small `LINK` JS constant + an `a(href, text)` helper at the top
+of each widget keeps the HTML strings readable and lets future
+sessions edit URLs in one place. See
+`texts/slt/chapters/dslt1-rlct-effective-dimension/widgets/01-bayes-loss-landscape.html`
+for the pattern.
+
 ## Verifying correctness
 
 Confidently wrong explainers are worse than no explainers. Before
