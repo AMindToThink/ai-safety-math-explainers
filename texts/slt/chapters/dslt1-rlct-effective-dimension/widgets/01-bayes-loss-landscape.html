@@ -54,19 +54,41 @@
   .legend-swatch { display: inline-block; width: 18px; height: 4px; vertical-align: middle; }
   .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
   code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .sources li { margin: 0.15rem 0; }
+  .source-link { display: inline-block; margin-top: 0.6rem; font-size: 0.88rem; }
+  .source-link::after { content: ' \2197'; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
 </style>
 </head>
 <body>
 
 <h1>The loss landscape $K(w)$ and the set of true parameters $W_0$</h1>
-<p class="subtitle">SLT companion · DSLT 1 widget 1 · <em>The RLCT Measures the Effective Dimension of Neural Networks</em></p>
+<p class="subtitle">SLT companion · widget 1 of 7 for <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural"><em>DSLT 1: The RLCT Measures the Effective Dimension of Neural Networks</em></a> by Liam Carroll</p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#Preliminaries_of_SLT">DSLT 1 §"Preliminaries of SLT"</a> &mdash; the Bayesian setup, $K(w)$, $W_0$, free energy.</li>
+    <li><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#Examples_of_Singular_Loss_Landscapes">DSLT 1 §"Examples of Singular Loss Landscapes"</a> &mdash; Examples 1.1, 1.2.</li>
+    <li><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#Multidimensional_case">DSLT 1 §"Multidimensional case"</a> &mdash; Example 1.5.</li>
+    <li><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#An_example_of_fractional_dimension">DSLT 1 §"An example of fractional dimension"</a> &mdash; Example 1.3 ($K = w^4$).</li>
+    <li><a href="https://www.alignmentforum.org/posts/CZHwwDd7t9aYra5HN/dslt-2-why-neural-networks-obey-occam-s-razor#Example_1__True_parameters_are_preferred_according_to_their_RLCT">DSLT 2 §"Example 1"</a> &mdash; the running $(w+1)^2(w-1)^4$ example.</li>
+    <li><a href="http://therisingsea.org/notes/MSc-Carroll.pdf">Liam Carroll, MSc thesis "Phase Transitions in Neural Networks"</a> (2021), Chapter 2 &mdash; the formal Bayesian setup and the worked examples in book form.</li>
+    <li>Sumio Watanabe, <em>Algebraic Geometry and Statistical Learning Theory</em>, Cambridge 2009 ("Grey Book"), Chapter 1 &mdash; the underlying SLT theorems. Library / institutional access required.</li>
+  </ul>
+</div>
 
 <div class="lede">
-  <p style="margin: 0 0 0.5rem;">In the Bayesian setup of SLT, the posterior $p(w \mid D_n) = \frac{1}{Z_n}\,\varphi(w)\, e^{-n L_n(w)}$ concentrates as $n \to \infty$ on parameters that minimise the empirical loss $L_n(w)$. The infinite-data limit of this loss is the Kullback&ndash;Leibler divergence between truth and model,
+  <p style="margin: 0 0 0.5rem;">In the Bayesian setup of SLT, the <a href="https://en.wikipedia.org/wiki/Posterior_probability">posterior</a> $p(w \mid D_n) = \frac{1}{Z_n}\,\varphi(w)\, e^{-n L_n(w)}$ concentrates as $n \to \infty$ on parameters that minimise the empirical loss $L_n(w)$. The infinite-data limit of this loss is the <a href="https://en.wikipedia.org/wiki/Kullback%E2%80%93Leibler_divergence">Kullback&ndash;Leibler divergence</a> between truth and model,
   $$ K(w) \;=\; \iint q(y \mid x)\, q(x)\, \log \frac{q(y \mid x)}{p(y \mid x, w)}\, dx\, dy \;\geq\; 0, $$
   which we call the <em>loss landscape</em>. Its zero set
   $$ W_0 \;=\; \{ w \in W : K(w) = 0 \} $$
-  is the <em>set of true parameters</em>. In <strong>regular</strong> models $W_0$ is a single point and Fisher information is non-degenerate there; in <strong>singular</strong> models $W_0$ can be a curve, an arrangement of curves, or a higher-dimensional variety. That difference is the entire reason classical Bayesian asymptotics break.</p>
+  is the <em>set of true parameters</em>. In <strong>regular</strong> models $W_0$ is a single point and the <a href="https://en.wikipedia.org/wiki/Fisher_information">Fisher information</a> is non-degenerate there; in <strong>singular</strong> models $W_0$ can be a curve, an arrangement of curves, or a higher-dimensional <a href="https://en.wikipedia.org/wiki/Algebraic_variety">variety</a>. That difference is the entire reason <a href="https://en.wikipedia.org/wiki/Asymptotic_distribution">classical Bayesian asymptotics</a> break.</p>
 </div>
 
 <h2>Pick a loss landscape</h2>
@@ -95,10 +117,15 @@
   contours. The contours come from sampling $K$ on an 80&times;80 grid and running marching
   squares (D3's <code>d3.contours</code>) at logarithmically-spaced thresholds.
   The 1D presets switch the plot from a 2D contour to a 1D curve $K(w)$ vs $w$, with the
-  zeros marked. Local Real Log Canonical Threshold (RLCT) values quoted below appear in
-  Carroll's DSLT 1 worked examples and are derived in the next widget,
+  zeros marked. Local <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#The_Real_Log_Canonical_Threshold__aka_the_Learning_Coefficient_">Real Log Canonical Threshold (RLCT)</a> values quoted in the
+  reveal text appear in <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural">Carroll's DSLT 1</a> worked examples and are derived in the next widget,
   <code>dslt1-volume-scaling-rlct</code>.
 </p>
+
+<nav class="nav">
+  <a href="https://github.com/AMindToThink/ai-safety-math-explainers/blob/main/texts/slt/chapters/dslt1-rlct-effective-dimension/README.md">&larr; DSLT 1 chapter index</a>
+  <a href="https://github.com/AMindToThink/ai-safety-math-explainers/blob/main/texts/slt/NOTES.md">SLT companion overview &rarr;</a>
+</nav>
 
 <script>
 "use strict";
@@ -125,8 +152,43 @@ function typeset(el) {
 //   W0  (algebraic description used to overlay the zero set in red),
 //   choices (predict-the-topology multiple choice),
 //   correct (id of correct choice),
-//   explanation (HTML revealed after the user picks)
+//   explanation (HTML revealed after the user picks),
+//   sourceUrl + sourceLabel (visible "read in source" link in the reveal,
+//     pointing at the specific section of DSLT 1 / DSLT 2 where this
+//     example appears).
 // ---------------------------------------------------------------------------
+const DSLT1 = 'https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural';
+const DSLT2 = 'https://www.alignmentforum.org/posts/CZHwwDd7t9aYra5HN/dslt-2-why-neural-networks-obey-occam-s-razor';
+
+// External references for "tricky terms" in the prose. Used as hover-link
+// targets so a reader who has never met (say) Fisher information can bounce
+// out, read a paragraph, and bounce back.
+const LINK = {
+  // Wikipedia
+  kl:           'https://en.wikipedia.org/wiki/Kullback%E2%80%93Leibler_divergence',
+  fisher:       'https://en.wikipedia.org/wiki/Fisher_information',
+  hessian:      'https://en.wikipedia.org/wiki/Hessian_matrix',
+  bic:          'https://en.wikipedia.org/wiki/Bayesian_information_criterion',
+  bayesPost:    'https://en.wikipedia.org/wiki/Posterior_probability',
+  partition:    'https://en.wikipedia.org/wiki/Partition_function_(statistical_mechanics)',
+  asympNormal:  'https://en.wikipedia.org/wiki/Asymptotic_distribution',
+  resolution:   'https://en.wikipedia.org/wiki/Resolution_of_singularities',
+  normalCross:  'https://en.wikipedia.org/wiki/Normal_crossings',
+  blowup:       'https://en.wikipedia.org/wiki/Blowing_up',
+  variety:      'https://en.wikipedia.org/wiki/Algebraic_variety',
+  relu:         'https://en.wikipedia.org/wiki/Rectifier_(neural_networks)',
+  multivarGauss:'https://en.wikipedia.org/wiki/Multivariate_normal_distribution',
+  // SLT-specific (DSLT subsections)
+  rlct:         DSLT1 + '#The_Real_Log_Canonical_Threshold__aka_the_Learning_Coefficient_',
+  fractDim:     DSLT1 + '#An_example_of_fractional_dimension',
+  freeEnergy:   DSLT1 + '#Preliminaries_of_SLT',
+  wbic:         DSLT2 + '#The_Widely_Applicable_Bayesian_Information_Criterion',
+  potentialWell:DSLT2 + '#K_w__is_like_a_potential_well__where_a_lower_RLCT_means_a_flatter_floor',
+};
+
+// Convenience: <a href="X">Y</a>.
+const a = (href, text) => `<a href="${href}">${text}</a>`;
+
 const MODELS = [
   // -- 2D presets --
   {
@@ -136,10 +198,12 @@ const MODELS = [
     tex: 'K(w_1, w_2) = w_1^2 + w_2^2',
     f: (x, y) => x*x + y*y,
     domain: [-1.5, 1.5],
-    note: 'A regular model. The Fisher information I(w⁰) = 2·diag(1, 1) is positive definite at the unique minimum.',
+    note: `A regular model. The ${a(LINK.fisher, 'Fisher information')} $I(w^{(0)}) = 2\\cdot\\mathrm{diag}(1, 1)$ is positive definite at the unique minimum.`,
     W0: { type: 'points', pts: [[0, 0]] },
     correct: 'point',
-    explanation: '$W_0 = \\{(0,0)\\}$ &mdash; a single point. The Hessian at the origin is non-degenerate, so the model is <em>regular</em>. The posterior concentrates as a Gaussian centred at the origin with covariance $\\frac{1}{n}\\,I^{-1}$, exactly as classical Bayesian asymptotics predicts. Local RLCT $\\lambda = d/2 = 1$.',
+    explanation: `$W_0 = \\{(0,0)\\}$ &mdash; a single point. The ${a(LINK.hessian, 'Hessian')} at the origin is non-degenerate, so the model is <em>regular</em>. The posterior concentrates as a ${a(LINK.multivarGauss, 'Gaussian')} centred at the origin with covariance $\\frac{1}{n}\\,I^{-1}$, exactly as ${a(LINK.asympNormal, 'classical Bayesian asymptotics')} predicts. Local ${a(LINK.rlct, 'RLCT')} $\\lambda = d/2 = 1$.`,
+    sourceUrl: DSLT1 + '#What_is_a_singular_model_',
+    sourceLabel: 'DSLT 1 §"What is a singular model?"',
   },
   {
     id: 'free-param',
@@ -148,10 +212,12 @@ const MODELS = [
     tex: 'K(w_1, w_2) = w_1^2',
     f: (x, y) => x*x,
     domain: [-1.5, 1.5],
-    note: 'A "minimally singular" landscape from Carroll Example 1.1: w₂ is a free parameter and the Fisher information has a kernel along it.',
+    note: `A "minimally singular" landscape from Carroll Example 1.1: $w_2$ is a free parameter and the ${a(LINK.fisher, 'Fisher information')} has a kernel along it.`,
     W0: { type: 'lines', lines: [{ axis: 'x', value: 0 }] },
     correct: 'line',
-    explanation: '$W_0 = \\{(0, w_2) : w_2 \\in \\mathbb{R}\\}$ &mdash; the entire $w_2$-axis is a curve of true parameters. The Fisher information is rank&nbsp;1 (one zero eigenvalue along $w_2$), so this is strictly singular. But it is the <em>easy</em> kind: drop $w_2$ and you recover a 1-parameter regular model with the same input&ndash;output behaviour. Local RLCT $\\lambda = d_1/2 = 1/2$, where $d_1 = 1$ is the number of non-free parameters.',
+    explanation: `$W_0 = \\{(0, w_2) : w_2 \\in \\mathbb{R}\\}$ &mdash; the entire $w_2$-axis is a curve of true parameters. The ${a(LINK.fisher, 'Fisher information')} is rank&nbsp;1 (one zero eigenvalue along $w_2$), so this is strictly singular. But it is the <em>easy</em> kind: drop $w_2$ and you recover a 1-parameter regular model with the same input&ndash;output behaviour. Local ${a(LINK.rlct, 'RLCT')} $\\lambda = d_1/2 = 1/2$, where $d_1 = 1$ is the number of non-free parameters.`,
+    sourceUrl: DSLT1 + '#Sometimes_singularities_are_just_free_parameters',
+    sourceLabel: 'DSLT 1 §"Sometimes singularities are just free parameters"',
   },
   {
     id: 'cross',
@@ -160,10 +226,12 @@ const MODELS = [
     tex: 'K(w_1, w_2) = \\tfrac{1}{2}\\, w_1^2\\, w_2^2',
     f: (x, y) => 0.5 * x*x * y*y,
     domain: [-1.5, 1.5],
-    note: 'Carroll Example 1.2: two flat valleys cross at the origin. Fisher information has rank 0 there, but you cannot just delete a coordinate.',
+    note: `Carroll Example 1.2: two flat valleys cross at the origin. ${a(LINK.fisher, 'Fisher information')} has rank 0 there, but you cannot just delete a coordinate.`,
     W0: { type: 'lines', lines: [{ axis: 'x', value: 0 }, { axis: 'y', value: 0 }] },
     correct: 'cross',
-    explanation: '$W_0 = \\{w_1 = 0\\} \\cup \\{w_2 = 0\\}$ &mdash; an axis-aligned cross. At the origin both $\\partial^2 K / \\partial w_1^2$ and $\\partial^2 K / \\partial w_2^2$ vanish, so $\\mathrm{rank}(I(0)) = 0$. Unlike the free-parameter case, you cannot just throw out one coordinate &mdash; the two singular curves are genuinely entangled. The local RLCT at the origin is $\\lambda = 1/2$ with multiplicity $m = 2$ (since $K$ is a product of two squared coordinates). This is the prototypical singularity for SLT.',
+    explanation: `$W_0 = \\{w_1 = 0\\} \\cup \\{w_2 = 0\\}$ &mdash; an axis-aligned cross. At the origin both $\\partial^2 K / \\partial w_1^2$ and $\\partial^2 K / \\partial w_2^2$ vanish, so $\\mathrm{rank}(I(0)) = 0$. Unlike the free-parameter case, you cannot just throw out one coordinate &mdash; the two singular curves are genuinely entangled. The local ${a(LINK.rlct, 'RLCT')} at the origin is $\\lambda = 1/2$ with multiplicity $m = 2$ (since $K$ is already in ${a(LINK.normalCross, 'normal-crossing form')} as a product of two squared coordinates). This is the prototypical singularity for SLT.`,
+    sourceUrl: DSLT1 + '#But_not_all_singularities_are_free_parameters',
+    sourceLabel: 'DSLT 1 §"But not all singularities are free parameters"',
   },
   {
     id: 'multi',
@@ -172,12 +240,14 @@ const MODELS = [
     tex: 'K(w_1, w_2) = (w_1 + 1)^2\\, w_1^{4}\\, w_2^{2}',
     f: (x, y) => Math.pow(x + 1, 2) * Math.pow(x, 4) * y*y,
     domain: [-1.6, 1.0],
-    note: 'Carroll Example 1.5: three lines of true parameters meeting at two distinct singular points with different local RLCTs.',
+    note: `Carroll Example 1.5: three lines of true parameters meeting at two distinct singular points with different local ${a(LINK.rlct, 'RLCTs')}.`,
     W0: { type: 'lines', lines: [
       { axis: 'x', value: -1 }, { axis: 'x', value: 0 }, { axis: 'y', value: 0 },
     ]},
     correct: 'multi',
-    explanation: '$W_0 = \\{w_1 = -1\\} \\cup \\{w_1 = 0\\} \\cup \\{w_2 = 0\\}$ &mdash; three lines. Two distinguished singular points: at $(-1, 0)$ the local form of $K$ is $\\approx (w_1+1)^2 w_2^2$, giving local RLCT $\\lambda_{-1} = 1/2$ with multiplicity $2$; at $(0, 0)$ the local form is $\\approx w_1^4 w_2^2$, giving $\\lambda_0 = 1/4$ with multiplicity $1$. The <em>global</em> RLCT is the smaller, $\\lambda = 1/4$, so the posterior most prefers the origin even though $(-1, 0)$ is also a true parameter. (DSLT 2 will turn this into a phase preference.)',
+    explanation: `$W_0 = \\{w_1 = -1\\} \\cup \\{w_1 = 0\\} \\cup \\{w_2 = 0\\}$ &mdash; three lines. Two distinguished singular points: at $(-1, 0)$ the local form of $K$ is $\\approx (w_1+1)^2 w_2^2$, giving local ${a(LINK.rlct, 'RLCT')} $\\lambda_{-1} = 1/2$ with multiplicity $2$; at $(0, 0)$ the local form is $\\approx w_1^4 w_2^2$, giving $\\lambda_0 = 1/4$ with multiplicity $1$. The <em>global</em> RLCT is the smaller, $\\lambda = 1/4$, so the posterior most prefers the origin even though $(-1, 0)$ is also a true parameter. (${a(DSLT2, 'DSLT 2')} will turn this into a phase preference.)`,
+    sourceUrl: DSLT1 + '#Multidimensional_case',
+    sourceLabel: 'DSLT 1 §"Multidimensional case"',
   },
   // -- 1D presets --
   {
@@ -190,7 +260,9 @@ const MODELS = [
     note: 'The simplest regular model. Posterior converges to a Gaussian.',
     W0: { type: 'points', pts: [0] },
     correct: 'point-1d-quadratic',
-    explanation: '$W_0 = \\{0\\}$. Local RLCT $\\lambda = 1/2 = d/2$, the regular value. Asymptotic normality holds: $p(w \\mid D_n) \\to \\mathcal{N}(0, 1/(2n))$.',
+    explanation: `$W_0 = \\{0\\}$. Local ${a(LINK.rlct, 'RLCT')} $\\lambda = 1/2 = d/2$, the regular value. ${a(LINK.asympNormal, 'Asymptotic normality')} holds: $p(w \\mid D_n) \\to \\mathcal{N}(0, 1/(2n))$.`,
+    sourceUrl: DSLT1 + '#What_is_a_singular_model_',
+    sourceLabel: 'DSLT 1 §"What is a singular model?"',
   },
   {
     id: '1d-quartic',
@@ -199,10 +271,12 @@ const MODELS = [
     tex: 'K(w) = w^4',
     f: (x) => Math.pow(x, 4),
     domain: [-1.5, 1.5],
-    note: 'Carroll Example 1.3. Same zero set as the quadratic, but flatter &mdash; and the RLCT is fractional.',
+    note: `Carroll Example 1.3. Same zero set as the quadratic, but flatter &mdash; and the ${a(LINK.rlct, 'RLCT')} is fractional.`,
     W0: { type: 'points', pts: [0] },
     correct: 'point-1d-flat',
-    explanation: '$W_0 = \\{0\\}$, same as the quadratic, <em>but</em> the volume of $\\{K < \\varepsilon\\}$ scales like $\\varepsilon^{1/4}$ rather than $\\varepsilon^{1/2}$. So the local RLCT is $\\lambda = 1/4$, and the "effective dimension" $2\\lambda = 1/2$ &mdash; half a dimension. The posterior near $0$ does <em>not</em> converge to a Gaussian.',
+    explanation: `$W_0 = \\{0\\}$, same as the quadratic, <em>but</em> the volume of $\\{K < \\varepsilon\\}$ scales like $\\varepsilon^{1/4}$ rather than $\\varepsilon^{1/2}$. So the local ${a(LINK.rlct, 'RLCT')} is $\\lambda = 1/4$, and the "effective dimension" $2\\lambda = 1/2$ &mdash; half a dimension. The posterior near $0$ does <em>not</em> converge to a ${a(LINK.multivarGauss, 'Gaussian')}.`,
+    sourceUrl: LINK.fractDim,
+    sourceLabel: 'DSLT 1 §"An example of fractional dimension"',
   },
   {
     id: '1d-two',
@@ -211,10 +285,12 @@ const MODELS = [
     tex: 'K(w) = (w + 1)^2\\, (w - 1)^4',
     f: (x) => Math.pow(x+1, 2) * Math.pow(x-1, 4),
     domain: [-2, 2],
-    note: 'Two true parameters, different local RLCTs. This is the running example of DSLT 2 §Example 1.',
+    note: `Two true parameters, different local ${a(LINK.rlct, 'RLCTs')}. This is the running example of ${a(DSLT2 + '#Example_1__True_parameters_are_preferred_according_to_their_RLCT', 'DSLT 2 §Example 1')}.`,
     W0: { type: 'points', pts: [-1, 1] },
     correct: 'two-points-1d',
-    explanation: '$W_0 = \\{-1, +1\\}$. Local form near $-1$: $K(w) \\approx 16\\,(w+1)^2$, giving $\\lambda_{-1} = 1/2$ (regular). Local form near $+1$: $K(w) \\approx 4\\,(w-1)^4$, giving $\\lambda_{+1} = 1/4$. The <em>global</em> RLCT is the smaller, $\\lambda = 1/4$, so the posterior prefers $+1$ as $n \\to \\infty$ even though both points have $K = 0$. This is the punchline of DSLT 2: lower RLCT wins.',
+    explanation: `$W_0 = \\{-1, +1\\}$. Local form near $-1$: $K(w) \\approx 16\\,(w+1)^2$, giving $\\lambda_{-1} = 1/2$ (regular). Local form near $+1$: $K(w) \\approx 4\\,(w-1)^4$, giving $\\lambda_{+1} = 1/4$. The <em>global</em> ${a(LINK.rlct, 'RLCT')} is the smaller, $\\lambda = 1/4$, so the posterior prefers $+1$ as $n \\to \\infty$ even though both points have $K = 0$. This is the punchline of ${a(DSLT2, 'DSLT 2')}: ${a(LINK.potentialWell, 'lower RLCT wins')}.`,
+    sourceUrl: DSLT2 + '#Example_1__True_parameters_are_preferred_according_to_their_RLCT',
+    sourceLabel: 'DSLT 2 §"Example 1: True parameters are preferred according to their RLCT"',
   },
 ];
 
@@ -238,8 +314,9 @@ const svg = d3.select('#plot');
 function renderModel(model) {
   // formula box
   document.getElementById('formula').innerHTML = `\\[ ${model.tex} \\]`;
-  document.getElementById('model-note').textContent = model.note;
+  document.getElementById('model-note').innerHTML = model.note;
   typeset(document.getElementById('formula'));
+  typeset(document.getElementById('model-note'));
 
   // choices
   const choices = model.dim === 2 ? CHOICES_2D : CHOICES_1D;
@@ -261,7 +338,11 @@ function renderModel(model) {
       }
       const reveal = document.getElementById('reveal');
       reveal.style.display = 'block';
-      reveal.innerHTML = '<strong>Answer.</strong> ' + model.explanation;
+      let html = '<strong>Answer.</strong> ' + model.explanation;
+      if (model.sourceUrl) {
+        html += `<br><a class="source-link" href="${model.sourceUrl}">Read this example in ${model.sourceLabel}</a>`;
+      }
+      reveal.innerHTML = html;
       typeset(reveal);
     };
     btn.dataset.id = c.id;
