@@ -136,14 +136,14 @@
 <h2>What a logical inductor does instead</h2>
 <p>A logical inductor's <strong>price</strong> $\mathbb{P}_t(\varphi)$ on day $t$ is not constrained by $\varphi$'s eventual truth — it is constrained by the inability of any polynomial-time trader to <em>exploit</em> $\mathbb{P}$. In particular:</p>
 <ul>
-  <li>If digits of $\pi$ at position $n$ are pseudorandom relative to all polynomial-time predictors, the inductor learns to price each $\quot{\pi[n] = 7}$ at $\approx 0.1$ — the empirical-frequency prior — until the deductive process actually computes $\pi[n]$.</li>
-  <li>Once the deductive process emits the resolved value, the price snaps to 0 or 1 in a timely manner.</li>
-  <li>Crucially, before resolution the inductor's price <em>can</em> represent uncertainty: $\mathbb{P}_t(\varphi) = 0.1$ is allowed, even though by ground truth either $\varphi$ or $\lnot \varphi$ is provable.</li>
+  <li>If digits of $\pi$ at position $n$ are pseudorandom relative to all polynomial-time predictors, the inductor's price for $\quot{\pi[n] = 7}$ <em>converges</em> to $\approx 0.1$ — the empirical-frequency prior — driven by traders who profit whenever the price drifts away from $0.1$. The prior is not hardcoded; it emerges from the trading dynamics. (See <a href="https://github.com/monasticacademy/logical-induction/blob/main/examples/uniform_digits_of_pi.py">Flint's <code>uniform_digits_of_pi.py</code></a> for a runnable instance: a single s-curve trader with intercept $0.1$, and the credence climbs/oscillates toward $0.1$ over many update steps rather than starting there.)</li>
+  <li>Once the deductive process emits the resolved value, the price snaps to 0 or 1 in a timely manner — again driven by traders, this time exploiting the gap between the now-known truth and any non-trivial price.</li>
+  <li>Crucially, before resolution the inductor's price <em>can</em> represent uncertainty: $\mathbb{P}_t(\varphi) \approx 0.1$ is allowed, even though by ground truth either $\varphi$ or $\lnot \varphi$ is provable.</li>
 </ul>
 <p class="panel-note">This is what §4.3 of the paper formalizes as the <strong>Statistical-Pattern Learning</strong> theorem. The "10%" estimate is the right answer in the same sense that "the probability the next coin flip is heads given a fair coin is 50%" is the right answer — even though for any single flip there's a ground truth.</p>
 
 <p class="footnote">
-  <strong>How this widget thinks about the LI's price.</strong> The widget's "logical inductor" is a stand-in: a constant 0.1 prior that snaps to 0 or 1 on day $\tau(n)$, where $\tau(n) = \lceil n / 5 \rceil + 5$ — small $n$ get resolved quickly, large $n$ take longer. The actual LIA in §5 of the paper is far more elaborate, but the qualitative trajectory is the same: a flat empirical-frequency prior followed by a snap to the resolved value. The Bayesian's "price" is shown as $1$ throughout if $\pi[n] = 7$ in our pre-computed first-100-digit table; otherwise $0$. Either way, it never floats — that's the whole point.
+  <strong>How this widget thinks about the LI's price.</strong> The widget's "logical inductor" is a stand-in: a flat $0.1$ line that snaps to $0$ or $1$ on day $\tau(n)$, where $\tau(n) = \lceil n / 5 \rceil + 5$. This is a heuristic for a true LI's <em>resolution day</em> — the day the deductive process $D_n$ first emits $\varphi$ or $\lnot \varphi$ — and the n-dependent shape is purely cosmetic, not a property of any real LI. The flat $0.1$ before resolution is also a simplification: in the actual LIA of §5, the price <em>converges</em> to $\approx 0.1$ as s-curve traders (sigmoids centred at $0.1$, slope $\sim 10$) push the price toward the empirical-frequency prior — see <a href="https://github.com/monasticacademy/logical-induction/blob/main/examples/uniform_digits_of_pi.py">Flint's <code>uniform_digits_of_pi.py</code></a>, which is small enough to run in seconds and shows the convergence explicitly. The qualitative trajectory shown here — flat prior then snap to resolution — is correct; the "exactly $0.1$ from day 1" detail is not. The Bayesian's "price" is shown as $1$ throughout if $\pi[n] = 7$ in our pre-computed first-100-digit table; otherwise $0$. Either way, it never floats — that's the whole point.
 </p>
 
 <nav class="nav">
@@ -160,10 +160,12 @@ const PI_DIGITS = (
   '58209749445923078164062862089986280348253421170679'
 );
 
-// Logical inductor's "snap day" — heuristic: small n is resolved quickly,
-// large n takes longer. tau(n) = ceil(n / 5) + 5. Caps at the simulation
-// horizon for visualization purposes.
-function snapDay(n) { return Math.ceil(n / 5) + 5; }
+// Stand-in for the deductive process D_n's resolution schedule for phi := "pi[n]=7":
+// the day D_n first emits phi or its negation. We use tau(n) = ceil(n/5) + 5 so
+// small n resolves quickly and large n takes longer; this is purely cosmetic, not
+// a property of any real LI or D_n. A faithful widget would derive resolutionDay
+// from the deductive process; here it's a knob the reader can ignore.
+function resolutionDay(n) { return Math.ceil(n / 5) + 5; }
 
 const N_SIM_DAYS = 60;     // simulation horizon
 const LI_PRIOR = 0.1;      // empirical-frequency prior (uniform over digits 0..9)
@@ -181,7 +183,7 @@ function bayesianPrice(n) {
 }
 
 function liPrice(n, day) {
-  const tau = snapDay(n);
+  const tau = resolutionDay(n);
   if (day < tau) return LI_PRIOR;
   return piDigitIs7(n) ? 1.0 : 0.0;
 }
@@ -222,9 +224,9 @@ function updateAll() {
 
   // LI on day 1
   liPriceEl.textContent = LI_PRIOR.toFixed(3);
-  const tau = snapDay(n);
+  const tau = resolutionDay(n);
   liNoteEl.innerHTML =
-    `LI prior is the empirical frequency of digit "7" in random base-10 strings — exactly $\\frac{1}{10}$. ` +
+    `LI's price <em>converges</em> to the empirical frequency of digit "7" in random base-10 strings — $\\approx \\frac{1}{10}$ — pushed there by traders who profit whenever the price drifts away (see footnote on s-curve traders). ` +
     `The (toy) deductive process resolves $\\varphi$ on day $\\tau(${n}) = ${tau}$; from then on, $\\mathbb{P}_t(\\varphi) = ${isSeven ? '1' : '0'}$.`;
 
   renderPlot(n);
@@ -293,7 +295,7 @@ function renderPlot(n) {
   });
 
   // snap-day marker
-  const tau = snapDay(n);
+  const tau = resolutionDay(n);
   if (tau >= 1 && tau <= N_SIM_DAYS) {
     svg.append('line')
        .attr('x1', x(tau)).attr('x2', x(tau))
