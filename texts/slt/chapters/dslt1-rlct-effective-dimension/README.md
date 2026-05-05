@@ -62,7 +62,7 @@ Status definitions match `texts/slt/NOTES.md`:
 | 4 | [`dslt1-bic-derivation`](widgets/04-bic-derivation.html) | drafted |
 | 5 | [`dslt1-volume-scaling-rlct`](widgets/05-volume-scaling-rlct.html) | drafted |
 | 6 | [`dslt1-normal-crossing-game`](widgets/06-normal-crossing-game.html) | drafted |
-| 7 | `dslt1-resolution-primer` | not started |
+| 7 | [`dslt1-resolution-primer`](widgets/07-resolution-primer.html) | drafted |
 | 8 | `dslt1-wbic-vs-bic` | not started |
 
 See `texts/slt/NOTES.md` for the full breakdown table with toy systems
@@ -120,6 +120,21 @@ A 1-hidden-unit ReLU regressor (with target $0$ and $x \sim
 \mathcal{N}(0, 1)$) appears as a final preset and recovers Example
 1.2 verbatim, demonstrating the Carroll thesis Lemma 3.2 result that
 ReLU networks are strictly singular.
+
+### Module 7 — `dslt1-resolution-primer`
+
+[`widgets/07-resolution-primer.html`](widgets/07-resolution-primer.html)
+introduces blow-ups as the bridge from "compute RLCT for normal-crossing
+$K$" (module 6) to "compute RLCT for any analytic $K$" (Hironaka).
+Side-by-side contour plots show the original $K(x, y)$ and the pulled-back
+$K(u, u v)$ in the $(x, y) = (u, u v)$ chart of the blow-up at the
+origin. Four toy $K$'s: regular $K = x^2 + y^2$, already-normal-crossing
+$K = x^2 y^2$, tilted-lines $K = (x^2 - y^2)^2$ that needs one blow-up,
+and cusp-squared $K = (x^3 - y^2)^2$ that needs more than one. Active
+check: predict whether one blow-up in this chart suffices. Reveal
+computes $K(u, u v)$ symbolically and inspects the result. The cusp
+case is the instructive failure that motivates Hironaka's "finite
+sequence of blow-ups" guarantee.
 
 ### Module 6 — `dslt1-normal-crossing-game`
 

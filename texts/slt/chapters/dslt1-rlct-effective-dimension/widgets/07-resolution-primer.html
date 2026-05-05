@@ -1,0 +1,303 @@
+<!--
+  Widget: dslt1-resolution-primer. Module 7 for DSLT 1.
+  Source: DSLT 1 §"Resolution of Singularities" (Carroll 2023). Watanabe Grey
+          Book §1.4 for the rigorous statement; Carroll thesis Ch 4 for a
+          gentler real-analytic intro to blow-ups.
+  Toy system: four 2D K's chosen so that (a) one is regular, (b) one is
+              already in normal-crossing form, (c) one is in non-aligned
+              normal-crossing form (two crossing lines y = ±x) that needs
+              one blow-up, and (d) one is a cusp-squared K = (x³ - y²)²
+              that needs more than one blow-up.
+  Active check: predict, for each K, whether a single blow-up at the origin
+                in the (x, y) = (u, uv) chart suffices to put K into
+                normal-crossing form. Reveal computes K(u, uv) symbolically
+                and inspects the result.
+  Standalone: open this .html in a browser. D3 v7 + d3-contour v4 + KaTeX
+              0.16 from CDN.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SLT companion · DSLT 1 widget 7 · Resolution of singularities — a primer</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-contour@4"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --w0:#d92d20; --muted:#52606d; --ok:#099250; --okbg:#d1fadf; --bad:#b42318; --badbg:#fee4e2; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 980px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; color: var(--ink); }
+  h3 { font-size: 0.95rem; margin-top: 1.2rem; color: var(--ink); }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .sources li { margin: 0.15rem 0; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  .controls { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.8rem 0 0.4rem; }
+  .controls button { padding: 0.4rem 0.7rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.85rem; color: var(--ink); }
+  .controls button:hover { background: #eef3f8; }
+  .controls button.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .twin { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.6rem; }
+  @media (max-width: 750px) { .twin { grid-template-columns: 1fr; } }
+  .panel { background: #fff; border: 1px solid #d9e0e7; border-radius: 4px; padding: 0.7rem 0.8rem; }
+  .panel .ptitle { font-weight: 600; color: var(--accent); margin-bottom: 0.3rem; font-size: 0.95rem; }
+  .panel .ptex { font-size: 0.95rem; padding: 0.35rem 0; }
+  svg.contour { background: #fff; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 11px; font-style: italic; }
+  .question-box { background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; padding: 0.55rem 0.85rem; margin-top: 0.8rem; }
+  .choice-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem; }
+  .choice { padding: 0.4rem 0.9rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover:not(:disabled) { background: #eef3f8; }
+  .choice.correct { background: var(--okbg); border-color: var(--ok); color: var(--ok); }
+  .choice.wrong { background: var(--badbg); border-color: var(--w0); color: var(--bad); }
+  .choice:disabled { cursor: default; }
+  .reveal { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.7rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; }
+</style>
+</head>
+<body>
+
+<h1>Resolution of singularities &mdash; a primer</h1>
+<p class="subtitle">SLT companion · widget 7 of 7 for <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural"><em>DSLT 1: The RLCT Measures the Effective Dimension of Neural Networks</em></a> by Liam Carroll</p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#Resolution_of_Singularities">DSLT 1 §"Resolution of Singularities"</a> &mdash; Hironaka's theorem statement and the global RLCT formula $\lambda = \min_\alpha \min_j (h_j + 1)/(2 k_j)$.</li>
+    <li><a href="http://therisingsea.org/notes/MSc-Carroll.pdf">Liam Carroll, MSc thesis</a> Chapter 4 &mdash; a longer, real-analytic introduction to blow-ups in the SLT context.</li>
+    <li>Sumio Watanabe, <em>Algebraic Geometry and Statistical Learning Theory</em>, Cambridge 2009, §1.4 (Resolution of Singularities) &mdash; the canonical statement and its application to the zeta function. Library / institutional access required.</li>
+    <li>Daniel Murfet's <a href="http://therisingsea.org/notes/metauni/slt.pdf">metauni SLT lectures</a> &mdash; visual / algebraic-geometric introduction to blow-ups for the SLT audience.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;">In widget&nbsp;6 we computed RLCTs for $K$ already in normal-crossing form. <strong>Hironaka's resolution of singularities</strong> says we don't have to be that lucky: for any analytic $K \geq 0$, there is a smooth manifold $M$ and a real-analytic map $g \colon M \to W$ such that <em>after pulling back along $g$</em>, $K(g(u))$ is normal-crossing in every local chart:
+    $$ K(g(u)) \;=\; u_1^{2 k_1} \cdots u_d^{2 k_d}, \qquad |g'(u)| \;=\; |u_1^{h_1} \cdots u_d^{h_d}|\, \phi(u),\;\;\phi > 0. $$
+  The RLCT is then $\lambda = \min_\alpha \min_j (h_j + 1)/(2 k_j)$ over local charts $M_\alpha$. The whole point of the resolution is to <em>make widget 6's calculation universal</em>.</p>
+  <p style="margin: 0;">This widget shows the simplest blow-up: replace the origin in $\mathbb{R}^2$ with a $\mathbb{P}^1$ of directions, parameterised in one chart by $(x, y) = (u, u v)$. The Jacobian is $u$, so $|g'| = |u|$ &mdash; this is the $h_1 = 1$ that appears in the formula. For each $K$ below, predict whether one blow-up in this chart already gives normal-crossing form near the origin.</p>
+</div>
+
+<h2>Pick a $K$</h2>
+<div class="controls" id="model-buttons"></div>
+
+<div class="twin">
+  <div class="panel">
+    <div class="ptitle">Original — $K(x, y)$ in $(x, y)$</div>
+    <div class="ptex" id="orig-tex"></div>
+    <svg class="contour" id="orig-plot" viewBox="0 0 360 320"></svg>
+  </div>
+  <div class="panel">
+    <div class="ptitle">Pulled back — $K(u, uv)$ in $(u, v)$</div>
+    <div class="ptex" id="blown-tex"></div>
+    <svg class="contour" id="blown-plot" viewBox="0 0 360 320"></svg>
+  </div>
+</div>
+
+<div class="question-box" id="question-box">
+  <strong>After one blow-up at the origin in the $(x, y) = (u, uv)$ chart, is $K(u, uv)$ in normal-crossing form near $(0, 0)$?</strong>
+  <div class="choice-row" id="choices">
+    <button class="choice" data-ans="yes">Yes</button>
+    <button class="choice" data-ans="no">No</button>
+  </div>
+</div>
+<div class="reveal" id="reveal" style="display: none;"></div>
+
+<p class="footnote">
+  <strong>Notation.</strong> The "blow-up at the origin" of $\mathbb{R}^2$ is a 2-manifold $M$ that comes with two charts; this widget shows only the first chart, $(x, y) = (u, u v)$, whose Jacobian is $u$. The second chart, $(x, y) = (u v, v)$, has Jacobian $v$, and "true" Hironaka resolution requires you to check both charts. A $K$ that's already normal-crossing in chart 1 may need additional blow-ups in chart 2 (cusp $K = (x^3 - y^2)^2$ is the canonical example). The active check sticks to chart 1 to keep the moving parts down. In a real computation, $\lambda$ is determined by the chart that gives the smallest $(h_j + 1)/(2 k_j)$; the widget's reveals quote local exponents in chart 1 only and flag when chart 2 changes the answer.
+  Contour plots are computed on a $90 \times 90$ grid via <code>d3.contours</code>; the colour ramp is shared between original and pulled-back panels so you can compare visually.
+</p>
+
+<nav class="nav">
+  <a href="https://github.com/AMindToThink/ai-safety-math-explainers/blob/main/texts/slt/chapters/dslt1-rlct-effective-dimension/README.md">&larr; DSLT 1 chapter index</a>
+  <a href="https://github.com/AMindToThink/ai-safety-math-explainers/blob/main/texts/slt/NOTES.md">SLT companion overview &rarr;</a>
+</nav>
+
+<script>
+"use strict";
+
+const KATEX_DELIMITERS = [
+  { left: '$$', right: '$$', display: true },
+  { left: '\\[', right: '\\]', display: true },
+  { left: '$', right: '$', display: false },
+  { left: '\\(', right: '\\)', display: false },
+];
+function typeset(el) { if (window.renderMathInElement) renderMathInElement(el, { delimiters: KATEX_DELIMITERS, throwOnError: false }); }
+
+// ---------------------------------------------------------------------------
+// MODELS
+//   tex   : original K in (x, y)
+//   f     : numerical K(x, y) for the contour
+//   blow  : object with
+//             tex      : K after substituting (x, y) = (u, uv)
+//             f        : numerical K(u, uv) for the contour
+//             nc       : 'yes' or 'no' — answer to the question
+//             reveal   : HTML explanation
+// ---------------------------------------------------------------------------
+const MODELS = [
+  {
+    id: 'sphere',
+    name: 'K = x² + y²',
+    tex: 'K(x, y) = x^2 + y^2',
+    f: (x, y) => x*x + y*y,
+    blow: {
+      tex: 'K(u, uv) = u^2 (1 + v^2)',
+      f: (u, v) => u*u * (1 + v*v),
+      nc: 'yes',
+      reveal: `Substituting $(x, y) = (u, u v)$ gives $K = u^2 + u^2 v^2 = u^2 (1 + v^2)$. The factor $(1 + v^2)$ is positive everywhere &mdash; in particular it does not vanish at $(0, 0)$ &mdash; so it lumps into the analytic prefactor $\\phi(u, v)$. What's left is $u^{2 \\cdot 1} \\cdot v^{2 \\cdot 0}$, which is normal-crossing with $k_1 = 1, k_2 = 0$. The Jacobian is $u^1$, so $h_1 = 1, h_2 = 0$, giving local $\\lambda = (1 + 1)/(2 \\cdot 1) = 1$ &mdash; matching $\\lambda = d/2$ for the regular case.`,
+    },
+  },
+  {
+    id: 'cross',
+    name: 'K = x²y² (already n.c.)',
+    tex: 'K(x, y) = x^2 y^2',
+    f: (x, y) => x*x * y*y,
+    blow: {
+      tex: 'K(u, uv) = u^4 v^2',
+      f: (u, v) => Math.pow(u, 4) * v*v,
+      nc: 'yes',
+      reveal: `$(x, y) = (u, u v)$ gives $K = u^2 (u v)^2 = u^4 v^2$. This is a pure monomial, so it's normal-crossing in $(u, v)$ already. In <em>this</em> chart, $k_1 = 2, k_2 = 1, h_1 = 1, h_2 = 0$, so the local exponents are $(h_1 + 1)/(2 k_1) = 2/4 = 1/2$ and $(h_2 + 1)/(2 k_2) = 1/2$ &mdash; tied. (Note that the original $K = x^2 y^2$ was already in normal-crossing form in the original $(x, y)$ coordinates; the blow-up here doesn't change anything important.)`,
+    },
+  },
+  {
+    id: 'tilted',
+    name: 'K = (x − y)²(x + y)²',
+    tex: 'K(x, y) = (x - y)^2 (x + y)^2 = (x^2 - y^2)^2',
+    f: (x, y) => Math.pow(x*x - y*y, 2),
+    blow: {
+      tex: 'K(u, uv) = u^4 (1 - v^2)^2',
+      f: (u, v) => Math.pow(u, 4) * Math.pow(1 - v*v, 2),
+      nc: 'yes',
+      reveal: `$V(K)$ is the union of the lines $y = x$ and $y = -x$ &mdash; two crossing lines, but <em>not</em> aligned with the axes, so $K$ is not in normal-crossing form in $(x, y)$. After blow-up, $K(u, uv) = (u^2 - u^2 v^2)^2 = u^4 (1 - v^2)^2$. The factor $(1 - v^2)^2$ vanishes at $v = \\pm 1$, but those points are <em>away</em> from $(0, 0)$ in the $(u, v)$ chart, so locally near $(0, 0)$ it's a non-vanishing analytic prefactor. So locally normal-crossing with $k_1 = 2, h_1 = 1$; local $\\lambda$ in this chart is $2/4 = 1/2$. (The two zeros at $v = \\pm 1$ are the original two lines, now separated by the blow-up &mdash; you can see them as the two "valleys" in the right-hand plot.)`,
+    },
+  },
+  {
+    id: 'cusp',
+    name: 'K = (x³ − y²)² (cusp²)',
+    tex: 'K(x, y) = (x^3 - y^2)^2',
+    f: (x, y) => Math.pow(x*x*x - y*y, 2),
+    blow: {
+      tex: 'K(u, uv) = u^4 (u - v^2)^2',
+      f: (u, v) => Math.pow(u, 4) * Math.pow(u - v*v, 2),
+      nc: 'no',
+      reveal: `<strong>The instructive case.</strong> $V(K)$ is the cusp $x^3 = y^2$ &mdash; a singular curve with a sharp point at the origin. After blow-up, $K(u, u v) = (u^3 - u^2 v^2)^2 = u^4 (u - v^2)^2$. The factor $(u - v^2)$ vanishes on the curve $u = v^2$, which <em>does</em> pass through $(0, 0)$ in the $(u, v)$ chart. So $K(u, u v)$ has a residual singularity along $u = v^2$ &mdash; not normal-crossing. Need a second blow-up. (This is exactly Hironaka's theorem giving us a <em>finite sequence</em> of blow-ups, not a one-shot resolution. For this $K$, two blow-ups suffice.)`,
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Plot
+// ---------------------------------------------------------------------------
+const PW = 360, PH = 320, PAD_L = 36, PAD_B = 28, PAD_T = 14, PAD_R = 14;
+
+function drawContour(svgSel, f, lo, hi, label) {
+  svgSel.selectAll('*').remove();
+  const N = 90;
+  const grid = new Array(N * N);
+  let kMax = 0;
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const xv = lo + (hi - lo) * i / (N - 1);
+      const yv = lo + (hi - lo) * j / (N - 1);
+      const k = f(xv, yv);
+      grid[j * N + i] = k;
+      if (k > kMax) kMax = k;
+    }
+  }
+  const thresholds = d3.range(1, 8).map(i => kMax * Math.pow(2, -i));
+  const contours = d3.contours().size([N, N]).thresholds(thresholds)(grid);
+
+  const xi = d3.scaleLinear().domain([0, N - 1]).range([PAD_L, PW - PAD_R]);
+  const yi = d3.scaleLinear().domain([0, N - 1]).range([PAD_T, PH - PAD_B]);
+  const path = d3.geoPath(d3.geoTransform({
+    point(xPx, yPx) { this.stream.point(xi(xPx), yi((N - 1) - yPx)); }
+  }));
+
+  // Shading by threshold.
+  const cm = d3.scaleSequential(d3.interpolateBlues).domain([Math.log10(thresholds[0] + 1e-12), Math.log10(thresholds[thresholds.length - 1] + 1e-12)]);
+  svgSel.append('g').selectAll('path').data(contours).join('path')
+    .attr('d', path).attr('fill', d => cm(Math.log10(d.value + 1e-12))).attr('stroke', '#246').attr('stroke-width', 0.4).attr('opacity', 0.45);
+
+  // Axes for orientation.
+  const xs = d3.scaleLinear().domain([lo, hi]).range([PAD_L, PW - PAD_R]);
+  const ys = d3.scaleLinear().domain([lo, hi]).range([PH - PAD_B, PAD_T]);
+  svgSel.append('g').attr('class', 'axis').attr('transform', `translate(0, ${PH - PAD_B})`).call(d3.axisBottom(xs).ticks(5));
+  svgSel.append('g').attr('class', 'axis').attr('transform', `translate(${PAD_L}, 0)`).call(d3.axisLeft(ys).ticks(5));
+  svgSel.append('text').attr('class', 'axis-label').attr('x', PW - PAD_R).attr('y', PH - 6).attr('text-anchor', 'end').text(label[0]);
+  svgSel.append('text').attr('class', 'axis-label').attr('x', PAD_L + 4).attr('y', PAD_T).text(label[1]);
+}
+
+// ---------------------------------------------------------------------------
+// UI
+// ---------------------------------------------------------------------------
+let currentModel = MODELS[0];
+let answered = false;
+
+function buildButtons() {
+  const root = d3.select('#model-buttons');
+  root.selectAll('button').data(MODELS).join('button')
+    .text(m => m.name).classed('active', m => m.id === currentModel.id)
+    .on('click', (_, m) => { currentModel = m; answered = false; render(); });
+}
+
+function render() {
+  d3.select('#model-buttons').selectAll('button').classed('active', m => m.id === currentModel.id);
+  d3.select('#orig-tex').html(`$$ ${currentModel.tex} $$`);
+  d3.select('#blown-tex').html(`$$ ${currentModel.blow.tex} $$`);
+  typeset(document.getElementById('orig-tex'));
+  typeset(document.getElementById('blown-tex'));
+
+  drawContour(d3.select('#orig-plot'), currentModel.f, -1.2, 1.2, ['x', 'y']);
+  drawContour(d3.select('#blown-plot'), currentModel.blow.f, -1.2, 1.2, ['u', 'v']);
+
+  // Reset choices.
+  d3.select('#reveal').style('display', 'none');
+  d3.selectAll('#choices button').each(function () {
+    this.disabled = false;
+    this.classList.remove('correct', 'wrong');
+  });
+}
+
+function bindChoices() {
+  d3.selectAll('#choices button').on('click', function () {
+    if (answered) return;
+    answered = true;
+    const ans = this.dataset.ans;
+    const correct = currentModel.blow.nc;
+    d3.selectAll('#choices button').each(function () {
+      this.disabled = true;
+      if (this.dataset.ans === correct) this.classList.add('correct');
+    });
+    if (ans !== correct) this.classList.add('wrong');
+    const reveal = d3.select('#reveal');
+    reveal.style('display', 'block').html(currentModel.blow.reveal);
+    typeset(reveal.node());
+  });
+  // ALSO: when switching models, "answered" resets — re-bind isn't needed, but
+  // we need to allow new clicks. Track via the answered flag.
+  d3.selectAll('#model-buttons button').on('click.reset', function () {
+    answered = false;
+  });
+}
+
+function init() {
+  buildButtons();
+  render();
+  bindChoices();
+  typeset(document.body);
+}
+
+init();
+</script>
+</body>
+</html>

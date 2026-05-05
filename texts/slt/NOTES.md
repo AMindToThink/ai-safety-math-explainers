@@ -231,7 +231,7 @@ secondary toys are noted in the justification.
 | DSLT 1 §"Classical Bayesian inference breaks down" | `dslt1-bic-derivation` | Comparison K = w² (regular) vs K = w⁴ (singular) | Step through the BIC derivation; pinpoint the line that fails under degenerate I(w₀) | drafted | |
 | DSLT 1 §"Dimensionality as a volume co-dimension" | `dslt1-volume-scaling-rlct` | 1D K(w) = w^(2k) and 2D normal-crossing K | Scrub ε; plot log V(ε) vs log ε; read slope = λ. Tune k so 2λ matches a target effective dimension | drafted | |
 | DSLT 1 §"The RLCT can be read off when K(w) is in normal crossing form" (one- and multi-dim cases) | `dslt1-normal-crossing-game` | Polynomial K in normal crossing form, 1D/2D | Game: given K(w) = ∏ w_i^(2k_i) (possibly with shifted critical points, à la Example 1.5), read off the local and global RLCT and multiplicity | drafted | |
-| DSLT 1 §"Resolution of Singularities" | `dslt1-resolution-primer` | Real plane curves V(xy), V(x²−y³), V(x²−y²) | Animated blow-up: see how (M, g) puts K(g(u)) into normal crossing form. Active: pick the blow-up centre that resolves a given singularity | in progress | |
+| DSLT 1 §"Resolution of Singularities" | `dslt1-resolution-primer` | Real plane curves V(xy), V(x²−y³), V(x²−y²) | Animated blow-up: see how (M, g) puts K(g(u)) into normal crossing form. Active: pick the blow-up centre that resolves a given singularity | drafted | |
 | DSLT 1 §"The RLCT measures the effective dimensionality" + WBIC | `dslt1-wbic-vs-bic` | Toy regular K = w² + w² vs toy singular K = w₁² w₂² | Side-by-side BIC vs WBIC as n grows; predict-then-reveal which model "wins" at each n | not started | |
 
 ### Module justifications
@@ -337,15 +337,17 @@ Empty for now. Populate as we encounter them.
 
 - **Last updated:** 2026-05-05
 - **Chapters complete:** 0
-- **Currently being drafted:** Six DSLT 1 widgets shipped as
+- **Currently being drafted:** Seven DSLT 1 widgets shipped as
   single-file standalone HTML and marked drafted —
   `dslt1-bayes-loss-landscape` (module 1),
   `dslt1-singular-posterior` (module 2),
   `dslt1-fisher-degeneracy` (module 3),
   `dslt1-bic-derivation` (module 4),
-  `dslt1-volume-scaling-rlct` (module 5), and
-  `dslt1-normal-crossing-game` (module 6). Two remaining DSLT 1
-  modules still proposed and awaiting human approval.
+  `dslt1-volume-scaling-rlct` (module 5),
+  `dslt1-normal-crossing-game` (module 6), and
+  `dslt1-resolution-primer` (module 7). One remaining DSLT 1
+  module (`dslt1-wbic-vs-bic`) still proposed and awaiting
+  human approval.
 - **Blockers:** none
 
 ## Cross-references
