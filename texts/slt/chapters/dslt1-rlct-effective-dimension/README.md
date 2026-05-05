@@ -57,12 +57,13 @@ Status definitions match `texts/slt/NOTES.md`:
 | # | Slug | Status |
 |---|------|--------|
 | 1 | [`dslt1-bayes-loss-landscape`](widgets/01-bayes-loss-landscape.html) | drafted |
-| 2 | `dslt1-fisher-degeneracy` | not started |
-| 3 | `dslt1-bic-derivation` | not started |
-| 4 | `dslt1-volume-scaling-rlct` | not started |
-| 5 | `dslt1-normal-crossing-game` | not started |
-| 6 | `dslt1-resolution-primer` | not started |
-| 7 | `dslt1-wbic-vs-bic` | not started |
+| 2 | [`dslt1-singular-posterior`](widgets/02-singular-posterior.html) | drafted |
+| 3 | `dslt1-fisher-degeneracy` | not started |
+| 4 | `dslt1-bic-derivation` | not started |
+| 5 | `dslt1-volume-scaling-rlct` | not started |
+| 6 | `dslt1-normal-crossing-game` | not started |
+| 7 | `dslt1-resolution-primer` | not started |
+| 8 | `dslt1-wbic-vs-bic` | not started |
 
 See `texts/slt/NOTES.md` for the full breakdown table with toy systems
 and active checks.
@@ -75,12 +76,30 @@ in a browser). It introduces $K(w)$ as the loss landscape and $W_0$ as
 its zero set, walks the reader through seven worked examples (four 2D,
 three 1D), and asks for a topology prediction on each. The reveal
 explains the local form of $K$ near each singularity and quotes the
-local RLCT, foreshadowing modules 4–5.
+local RLCT, foreshadowing modules 5–6.
 
 What this widget does *not* do (deliberately): it does not yet show
 the posterior $p(w \mid D_n)$, the volume integral $V(\varepsilon)$,
-or the free-energy formula. Those land in modules 4 and 7
-respectively. Module 1 is the orienting widget.
+or the free-energy formula. The posterior lands in module 2; the
+volume integral and free-energy formula in modules 5 and 8.
+
+### Module 2 — `dslt1-singular-posterior`
+
+[`widgets/02-singular-posterior.html`](widgets/02-singular-posterior.html)
+is the visceral "this is not your textbook Bayesian setting" widget.
+Same toy K family as module 1, but the plot now shows
+$p(w \mid D_n) \propto \varphi(w)\, e^{-n K(w)}$ (true mass-normalised
+density in 1D, peak-normalised heatmap in 2D), with an interactive
+slider on $n$. As $n$ grows, the regular cases collapse to a Gaussian;
+the singular cases trail along $W_0$, refuse to be Gaussian, and (for
+$K = (w+1)^2 (w-1)^4$) shift their mass toward the lower-RLCT zero,
+with explicit $P(\text{near}\,\pm 1)$ readouts that converge to the
+DSLT 2 §Animation 1 result of ${\sim}0.95$ vs ${\sim}0.05$.
+
+The active check asks the reader to predict the asymptotic posterior
+shape for each preset *before* dragging $n$ to the asymptote and
+checking. The reveal text explains why each case behaves as it
+does in terms of local RLCT.
 
 ## Pedagogical decisions
 

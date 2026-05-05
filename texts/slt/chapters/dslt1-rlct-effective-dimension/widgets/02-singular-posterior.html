@@ -1,0 +1,640 @@
+<!--
+  Widget: dslt1-singular-posterior (DSLT 1 module added 2026-05-05 at MK's
+  request). Companion to widget 1 (01-bayes-loss-landscape.html), reusing the
+  same polynomial K(w) family but plotting the unnormalised posterior
+  p(w | D_n) ∝ φ(w) e^(-n K(w)) instead of K itself.
+  Source: DSLT 1 §"Preliminaries of SLT" for the Bayesian setup; DSLT 2
+  §"Free Energy, Generalisation and Model Selection" + §"Animation 1" for
+  the n→∞ animation framing.
+  Toy system: real polynomial K(w) drawn from Carroll Examples 1.1, 1.2,
+  1.5 in DSLT 1 plus the running (w+1)²(w-1)⁴ from DSLT 2 §Example 1.
+  Active check: drag n; predict the asymptotic posterior shape.
+  Standalone: open this .html in a browser. D3 v7 + KaTeX 0.16 from CDN.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SLT companion · DSLT 1 widget 2 · The funky singular posterior</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --w0:#d92d20; --muted:#52606d; --post:#1a3a8e; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 920px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; color: var(--ink); }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .controls { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.8rem 0 0.4rem; }
+  .controls button { padding: 0.4rem 0.7rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.85rem; color: var(--ink); }
+  .controls button:hover { background: #eef3f8; }
+  .controls button.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .layout { display: grid; grid-template-columns: 480px 1fr; gap: 1.6rem; align-items: start; margin-top: 0.5rem; }
+  @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+  svg.plot { background: #fff; border: 1px solid #d9e0e7; border-radius: 4px; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  .formula-box { font-size: 1.08rem; padding: 0.4rem 0.6rem; background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; min-height: 2.4rem; }
+  .panel-note { color: var(--muted); font-size: 0.92rem; margin-top: 0.4rem; }
+  .choice { display: block; width: 100%; text-align: left; margin: 0.3rem 0; padding: 0.55rem 0.8rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover { background: #eef3f8; }
+  .choice.correct { background: #d1fadf; border-color: #099250; }
+  .choice.wrong { background: #fee4e2; border-color: var(--w0); }
+  .choice:disabled { cursor: default; }
+  .reveal { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.7rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; }
+  .legend { display: flex; gap: 1rem; align-items: center; margin-top: 0.4rem; font-size: 0.86rem; color: var(--muted); }
+  .legend-swatch { display: inline-block; width: 18px; height: 4px; vertical-align: middle; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .sources li { margin: 0.15rem 0; }
+  .source-link { display: inline-block; margin-top: 0.6rem; font-size: 0.88rem; }
+  .source-link::after { content: ' \2197'; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  .n-slider-row { display: flex; align-items: center; gap: 0.8rem; margin: 0.7rem 0 0.4rem; flex-wrap: wrap; }
+  .n-slider-row label { font-size: 0.92rem; color: var(--muted); min-width: 0; }
+  .n-slider-row input[type="range"] { flex: 1; min-width: 200px; max-width: 380px; }
+  .n-readout { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1rem; min-width: 5rem; color: var(--ink); }
+  .n-presets { display: flex; gap: 0.3rem; }
+  .n-presets button { padding: 0.25rem 0.55rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 3px; font-size: 0.78rem; color: var(--muted); }
+  .n-presets button:hover { background: #eef3f8; color: var(--ink); }
+</style>
+</head>
+<body>
+
+<h1>The funky singular posterior</h1>
+<p class="subtitle">SLT companion · widget 2 of 7 for <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural"><em>DSLT 1: The RLCT Measures the Effective Dimension of Neural Networks</em></a> by Liam Carroll</p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#Preliminaries_of_SLT">DSLT 1 §"Preliminaries of SLT"</a> &mdash; the Bayesian setup, posterior, partition function, free energy.</li>
+    <li><a href="https://www.alignmentforum.org/posts/CZHwwDd7t9aYra5HN/dslt-2-why-neural-networks-obey-occam-s-razor#Free_Energy__Generalisation_and_Model_Selection">DSLT 2 §"Free Energy, Generalisation and Model Selection"</a> &mdash; the local free energy and posterior preference relation $F_n(\mathcal{W}) \,\Leftrightarrow\, \int_{\mathcal{W}} p(w \mid D_n)\, dw$.</li>
+    <li><a href="https://www.alignmentforum.org/posts/CZHwwDd7t9aYra5HN/dslt-2-why-neural-networks-obey-occam-s-razor#Animation_1__The_posterior_concentrates_on_both_true_parameters_as_n____but_it_prefers_the_one_with_lower_RLCT">DSLT 2 §"Animation 1"</a> &mdash; the original n-slider animation that this widget is the interactive analogue of.</li>
+    <li><a href="https://www.alignmentforum.org/posts/CZHwwDd7t9aYra5HN/dslt-2-why-neural-networks-obey-occam-s-razor#K_w__is_like_a_potential_well__where_a_lower_RLCT_means_a_flatter_floor">DSLT 2 §"K(w) is like a potential well"</a> &mdash; the physics analogy that explains why lower-RLCT regions are visited more.</li>
+    <li><a href="http://therisingsea.org/notes/MSc-Carroll.pdf">Liam Carroll, MSc thesis "Phase Transitions in Neural Networks"</a> (2021), Chapter 2 &mdash; the same posterior derivation in long form.</li>
+    <li>Sumio Watanabe, <em>Mathematical Theory of Bayesian Statistics</em>, CRC 2018 ("Green Book"), Chapter 5 &mdash; rigorous treatment of singular posterior asymptotics. Library / institutional access required.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;">In a <a href="https://en.wikipedia.org/wiki/Bayesian_statistics">Bayesian</a> setting the <a href="https://en.wikipedia.org/wiki/Posterior_probability">posterior</a> over parameters is
+  $$ p(w \mid D_n) \;=\; \frac{1}{Z_n}\, \varphi(w)\, e^{-n L_n(w)} \;\propto\; \varphi(w)\, e^{-n L_n(w)}, $$
+  and as $n \to \infty$ this is dominated by the loss landscape $K(w)$ (the limit of $L_n$): $p(w \mid D_n) \,\propto\, \varphi(w)\, e^{-n K(w)}$.</p>
+  <p style="margin: 0;">For a <strong>regular</strong> model $K$ has a single non-degenerate minimum, so the posterior tightens to a multivariate <a href="https://en.wikipedia.org/wiki/Multivariate_normal_distribution">Gaussian</a> with covariance $\frac{1}{n}\, I^{-1}$ &mdash; <a href="https://en.wikipedia.org/wiki/Asymptotic_distribution">asymptotic normality</a>. For a <strong>singular</strong> model the picture is funkier: the posterior trails along the <a href="https://en.wikipedia.org/wiki/Algebraic_variety">variety</a> $W_0$, splits unevenly between competing singularities, and (in general) is <em>not</em> Gaussian even at $n = 10^6$. This widget lets you see that funkiness directly: pick a $K$, drag $n$, watch the posterior.</p>
+</div>
+
+<h2>Pick a loss landscape</h2>
+<div class="controls" id="model-buttons"></div>
+
+<div class="n-slider-row">
+  <label for="n-slider">$n$ (sample size)</label>
+  <input type="range" id="n-slider" min="0" max="100" value="40" step="0.5">
+  <span class="n-readout" id="n-readout">n&nbsp;=&nbsp;30</span>
+  <span class="n-presets">
+    <button data-n="1">1</button>
+    <button data-n="10">10</button>
+    <button data-n="100">100</button>
+    <button data-n="1000">1000</button>
+  </span>
+</div>
+
+<div class="layout">
+  <div>
+    <svg class="plot" id="plot" viewBox="0 0 480 480"></svg>
+    <div class="legend">
+      <span><span class="legend-swatch" style="background:#1a3a8e;"></span> posterior $p(w\mid D_n)$</span>
+      <span><span class="legend-swatch" style="background:#d92d20; height:3px;"></span> $W_0$</span>
+    </div>
+  </div>
+  <div>
+    <div class="formula-box" id="formula"></div>
+    <p class="panel-note" id="model-note"></p>
+    <h2>Predict: as $n \to \infty$, the posterior&hellip;</h2>
+    <div id="choices"></div>
+    <div class="reveal" id="reveal" style="display: none;"></div>
+  </div>
+</div>
+
+<p class="footnote">
+  <strong>How this widget computes the posterior.</strong> For each preset, the
+  unnormalised posterior $\varphi(w)\, e^{-n K(w)}$ is evaluated on a grid
+  (401 points in 1D; 100&times;100 in 2D), with $\varphi$ taken uniform on the
+  plot window and $K$ taken in the large-$n$ approximation $L_n \approx K$.
+  Numerical stability uses the standard log-sum-exp trick &mdash; without it,
+  $e^{-100 \cdot 5}$ underflows.
+  In 1D the curve is the true probability density (mass-normalised over the
+  plot window), so the y-axis shows real probability density and peak heights
+  scale with $n$ &mdash; that scaling is itself part of the lesson.
+  In 2D the heatmap is normalised to its peak before colouring (with a
+  square-root contrast so low-density structure stays visible) so what you see
+  is <em>shape</em>, not absolute density. The W₀ overlay and toy K family are
+  shared with widget 1
+  (<a href="01-bayes-loss-landscape.html"><code>01-bayes-loss-landscape</code></a>).
+</p>
+
+<nav class="nav">
+  <a href="https://github.com/AMindToThink/ai-safety-math-explainers/blob/main/texts/slt/chapters/dslt1-rlct-effective-dimension/README.md">&larr; DSLT 1 chapter index</a>
+  <a href="https://github.com/AMindToThink/ai-safety-math-explainers/blob/main/texts/slt/NOTES.md">SLT companion overview &rarr;</a>
+</nav>
+
+<script>
+"use strict";
+
+const KATEX_DELIMITERS = [
+  { left: '$$', right: '$$', display: true },
+  { left: '\\[', right: '\\]', display: true },
+  { left: '$', right: '$', display: false },
+  { left: '\\(', right: '\\)', display: false },
+];
+function typeset(el) {
+  if (window.renderMathInElement) renderMathInElement(el, { delimiters: KATEX_DELIMITERS, throwOnError: false });
+}
+
+const DSLT1 = 'https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural';
+const DSLT2 = 'https://www.alignmentforum.org/posts/CZHwwDd7t9aYra5HN/dslt-2-why-neural-networks-obey-occam-s-razor';
+const LINK = {
+  rlct:        DSLT1 + '#The_Real_Log_Canonical_Threshold__aka_the_Learning_Coefficient_',
+  fisher:      'https://en.wikipedia.org/wiki/Fisher_information',
+  hessian:     'https://en.wikipedia.org/wiki/Hessian_matrix',
+  multivarGauss:'https://en.wikipedia.org/wiki/Multivariate_normal_distribution',
+  asympNormal: 'https://en.wikipedia.org/wiki/Asymptotic_distribution',
+  potential:   DSLT2 + '#K_w__is_like_a_potential_well__where_a_lower_RLCT_means_a_flatter_floor',
+  freeEnergy:  DSLT2 + '#Free_Energy__Generalisation_and_Model_Selection',
+};
+const a = (href, text) => `<a href="${href}">${text}</a>`;
+
+// ---------------------------------------------------------------------------
+// MODELS — same toy K family as widget 1, with shape-of-asymptotic-posterior
+// rather than topology-of-W_0 as the active-check question.
+// ---------------------------------------------------------------------------
+const MODELS = [
+  // -- 2D --
+  {
+    id: 'regular-2d',
+    name: 'K = w₁² + w₂²',
+    dim: 2,
+    tex: 'K(w_1, w_2) = w_1^2 + w_2^2',
+    f: (x, y) => x*x + y*y,
+    domain: [-1.5, 1.5],
+    note: `A regular model. ${a(LINK.fisher, 'Fisher information')} is positive definite at $(0,0)$.`,
+    W0: { type: 'points', pts: [[0, 0]] },
+    correct: 'gauss-spike-2d',
+    explanation: `As $n \\to \\infty$, the posterior tightens to a 2D ${a(LINK.multivarGauss, 'Gaussian')} centred at $(0,0)$ with covariance $\\frac{1}{n}\\, I^{-1} = \\frac{1}{2n}\\, \\mathrm{diag}(1,1)$. This is ${a(LINK.asympNormal, 'asymptotic normality')} &mdash; the regular Bayesian story.`,
+    sourceUrl: DSLT1 + '#What_is_a_singular_model_',
+    sourceLabel: 'DSLT 1 §"What is a singular model?"',
+  },
+  {
+    id: 'free-param',
+    name: 'K = w₁² (Example 1.1)',
+    dim: 2,
+    tex: 'K(w_1, w_2) = w_1^2',
+    f: (x, y) => x*x,
+    domain: [-1.5, 1.5],
+    note: `Carroll Example 1.1: $w_2$ is a free parameter; ${a(LINK.fisher, 'Fisher information')} has a kernel along it.`,
+    W0: { type: 'lines', lines: [{ axis: 'x', value: 0 }] },
+    correct: 'along-curve',
+    explanation: `The posterior tightens in the $w_1$ direction (Gaussian-like, width $\\sim 1/\\sqrt{n}$) but stays flat along $w_2$, because $K$ doesn't depend on $w_2$ at all. So the posterior collapses to a thin <em>strip</em> along $\\{w_1 = 0\\}$, not to a point. As $n \\to \\infty$ the strip's $w_1$-width goes to zero but its $w_2$-extent stays the prior's support.`,
+    sourceUrl: DSLT1 + '#Sometimes_singularities_are_just_free_parameters',
+    sourceLabel: 'DSLT 1 §"Sometimes singularities are just free parameters"',
+  },
+  {
+    id: 'cross',
+    name: 'K = ½ w₁²w₂² (Example 1.2)',
+    dim: 2,
+    tex: 'K(w_1, w_2) = \\tfrac{1}{2}\\, w_1^2\\, w_2^2',
+    f: (x, y) => 0.5 * x*x * y*y,
+    domain: [-1.5, 1.5],
+    note: `Carroll Example 1.2: two flat valleys cross at the origin. ${a(LINK.fisher, 'Fisher information')} has rank 0 at $(0,0)$.`,
+    W0: { type: 'lines', lines: [{ axis: 'x', value: 0 }, { axis: 'y', value: 0 }] },
+    correct: 'arrangement',
+    explanation: `The posterior concentrates on the cross $\\{w_1 = 0\\} \\cup \\{w_2 = 0\\}$ &mdash; both axes simultaneously, with a brighter peak at the intersection $(0,0)$ where every direction is "free". You can see this by inspecting $K = 0$: it is achieved <em>everywhere</em> on the cross, so $e^{-n K}$ is large there for every $n$. This shape does not approach any Gaussian.`,
+    sourceUrl: DSLT1 + '#But_not_all_singularities_are_free_parameters',
+    sourceLabel: 'DSLT 1 §"But not all singularities are free parameters"',
+  },
+  {
+    id: 'multi',
+    name: 'K = (w₁+1)²·w₁⁴·w₂² (Example 1.5)',
+    dim: 2,
+    tex: 'K(w_1, w_2) = (w_1 + 1)^2\\, w_1^{4}\\, w_2^{2}',
+    f: (x, y) => Math.pow(x + 1, 2) * Math.pow(x, 4) * y*y,
+    domain: [-1.6, 1.0],
+    note: `Carroll Example 1.5: three lines of true parameters meeting at two distinct singular points with different local ${a(LINK.rlct, 'RLCTs')}.`,
+    W0: { type: 'lines', lines: [
+      { axis: 'x', value: -1 }, { axis: 'x', value: 0 }, { axis: 'y', value: 0 },
+    ]},
+    correct: 'lowest-rlct-2d',
+    explanation: `Both $(-1, 0)$ and $(0, 0)$ are true parameters ($K = 0$), but the local ${a(LINK.rlct, 'RLCTs')} differ: $\\lambda_{-1} = 1/2$ and $\\lambda_0 = 1/4$. The free-energy formula $F_n(\\mathcal{W}) = n L(w_{\\mathcal W}^{(0)}) + \\lambda_{\\mathcal W}\\, \\log n$ then makes the lower-RLCT region preferred &mdash; you see the posterior brighten preferentially at the origin as $n$ grows, even though $(-1, 0)$ is just as accurate. This is ${a(LINK.potential, 'the "potential well" intuition')}: a flatter floor traps more mass.`,
+    sourceUrl: DSLT1 + '#Multidimensional_case',
+    sourceLabel: 'DSLT 1 §"Multidimensional case"',
+  },
+  // -- 1D --
+  {
+    id: '1d-quadratic',
+    name: '1D: K = w² (regular)',
+    dim: 1,
+    tex: 'K(w) = w^2',
+    f: (x) => x*x,
+    domain: [-1.5, 1.5],
+    note: 'The simplest regular model. Watch for the textbook Gaussian.',
+    W0: { type: 'points', pts: [0] },
+    correct: 'gauss-spike',
+    explanation: `As $n$ grows the posterior approaches $\\mathcal{N}(0, 1/(2n))$ &mdash; an exact ${a(LINK.multivarGauss, 'Gaussian')} centred at $0$, width shrinking like $1/\\sqrt{n}$. ${a(LINK.asympNormal, 'Asymptotic normality')}: the regular case.`,
+    sourceUrl: DSLT1 + '#What_is_a_singular_model_',
+    sourceLabel: 'DSLT 1 §"What is a singular model?"',
+  },
+  {
+    id: '1d-quartic',
+    name: '1D: K = w⁴ (fractional dim, Example 1.3)',
+    dim: 1,
+    tex: 'K(w) = w^4',
+    f: (x) => Math.pow(x, 4),
+    domain: [-1.5, 1.5],
+    note: `Same zero set as $K = w^2$, but the posterior shape is genuinely different.`,
+    W0: { type: 'points', pts: [0] },
+    correct: 'non-gauss-spike',
+    explanation: `The posterior has a single peak at $0$, but its shape is $\\propto e^{-n w^4}$ &mdash; <em>not</em> a Gaussian. It is fatter-tailed than a Gaussian of comparable width, and its ${a(LINK.rlct, 'RLCT')} ($\\lambda = 1/4$) is half of $d/2$ for $d = 1$. Drag $n$ to $1000$ and compare side-by-side with $K = w^2$: the quartic posterior is visibly wider for the same $n$ because $K$ is flatter near $0$.`,
+    sourceUrl: DSLT1 + '#An_example_of_fractional_dimension',
+    sourceLabel: 'DSLT 1 §"An example of fractional dimension"',
+  },
+  {
+    id: '1d-two',
+    name: '1D: K = (w+1)²(w−1)⁴ (DSLT 2 Example 1)',
+    dim: 1,
+    tex: 'K(w) = (w + 1)^2\\, (w - 1)^4',
+    f: (x) => Math.pow(x+1, 2) * Math.pow(x-1, 4),
+    domain: [-2, 2],
+    note: `Two true parameters, different local ${a(LINK.rlct, 'RLCTs')}. This is the running example of ${a(DSLT2 + '#Example_1__True_parameters_are_preferred_according_to_their_RLCT', 'DSLT 2 §Example 1')}.`,
+    W0: { type: 'points', pts: [-1, 1] },
+    partitions: [
+      { label: 'P(near −1)', range: [-2, 0] },
+      { label: 'P(near +1)', range: [0, 2] },
+    ],
+    correct: 'lowest-rlct-1d',
+    explanation: `Both $w = -1$ and $w = +1$ are exact zeros of $K$, so the peak <em>heights</em> stay roughly equal (both peaks share the same global normalisation). What pulls apart is the <em>width</em>: locally $K \\approx 16(w+1)^2$ at $-1$ but $K \\approx 4(w-1)^4$ at $+1$, so the $+1$ valley is much flatter. The integrated mass $\\int_{\\text{near}\\,+1} p(w \\mid D_n)\\, dw$ therefore dominates &mdash; watch the $P(\\text{near}\\,\\pm 1)$ readouts. The local ${a(LINK.rlct, 'RLCTs')} are $\\lambda_{+1} = 1/4$ vs $\\lambda_{-1} = 1/2$, and ${a(LINK.freeEnergy, 'the free-energy formula')} tells us the lower-RLCT region wins. By $n = 100$ the $+1$ side has $\\sim 95\\%$ of the posterior mass. Same content as DSLT 2 Animation 1, but interactive.`,
+    sourceUrl: DSLT2 + '#Example_1__True_parameters_are_preferred_according_to_their_RLCT',
+    sourceLabel: 'DSLT 2 §"Example 1: True parameters are preferred according to their RLCT"',
+  },
+];
+
+const CHOICES_2D = [
+  { id: 'gauss-spike-2d',  text: 'Tightens to a 2D Gaussian centred at a single point.' },
+  { id: 'along-curve',     text: 'Collapses to a thin strip along a 1D curve in $W_0$.' },
+  { id: 'arrangement',     text: 'Concentrates on an arrangement of curves; brightest at their intersection.' },
+  { id: 'lowest-rlct-2d',  text: 'Concentrates preferentially near the singularity with the smallest local RLCT.' },
+];
+const CHOICES_1D = [
+  { id: 'gauss-spike',     text: 'Approaches a Gaussian, $\\mathcal{N}(0, 1/(2n))$.' },
+  { id: 'non-gauss-spike', text: 'Spikes at the unique zero, but the shape stays non-Gaussian for all $n$.' },
+  { id: 'two-equal',       text: 'Two peaks at $\\pm 1$ that stay equal in height.' },
+  { id: 'lowest-rlct-1d',  text: 'Two peaks that pull apart in height; the lower-RLCT one dominates.' },
+];
+
+// n-slider mapping: t ∈ [0, 100] ↦ n ∈ [0.5, 1000] log-scale
+const N_MIN = 0.5, N_MAX = 1000;
+function tToN(t) {
+  const lo = Math.log(N_MIN), hi = Math.log(N_MAX);
+  return Math.exp(lo + (hi - lo) * t / 100);
+}
+function nToT(n) {
+  const lo = Math.log(N_MIN), hi = Math.log(N_MAX);
+  return 100 * (Math.log(n) - lo) / (hi - lo);
+}
+
+const PLOT_W = 480, PLOT_H = 480, PAD = 36;
+const svg = d3.select('#plot');
+
+// ---------------------------------------------------------------------------
+// Numerical helpers
+// ---------------------------------------------------------------------------
+// Compute the *true* posterior density p(w | D_n) ∝ exp(-n K(w)) on a 1D grid,
+// normalised to total mass 1 over the plot domain (so the curve is a true
+// probability density). Peak height varies with n — that is part of the
+// pedagogical content: regular models spike like sqrt(n), quartic models
+// spike like n^(1/4), so the difference between the two is visible.
+function posterior1D(model, n, M=401) {
+  const [a, b] = model.domain;
+  const ws = new Array(M);
+  const lps = new Array(M);
+  let maxLp = -Infinity;
+  for (let i = 0; i < M; i++) {
+    const w = a + (b - a) * i / (M - 1);
+    ws[i] = w;
+    const k = model.f(w);
+    const lp = -n * k;
+    lps[i] = lp;
+    if (lp > maxLp) maxLp = lp;
+  }
+  // exp-shift for numerical stability, then integrate via the trapezoid rule.
+  const us = new Array(M);
+  for (let i = 0; i < M; i++) us[i] = Math.exp(lps[i] - maxLp);
+  const dw = (b - a) / (M - 1);
+  let mass = 0;
+  for (let i = 0; i < M; i++) mass += us[i] * dw;
+  // True density = exp(-n K) / Z; the maxLp shift cancels (it appears in both
+  // numerator and Z), so just dividing by `mass` is correct.
+  const ps = us.map(u => u / mass);
+  return { ws, ps, dw };
+}
+
+// Compute integrated mass of the posterior on each declared partition
+// (a list of [w_lo, w_hi] ranges that need not cover the whole domain).
+function partitionMasses(model, n, partitions) {
+  if (!partitions) return null;
+  const { ws, ps, dw } = posterior1D(model, n);
+  return partitions.map(part => {
+    let m = 0;
+    for (let i = 0; i < ws.length; i++) {
+      if (ws[i] >= part.range[0] && ws[i] <= part.range[1]) m += ps[i] * dw;
+    }
+    return { label: part.label, mass: m };
+  });
+}
+
+// Compute exp(-n*K(w₁,w₂)) on N×N grid, peak normalised to 1.
+function posterior2D(model, n, N=100) {
+  const [a, b] = model.domain;
+  const grid = new Float32Array(N * N);
+  let maxLp = -Infinity;
+  for (let j = 0; j < N; j++) {
+    const y = a + (b - a) * j / (N - 1);
+    for (let i = 0; i < N; i++) {
+      const x = a + (b - a) * i / (N - 1);
+      const k = model.f(x, y);
+      const lp = -n * k;
+      grid[j * N + i] = lp;
+      if (lp > maxLp) maxLp = lp;
+    }
+  }
+  for (let i = 0; i < N * N; i++) grid[i] = Math.exp(grid[i] - maxLp);
+  return grid;
+}
+
+// Color ramp: white → light blue → dark blue, with sqrt contrast so low-density
+// structure stays visible.
+function colorFor(t) {
+  const u = Math.sqrt(Math.max(0, Math.min(1, t)));
+  // interpolate white (255,255,255) → dark blue (26, 58, 142)
+  const r = Math.round(255 + (26 - 255) * u);
+  const g = Math.round(255 + (58 - 255) * u);
+  const b = Math.round(255 + (142 - 255) * u);
+  return [r, g, b];
+}
+
+function drawPosterior2D(model, n) {
+  const N = 100;
+  const grid = posterior2D(model, n, N);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = N; canvas.height = N;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(N, N);
+  // image y-axis is top-down; math y goes bottom-up. Flip rows.
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const cell = (N - 1 - j) * N + i;
+      const [r, g, b] = colorFor(grid[cell]);
+      const idx = (j * N + i) * 4;
+      img.data[idx] = r;
+      img.data[idx+1] = g;
+      img.data[idx+2] = b;
+      img.data[idx+3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const dataUrl = canvas.toDataURL();
+
+  svg.append('image')
+    .attr('href', dataUrl).attr('xlink:href', dataUrl)
+    .attr('x', PAD).attr('y', PAD)
+    .attr('width', PLOT_W - 2*PAD).attr('height', PLOT_H - 2*PAD)
+    .attr('preserveAspectRatio', 'none')
+    .style('image-rendering', 'pixelated');
+}
+
+function drawAxes2D(model) {
+  const [a, b] = model.domain;
+  const xS = d3.scaleLinear().domain([a, b]).range([PAD, PLOT_W - PAD]);
+  const yS = d3.scaleLinear().domain([a, b]).range([PLOT_H - PAD, PAD]);
+  // bounding box
+  svg.append('rect').attr('x', PAD).attr('y', PAD)
+    .attr('width', PLOT_W - 2*PAD).attr('height', PLOT_H - 2*PAD)
+    .attr('fill', 'none').attr('stroke', '#98a4b3');
+  // axes through origin if origin is in the window
+  const x0px = xS(0), y0px = yS(0);
+  if (x0px >= PAD && x0px <= PLOT_W - PAD) {
+    svg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${y0px})`)
+      .call(d3.axisBottom(xS).ticks(5));
+    svg.append('text').attr('class', 'axis-label').attr('x', PLOT_W - PAD + 4).attr('y', y0px + 4).text('w₁');
+  }
+  if (y0px >= PAD && y0px <= PLOT_H - PAD) {
+    svg.append('g').attr('class', 'axis').attr('transform', `translate(${x0px}, 0)`)
+      .call(d3.axisLeft(yS).ticks(5));
+    svg.append('text').attr('class', 'axis-label').attr('x', x0px + 4).attr('y', PAD - 6).text('w₂');
+  }
+  return { xS, yS };
+}
+
+function drawW0_2D(W0, xS, yS) {
+  const [xmin, xmax] = xS.domain();
+  const [ymin, ymax] = yS.domain();
+  const layer = svg.append('g').attr('class', 'W0');
+  if (W0.type === 'points') {
+    for (const [x, y] of W0.pts) {
+      layer.append('circle').attr('cx', xS(x)).attr('cy', yS(y)).attr('r', 5)
+        .attr('fill', '#d92d20').attr('stroke', 'white').attr('stroke-width', 1.4);
+    }
+  } else if (W0.type === 'lines') {
+    for (const ln of W0.lines) {
+      if (ln.axis === 'x') {
+        layer.append('line')
+          .attr('x1', xS(ln.value)).attr('x2', xS(ln.value))
+          .attr('y1', yS(ymin)).attr('y2', yS(ymax))
+          .attr('stroke', '#d92d20').attr('stroke-width', 2.2).attr('stroke-opacity', 0.85);
+      } else if (ln.axis === 'y') {
+        layer.append('line')
+          .attr('x1', xS(xmin)).attr('x2', xS(xmax))
+          .attr('y1', yS(ln.value)).attr('y2', yS(ln.value))
+          .attr('stroke', '#d92d20').attr('stroke-width', 2.2).attr('stroke-opacity', 0.85);
+      }
+    }
+  }
+}
+
+function drawPlot2D(model, n) {
+  svg.selectAll('*').remove();
+  drawPosterior2D(model, n);
+  const { xS, yS } = drawAxes2D(model);
+  drawW0_2D(model.W0, xS, yS);
+}
+
+function drawPlot1D(model, n) {
+  svg.selectAll('*').remove();
+  const [a, b] = model.domain;
+  const { ws, ps } = posterior1D(model, n);
+  const pMax = Math.max(0.5, ...ps);
+  const yMax = pMax * 1.12;
+
+  const xS = d3.scaleLinear().domain([a, b]).range([PAD, PLOT_W - PAD]);
+  const yS = d3.scaleLinear().domain([0, yMax]).range([PLOT_H - PAD, PAD]);
+
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${PLOT_H - PAD})`)
+    .call(d3.axisBottom(xS).ticks(7));
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(${PAD}, 0)`)
+    .call(d3.axisLeft(yS).ticks(5).tickFormat(d => d < 10 ? d.toFixed(1) : d.toFixed(0)));
+  svg.append('text').attr('class', 'axis-label').attr('x', PLOT_W - PAD).attr('y', PLOT_H - 6).attr('text-anchor', 'end').text('w');
+  svg.append('text').attr('class', 'axis-label').attr('x', 6).attr('y', PAD - 6).text('p(w | Dₙ) — true density');
+
+  const clipId = 'pclip-' + Math.random().toString(36).slice(2, 8);
+  svg.append('defs').append('clipPath').attr('id', clipId)
+    .append('rect').attr('x', PAD).attr('y', PAD)
+    .attr('width', PLOT_W - 2*PAD).attr('height', PLOT_H - 2*PAD);
+  const plotG = svg.append('g').attr('clip-path', `url(#${clipId})`);
+
+  // shaded posterior under the curve
+  const area = d3.area()
+    .x((_, i) => xS(ws[i]))
+    .y0(yS(0))
+    .y1(d => yS(d));
+  plotG.append('path').datum(ps).attr('d', area)
+    .attr('fill', '#1a3a8e').attr('fill-opacity', 0.16);
+
+  // curve
+  const line = d3.line()
+    .x((_, i) => xS(ws[i]))
+    .y(d => yS(d));
+  plotG.append('path').datum(ps).attr('d', line)
+    .attr('fill', 'none').attr('stroke', '#1a3a8e').attr('stroke-width', 2);
+
+  // W0 markers
+  for (const w of model.W0.pts) {
+    svg.append('circle').attr('cx', xS(w)).attr('cy', yS(0)).attr('r', 5.5)
+      .attr('fill', '#d92d20').attr('stroke', 'white').attr('stroke-width', 1.4);
+  }
+
+  // Per-partition mass labels (drawn near the top of each region's center)
+  const masses = partitionMasses(model, n, model.partitions);
+  if (masses) {
+    for (let i = 0; i < masses.length; i++) {
+      const part = model.partitions[i];
+      const cx = xS((part.range[0] + part.range[1]) / 2);
+      const txt = svg.append('text')
+        .attr('x', cx).attr('y', PAD + 14)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', 12)
+        .attr('font-family', 'ui-monospace, SFMono-Regular, Menlo, monospace')
+        .attr('fill', '#1a3a8e');
+      txt.append('tspan').attr('font-style', 'italic').text(masses[i].label + ' = ');
+      txt.append('tspan').text(masses[i].mass.toFixed(3));
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Wire up UI
+// ---------------------------------------------------------------------------
+let currentModel = MODELS[0];
+let currentN = tToN(40);
+
+function renderModel() {
+  document.getElementById('formula').innerHTML = `\\[ ${currentModel.tex} \\]`;
+  document.getElementById('model-note').innerHTML = currentModel.note;
+  typeset(document.getElementById('formula'));
+  typeset(document.getElementById('model-note'));
+
+  const choices = currentModel.dim === 2 ? CHOICES_2D : CHOICES_1D;
+  const cEl = document.getElementById('choices');
+  cEl.innerHTML = '';
+  for (const c of choices) {
+    const btn = document.createElement('button');
+    btn.className = 'choice';
+    btn.innerHTML = c.text;
+    btn.dataset.id = c.id;
+    btn.onclick = () => {
+      Array.from(cEl.children).forEach(el => { el.disabled = true; });
+      btn.classList.add(c.id === currentModel.correct ? 'correct' : 'wrong');
+      if (c.id !== currentModel.correct) {
+        Array.from(cEl.children).forEach(el => {
+          if (el.dataset.id === currentModel.correct) el.classList.add('correct');
+        });
+      }
+      const reveal = document.getElementById('reveal');
+      reveal.style.display = 'block';
+      let html = '<strong>Answer.</strong> ' + currentModel.explanation;
+      if (currentModel.sourceUrl) {
+        html += `<br><a class="source-link" href="${currentModel.sourceUrl}">Read this example in ${currentModel.sourceLabel}</a>`;
+      }
+      reveal.innerHTML = html;
+      typeset(reveal);
+    };
+    cEl.appendChild(btn);
+  }
+  typeset(cEl);
+  document.getElementById('reveal').style.display = 'none';
+
+  redraw();
+}
+
+function redraw() {
+  if (currentModel.dim === 2) drawPlot2D(currentModel, currentN);
+  else drawPlot1D(currentModel, currentN);
+}
+
+function updateNReadout() {
+  const n = currentN;
+  const txt = n < 10 ? n.toFixed(1) : n < 100 ? Math.round(n).toString() : Math.round(n).toString();
+  document.getElementById('n-readout').textContent = `n = ${txt}`;
+}
+
+function setupModelButtons() {
+  const c = document.getElementById('model-buttons');
+  for (const m of MODELS) {
+    const b = document.createElement('button');
+    b.textContent = m.name;
+    b.onclick = () => {
+      Array.from(c.children).forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      currentModel = m;
+      renderModel();
+    };
+    c.appendChild(b);
+  }
+  c.firstChild.classList.add('active');
+}
+
+function setupSlider() {
+  const slider = document.getElementById('n-slider');
+  slider.addEventListener('input', () => {
+    currentN = tToN(+slider.value);
+    updateNReadout();
+    redraw();
+  });
+  // preset buttons
+  for (const btn of document.querySelectorAll('.n-presets button')) {
+    btn.addEventListener('click', () => {
+      const n = +btn.dataset.n;
+      currentN = n;
+      slider.value = nToT(n);
+      updateNReadout();
+      redraw();
+    });
+  }
+}
+
+setupModelButtons();
+setupSlider();
+updateNReadout();
+renderModel();
+typeset(document.body);
+</script>
+
+</body>
+</html>
