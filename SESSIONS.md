@@ -267,8 +267,10 @@ per session, newest at the bottom. See
      the lean-game and pi-digit-paradox respectively (issue #9
      already existed for the centerpiece widget). All review
      issues now carry both `review` and a topic label.
-- **What's next:** Push the eight commits ahead of `origin/main`
-  (token push was denied this session — see "Blockers"). Then
+- **What's next:** Push the four commits ahead of `origin/main`
+  (token push was denied this session — see "Blockers"). Matthew's
+  automation auto-pushed the earlier four commits in this session
+  but stopped after the Lean game and Ch 1 widget commits. Then
   the next module to build, walking down the priority list, is
   `li-ch1-desiderata-tour` (the 17-desiderata compatibility
   graph) for breadth in Ch 1, or `li-ch2-deductive-process` /
