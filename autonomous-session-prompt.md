@@ -159,13 +159,20 @@ the stopping criteria in Step 4 are satisfied.
 If conversation context is getting full but the session still has
 productive work in front of it, run `/compact` rather than ending the
 session. After compaction continue developing widgets — but **re-read
-the relevant primary sources first**. Compaction summarises everything
-that has happened so far, so you keep the project context (which
-modules are drafted, what was decided) but you lose the verbatim source
-prose and the formula-by-formula understanding you built up by reading
-DSLT / Carroll / Watanabe end-to-end. Without reloading the source you
-will fabricate plausible-sounding but subtly-wrong notation, theorem
-numbers, and constants.
+the relevant primary sources first.** This is non-negotiable.
+
+Compaction keeps a summary of project state (which modules are
+drafted, decisions made) but drops the verbatim source prose and
+formula-by-formula understanding you built up. The texts this project
+covers contain *cutting-edge facts that are rare or absent from the
+training corpus* — SLT theorems, exact RLCT computations,
+Logical-Induction lemma numbering, Watanabe's specific notation
+choices. Without re-reading the source after compaction you will
+hallucinate not just notation but actual mathematical content:
+subtly-wrong theorem statements, plausible-sounding-but-fabricated
+constants, made-up section numbers, and "facts" that match the genre
+of the source but don't appear in it. This is exactly the failure
+mode the project exists to prevent.
 
 Practically:
 
