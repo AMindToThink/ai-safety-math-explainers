@@ -278,6 +278,14 @@ classes and the libraries listed in the artifact docs (Recharts, MathJS,
 d3, Three.js, Plotly, Tone, etc.) is usually enough. When the artifact
 sandbox isn't enough, drop into a static site under `texts/<slug>/site/`.
 
+## Lessons accumulated across sessions
+
+Situational tech notes (widget-build gotchas, headless-test recipes,
+source-ingestion surprises, sandbox quirks) live in
+[`LESSONS.md`](./LESSONS.md). Skim that file *only* when you are
+about to do work in one of those areas; you do not need to read it
+every session.
+
 ## Subagent policy
 
 **Use subagents for context management. Spawn one whenever a task

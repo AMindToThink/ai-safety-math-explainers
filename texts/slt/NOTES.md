@@ -98,10 +98,27 @@ also `texts/slt/source/README.md` for the directory layout.
   - LessWrong HTML embeds MathJax; equations survive a `pandoc`
     conversion to GFM but inline math sometimes loses surrounding
     whitespace.
-  - Some sandboxed environments (e.g., the autonomous Claude session
-    that scaffolded this directory) firewall lesswrong.com,
-    arxiv.org, and the Timaeus blog. Run `download.sh` from a
-    machine with general internet egress to populate fully.
+  - Sandbox network egress is intermittent across autonomous
+    sessions: the 2026-05-05 ~12:00 session reported every source
+    host (arxiv.org, lesswrong.com, alignmentforum.org,
+    therisingsea.org, timaeus.co, devinterp.com) firewalled, while
+    the 2026-05-05 ~05:54 session that follows confirmed full
+    egress to all of them. Don't assume either profile; always run
+    `download.sh` defensively.
+  - **Timaeus blog slugs have drifted.** As of 2026-05-05, the
+    `download.sh` URLs for `dslt-1` (`2023-06-17-dslt-1`) and
+    `dslt-4` (`2023-06-22-dslt-4`) return 404 from `timaeus.co`
+    *and* `devinterp.com`; the other DSLT mirrors (0, 2, 3) and
+    the SLT exercises page resolve fine. The LessWrong copies are
+    the authoritative source of record anyway, so this is not
+    project-blocking — but if you need the Timaeus rendering
+    specifically, browse `https://timaeus.co/blog/` for the current
+    slug and update `download.sh`.
+  - Required apt packages on a fresh sandbox:
+    `apt-get install -y poppler-utils pandoc`. The script tolerates
+    their absence (skipping `pdftotext` / `pandoc` post-processing)
+    but the resulting `dslt/*.md` and `carroll-thesis/*.txt`
+    extractions won't be there to grep.
 - **Gitignored?** Yes. Repo-level `.gitignore` excludes
   `texts/*/source/*` except for `download.sh` and `README.md`. Nested
   READMEs inside subdirectories (e.g., `watanabe/README.md`,
