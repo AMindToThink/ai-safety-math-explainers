@@ -1,0 +1,354 @@
+<!--
+  Widget: li-ch1-pi-digit-paradox (module 1 of the Logical Induction Ch 1
+          batch, "Introduction").
+  Source: Garrabrant et al. (2016) §1 "Introduction" (arXiv:1609.03543v3),
+          esp. the third paragraph (p. 3): "if [the 87,653rd digit of pi
+          is a 7] is true, then (1+1=2) ⇒ phi. But the laws of probability
+          theory say that if A ⇒ B then P(A) <= P(B). Thus, a perfect
+          Bayesian must be at least as sure of phi as they are that
+          1+1=2!"
+  Toy system: the digits-of-pi family (pi[n]=k) and a perfect Bayesian
+              forced into the inequality chain.
+  Active check: pick the digit position n at which the Bayesian's
+                forced probability becomes "obviously absurd";
+                contrast with the LI's price trajectory.
+
+  Standalone: open this .html directly in a browser. Uses D3 v7 and
+              KaTeX from CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Logical Induction · Ch 1 · The π-digit paradox</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 920px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .controls { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin: 0.6rem 0; }
+  input[type=range] { width: 220px; }
+  .layout { display: grid; grid-template-columns: 540px 1fr; gap: 1.6rem; align-items: start; margin-top: 0.5rem; }
+  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+  svg.plot { background: #fff; border: 1px solid #d9e0e7; border-radius: 4px; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  .panel-note { color: var(--muted); font-size: 0.92rem; margin-top: 0.4rem; }
+  .choice { display: block; width: 100%; text-align: left; margin: 0.3rem 0; padding: 0.55rem 0.8rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover { background: #eef3f8; }
+  .choice.active { border-color: var(--accent); background: #eef3f8; }
+  .reveal { padding: 0.7rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; background: #f4f6f8; border-left: 4px solid var(--accent); display: none; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  .panel { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.8rem 1rem; }
+  .price { font-size: 1.6rem; font-weight: 600; color: var(--accent); }
+  .reasoner-card { display: flex; gap: 1rem; margin: 0.6rem 0; }
+  .reasoner-card .panel { flex: 1; }
+  .reasoner-name { color: var(--muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+  .verdict-good { color: var(--good); font-weight: 600; }
+  .verdict-bad { color: var(--bad); font-weight: 600; }
+  blockquote.quote { border-left: 3px solid var(--accent); margin: 0.8rem 0; padding: 0.4rem 0.9rem; background: #fafbfc; font-size: 0.94rem; }
+</style>
+</head>
+<body>
+
+<h1>The π-digit paradox: why probability theory cannot model logical uncertainty</h1>
+<p class="subtitle">Logical Induction companion · widget 1 of the Ch 1 batch on <a href="https://arxiv.org/abs/1609.03543">Garrabrant et&nbsp;al. (2016) §1</a></p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=3">Garrabrant et&nbsp;al. (2016) §1 "Introduction"</a> — the π[87,653]=7 example (paragraph 3, p. 3). The opening paragraph names the Riemann hypothesis and the prime gap as canonical instances of the same pattern.</li>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=5">§1.1 "Desiderata for Reasoning under Logical Uncertainty"</a> — Coherence, Approximate Coherence, Calibration, Non-Dogmatism. Visit the desiderata-tour widget for the full set.</li>
+    <li>Background reading: <a href="https://www.alignmentforum.org/posts/3SG4WbNPoP8fsuZgs/an-intuitive-guide-to-logical-induction-1">Abram Demski, "An Intuitive Guide to Logical Induction"</a> (Alignment Forum, 2017) — §"Why Bayes Is Not Enough".</li>
+    <li>For Bayes' theorem and the inequality $P(A) \le P(B)$ when $A \Rightarrow B$: <a href="https://www.yudkowsky.net/rational/bayes">Yudkowsky's "Intuitive Explanation of Bayes"</a> and Jaynes, <em>Probability Theory: The Logic of Science</em>, Ch. 1.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;">Pick a digit position $n$. Let $\varphi := \quot{\pi[n] = 7}$. Either $\pi[n] = 7$ or it isn't — in standard mathematics this is a fixed truth, not a chance event. But for any reasoner who hasn't <em>computed</em> $\pi[n]$, the truth value is <strong>logically uncertain</strong>. What probability should they assign?</p>
+  <p style="margin: 0;">A perfect Bayesian, by the laws of probability theory, is forced into an answer that is plainly absurd. Watch.</p>
+</div>
+
+<h2>Pick a digit position $n$</h2>
+<div class="controls">
+  <label for="n-slider">$n$ =</label>
+  <input id="n-slider" type="range" min="1" max="100" step="1" value="50">
+  <span id="n-display" class="price"></span>
+</div>
+<p class="panel-note">For small $n$ a careful person can in principle compute $\pi[n]$ and answer "yes" or "no". For large $n$ the computation costs more and more — yet the probabilities a coherent Bayesian assigns must satisfy the same axioms throughout.</p>
+
+<div class="layout">
+  <div>
+    <svg class="plot" id="plot" viewBox="0 0 540 360"></svg>
+    <p class="panel-note" style="text-align:center;">Price trajectory of $\varphi := \quot{\pi[n]=7}$, days 1 to 60. The Bayesian's forced probability sits at 1 from the start; the logical inductor's price tracks the empirical-frequency prior 0.1, then settles to the truth as the deductive process catches up. The vertical dashed line marks the day the deductive process resolves $\varphi$.</p>
+  </div>
+  <div>
+    <div class="reasoner-card">
+      <div class="panel">
+        <div class="reasoner-name">Perfect Bayesian</div>
+        <div>$P(\varphi)$ on day 1: <span class="price" id="bayesian-price"></span></div>
+        <div class="panel-note" id="bayesian-note"></div>
+      </div>
+    </div>
+    <div class="reasoner-card">
+      <div class="panel">
+        <div class="reasoner-name">Logical inductor</div>
+        <div>$\mathbb{P}_1(\varphi)$ on day 1: <span class="price" id="li-price"></span></div>
+        <div class="panel-note" id="li-note"></div>
+      </div>
+    </div>
+
+    <h2>Predict, then reveal</h2>
+    <div id="prediction-choices"></div>
+    <div class="reveal" id="reveal"></div>
+  </div>
+</div>
+
+<h2>Why the Bayesian is forced into 100%</h2>
+<p>Two preliminaries from probability theory and logic:</p>
+<ol>
+  <li>If $A \Rightarrow B$, then $P(A) \le P(B)$. (This is one of the Kolmogorov axioms applied to monotonicity of measure: $A \Rightarrow B$ means $A \subseteq B$ as events, and measures of subsets are bounded by measures of supersets.)</li>
+  <li>If $A$ is a tautology — provable from no assumptions — then $P(A) = 1$.</li>
+</ol>
+<p>Now suppose $\pi[n] = 7$ is in fact true. Then so is the conjunction $\quot{1+1=2 \;\land\; \pi[n] = 7}$. And in propositional logic,</p>
+<p style="text-align:center;">$\quot{1+1=2} \;\Longrightarrow\; \quot{1+1=2 \;\land\; \pi[n] = 7} \;\Longrightarrow\; \quot{\pi[n] = 7}$.</p>
+<p>The first implication holds because conjoining a true statement to a true statement preserves truth. The second is just $\land$-elimination. Chaining (1) and (2):</p>
+<p style="text-align:center;">$1 = P\bigl(\quot{1+1=2}\bigr) \;\le\; P(\varphi)$.</p>
+<p>So $P(\varphi) \ge 1$. Probabilities are bounded by 1, hence $P(\varphi) = 1$. <strong>A perfect Bayesian who has never computed $\pi[n]$ is nonetheless forced to be 100% sure that $\pi[n] = 7$.</strong> But this only holds if $\pi[n] = 7$ in fact; if $\pi[n] \ne 7$, the same argument forces $P(\varphi) = 0$. The Bayesian's probability is *forced* to track the truth — meaning probability theory cannot represent any state of *uncertainty* about $\varphi$.</p>
+
+<blockquote class="quote">"In any given practical scenario, reasoners usually experience a mix of both empirical uncertainty (about how the world is) and logical uncertainty (about what that implies). In this paper, we focus entirely on the problem of managing logical uncertainty. Probability theory does not address this problem, because probability-theoretic reasoners cannot possess uncertainty about logical facts." — <a href="https://arxiv.org/pdf/1609.03543v3#page=2">Garrabrant et&nbsp;al. (2016), §1</a></blockquote>
+
+<h2>What a logical inductor does instead</h2>
+<p>A logical inductor's <strong>price</strong> $\mathbb{P}_t(\varphi)$ on day $t$ is not constrained by $\varphi$'s eventual truth — it is constrained by the inability of any polynomial-time trader to <em>exploit</em> $\mathbb{P}$. In particular:</p>
+<ul>
+  <li>If digits of $\pi$ at position $n$ are pseudorandom relative to all polynomial-time predictors, the inductor learns to price each $\quot{\pi[n] = 7}$ at $\approx 0.1$ — the empirical-frequency prior — until the deductive process actually computes $\pi[n]$.</li>
+  <li>Once the deductive process emits the resolved value, the price snaps to 0 or 1 in a timely manner.</li>
+  <li>Crucially, before resolution the inductor's price <em>can</em> represent uncertainty: $\mathbb{P}_t(\varphi) = 0.1$ is allowed, even though by ground truth either $\varphi$ or $\lnot \varphi$ is provable.</li>
+</ul>
+<p class="panel-note">This is what §4.3 of the paper formalizes as the <strong>Statistical-Pattern Learning</strong> theorem. The "10%" estimate is the right answer in the same sense that "the probability the next coin flip is heads given a fair coin is 50%" is the right answer — even though for any single flip there's a ground truth.</p>
+
+<p class="footnote">
+  <strong>How this widget thinks about the LI's price.</strong> The widget's "logical inductor" is a stand-in: a constant 0.1 prior that snaps to 0 or 1 on day $\tau(n)$, where $\tau(n) = \lceil n / 5 \rceil + 5$ — small $n$ get resolved quickly, large $n$ take longer. The actual LIA in §5 of the paper is far more elaborate, but the qualitative trajectory is the same: a flat empirical-frequency prior followed by a snap to the resolved value. The Bayesian's "price" is shown as $1$ throughout if $\pi[n] = 7$ in our pre-computed first-100-digit table; otherwise $0$. Either way, it never floats — that's the whole point.
+</p>
+
+<nav class="nav">
+  <a href="../README.md">← Ch 1 README</a>
+  <a href="../../../NOTES.md">Logical Induction NOTES.md →</a>
+</nav>
+
+<script>
+// First 100 digits of pi after the decimal point: 3.1415...
+// Used to look up the truth value of "pi[n] = 7" for n in [1, 100].
+// Source: A000796 in OEIS. Each character is a single digit '0'..'9'.
+const PI_DIGITS = (
+  '14159265358979323846264338327950288419716939937510' +
+  '58209749445923078164062862089986280348253421170679'
+);
+
+// Logical inductor's "snap day" — heuristic: small n is resolved quickly,
+// large n takes longer. tau(n) = ceil(n / 5) + 5. Caps at the simulation
+// horizon for visualization purposes.
+function snapDay(n) { return Math.ceil(n / 5) + 5; }
+
+const N_SIM_DAYS = 60;     // simulation horizon
+const LI_PRIOR = 0.1;      // empirical-frequency prior (uniform over digits 0..9)
+
+function piDigitIs7(n) {
+  // Returns the truth value of "pi[n] = 7" using the precomputed table.
+  // n is 1-indexed; n=1 is the first digit after the decimal.
+  if (n < 1 || n > PI_DIGITS.length) return null;
+  return PI_DIGITS[n - 1] === '7';
+}
+
+function bayesianPrice(n) {
+  // The Bayesian is forced to assign P(phi) = truth value of phi.
+  return piDigitIs7(n) ? 1.0 : 0.0;
+}
+
+function liPrice(n, day) {
+  const tau = snapDay(n);
+  if (day < tau) return LI_PRIOR;
+  return piDigitIs7(n) ? 1.0 : 0.0;
+}
+
+// ---- DOM ------------------------------------------------------------------
+
+const slider = document.getElementById('n-slider');
+const nDisplay = document.getElementById('n-display');
+const bayesianPriceEl = document.getElementById('bayesian-price');
+const bayesianNoteEl = document.getElementById('bayesian-note');
+const liPriceEl = document.getElementById('li-price');
+const liNoteEl = document.getElementById('li-note');
+const predictionEl = document.getElementById('prediction-choices');
+const revealEl = document.getElementById('reveal');
+
+let currentPrediction = null;
+
+const PREDICTIONS = [
+  { id: 'bayesian-floats', label: 'The Bayesian sometimes assigns $P(\\varphi) \\in (0, 1)$, just like the inductor.' },
+  { id: 'bayesian-hard', label: 'The Bayesian is always at $0$ or $1$ — but assigns those values <em>before</em> any computation.' },
+  { id: 'inductor-floats', label: 'The Bayesian is at $0$ or $1$; the logical inductor floats at $0.1$ until the deductive process resolves $\\varphi$.' },
+];
+
+const CORRECT = 'inductor-floats';
+
+function updateAll() {
+  const n = +slider.value;
+  nDisplay.textContent = `${n}`;
+
+  // Bayesian
+  const isSeven = piDigitIs7(n);
+  const truthLabel = isSeven ? 'true' : 'false';
+  const truthVerdict = isSeven ? 'verdict-good' : 'verdict-bad';
+  bayesianPriceEl.textContent = isSeven ? '1.000' : '0.000';
+  bayesianNoteEl.innerHTML =
+    `Forced by $A \\Rightarrow B \\Longrightarrow P(A) \\le P(B)$. ` +
+    `In our 100-digit table, $\\pi[${n}] = ${PI_DIGITS[n - 1]}$, so $\\varphi$ is <span class="${truthVerdict}">${truthLabel}</span> — the Bayesian must assign probability ${isSeven ? '1' : '0'} from day 1, with no evidence about $\\pi[${n}]$ in their hands.`;
+
+  // LI on day 1
+  liPriceEl.textContent = LI_PRIOR.toFixed(3);
+  const tau = snapDay(n);
+  liNoteEl.innerHTML =
+    `LI prior is the empirical frequency of digit "7" in random base-10 strings — exactly $\\frac{1}{10}$. ` +
+    `The (toy) deductive process resolves $\\varphi$ on day $\\tau(${n}) = ${tau}$; from then on, $\\mathbb{P}_t(\\varphi) = ${isSeven ? '1' : '0'}$.`;
+
+  renderPlot(n);
+  renderMath();
+}
+
+function renderPredictions() {
+  predictionEl.innerHTML = '';
+  PREDICTIONS.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'choice';
+    b.innerHTML = p.label;
+    if (currentPrediction === p.id) b.classList.add('active');
+    b.onclick = () => {
+      currentPrediction = p.id;
+      renderPredictions();
+      renderReveal();
+    };
+    predictionEl.appendChild(b);
+  });
+}
+
+function renderReveal() {
+  if (!currentPrediction) { revealEl.style.display = 'none'; return; }
+  const correct = currentPrediction === CORRECT;
+  revealEl.style.display = 'block';
+  revealEl.innerHTML = correct
+    ? '<strong>✓ Right.</strong> The Bayesian is at $0$ or $1$ from day 1 — pinned by the inequality chain through $1+1=2$. The logical inductor sits at $0.1$ (the empirical-frequency prior), maintaining genuine uncertainty until the deductive process actually settles $\\varphi$. That ability — to assign a probability that is neither $0$, nor $1$, nor a forced answer — is what makes LI capable of representing logical uncertainty.'
+    : '<strong>✗ Not quite.</strong> Re-read "Why the Bayesian is forced into 100%" below. The probability axioms force $P(\\varphi) = 0$ or $P(\\varphi) = 1$ depending on $\\varphi$\'s ground truth. They do <em>not</em> permit a Bayesian to maintain $P(\\varphi) = 0.1$ — that violates monotonicity through $1+1=2$. The logical inductor escapes the bind by being graded against polynomial-time exploitability, not against ground truth.';
+  renderMath();
+}
+
+// ---- Plot -----------------------------------------------------------------
+
+const PLOT_W = 540, PLOT_H = 360, PAD_L = 56, PAD_R = 18, PAD_T = 18, PAD_B = 38;
+const svg = d3.select('#plot');
+
+function renderPlot(n) {
+  svg.selectAll('*').remove();
+
+  const x = d3.scaleLinear().domain([1, N_SIM_DAYS]).range([PAD_L, PLOT_W - PAD_R]);
+  const y = d3.scaleLinear().domain([-0.05, 1.1]).range([PLOT_H - PAD_B, PAD_T]);
+
+  const days = d3.range(1, N_SIM_DAYS + 1);
+  const bayesianSeries = days.map(d => ({ d, p: bayesianPrice(n) }));
+  const liSeries = days.map(d => ({ d, p: liPrice(n, d) }));
+
+  // axes
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${PLOT_H - PAD_B})`)
+     .call(d3.axisBottom(x).ticks(8));
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(${PAD_L}, 0)`)
+     .call(d3.axisLeft(y).ticks(6).tickFormat(d3.format('.1f')));
+
+  svg.append('text').attr('class', 'axis-label').attr('x', PLOT_W / 2).attr('y', PLOT_H - 6)
+     .attr('text-anchor', 'middle').text('day t');
+  svg.append('text').attr('class', 'axis-label').attr('x', -PLOT_H / 2).attr('y', 14)
+     .attr('transform', 'rotate(-90)').attr('text-anchor', 'middle').text('price of φ := \"π[n] = 7\"');
+
+  // gridlines at p=0, 0.1, 1
+  [0, 0.1, 1].forEach(p => {
+    svg.append('line')
+       .attr('x1', PAD_L).attr('x2', PLOT_W - PAD_R)
+       .attr('y1', y(p)).attr('y2', y(p))
+       .attr('stroke', p === 0.1 ? '#bcd0e6' : '#e5eaf0')
+       .attr('stroke-dasharray', p === 0.1 ? '3 3' : null);
+  });
+
+  // snap-day marker
+  const tau = snapDay(n);
+  if (tau >= 1 && tau <= N_SIM_DAYS) {
+    svg.append('line')
+       .attr('x1', x(tau)).attr('x2', x(tau))
+       .attr('y1', PAD_T).attr('y2', PLOT_H - PAD_B)
+       .attr('stroke', 'var(--warn)').attr('stroke-dasharray', '4 3').attr('stroke-width', 1.2);
+    svg.append('text').attr('x', x(tau) + 4).attr('y', PAD_T + 12)
+       .attr('font-size', 11).attr('fill', 'var(--warn)')
+       .text(`day τ=${tau}: D resolves φ`);
+  }
+
+  // Bayesian line (red, solid, flat)
+  const bLine = d3.line().x(d => x(d.d)).y(d => y(d.p));
+  svg.append('path').datum(bayesianSeries)
+     .attr('fill', 'none').attr('stroke', 'var(--bad)').attr('stroke-width', 2.2)
+     .attr('d', bLine);
+  svg.append('text').attr('x', PLOT_W - PAD_R - 6).attr('y', y(bayesianPrice(n)) - 6)
+     .attr('text-anchor', 'end').attr('font-size', 11).attr('fill', 'var(--bad)')
+     .text('Bayesian');
+
+  // LI line (blue, with the snap)
+  const liLine = d3.line().x(d => x(d.d)).y(d => y(d.p));
+  svg.append('path').datum(liSeries)
+     .attr('fill', 'none').attr('stroke', 'var(--accent)').attr('stroke-width', 2.2)
+     .attr('d', liLine);
+  // a little label on the LI side
+  svg.append('text').attr('x', PAD_L + 8).attr('y', y(LI_PRIOR) - 6)
+     .attr('font-size', 11).attr('fill', 'var(--accent)')
+     .text(`LI prior = ${LI_PRIOR}`);
+}
+
+// ---- KaTeX ----------------------------------------------------------------
+
+function renderMath() {
+  if (!window.renderMathInElement) return;
+  renderMathInElement(document.body, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '\\[', right: '\\]', display: true },
+      { left: '$', right: '$', display: false },
+      { left: '\\(', right: '\\)', display: false },
+    ],
+    macros: {
+      '\\quot': '\\textsf{“}#1\\textsf{”}',
+    },
+    throwOnError: false,
+    strict: 'ignore',
+  });
+}
+
+// ---- Boot -----------------------------------------------------------------
+
+slider.addEventListener('input', updateAll);
+renderPredictions();
+updateAll();
+</script>
+
+</body>
+</html>
