@@ -219,7 +219,7 @@ justification. Section/page references are to arXiv:1609.03543v3.
 |-----------------|-------------|------------|--------------|--------|--------------|
 | §1 Introduction (motivation, π-digit) | `li-ch1-pi-digit-paradox` | Bayesian forced into `P(π[87653]=7) ≥ P(1+1=2)` | Predict-then-reveal: pick the inequality the laws of probability force; build a logical inductor whose price for π[87653]=7 floats below 1 | proposed | |
 | §1 + Table 1 of desiderata | `li-ch1-desiderata-tour` | The 17 desiderata as nodes in a compatibility graph (Sawin impossibility, etc.) | Click any subset of desiderata; widget reports whether the subset is achievable, and if not, names the impossibility result | proposed | |
-| §3.1 Markets + Table 1 (worked bets) | `li-ch2-market-trader-sandbox` | The §3.5 market: prices on `1+1=2`, `1+1≠2`, "Goldbach" | Design a trader (linear combination of buy/sell features); widget steps through n days, animates net worth in plausible worlds | proposed | |
+| §3.1 Markets + Table 1 (worked bets) | `li-ch2-market-trader-sandbox` | The §3.5 market: prices on `1+1=2`, `1+1≠2`, "Goldbach" | Design a trader (linear combination of buy/sell features); widget steps through n days, animates net worth in plausible worlds | drafted | |
 | §3.2 Deductive processes | `li-ch2-deductive-process` | Tiny PA-fragment deductive process; `dt_n` as theorems-provable-in-≤n-chars | Drag n; predict which p.c.-worlds get ruled out at each step; identify the day at which `dt_n` rules out an irrational world | proposed | |
 | §3.4 Traders (continuity + the χ paradox) | `li-ch2-continuity-paradox` | The paradoxical sentence χ := "I am true iff my price < 50¢" | Toggle continuous vs discontinuous trading strategies; show the no-fixed-point failure for discontinuous, the fixed-point existence (Brouwer) for continuous | proposed | |
 | §3.5 Exploitation | `li-ch2-exploit-or-not` | Five toy markets, only some exploitable | Multiple-choice with verification: pick the trader (from 3 candidates) that exploits a given market; widget runs each and shows realised value over n | proposed | |
@@ -438,9 +438,15 @@ multiple arXiv revisions; we pin v3 (2020-09) for citation.
 
 - **Last updated:** 2026-05-05
 - **Chapters complete:** 0
-- **Currently being drafted:** scaffold only — `NOTES.md`,
-  `source/download.sh`. First module will land after a §1–§3
-  read.
+- **Currently being drafted:** scaffold + module proposal landed;
+  `li-ch2-market-trader-sandbox` (the centerpiece widget for §3)
+  shipped as a single-file standalone widget at
+  `chapters/ch2-the-criterion/widgets/01-market-trader-sandbox.html`,
+  with a five-trader catalogue (canonical $\varphi$-buy exploit;
+  $\psi$-sell exploit; $\chi$-Goldbach bet that does not exploit;
+  combined exploits; combined exploit-plus-bet that ruins the
+  exploit). Smoke-tested clean. Lean Game Server scaffold queued
+  for next.
 - **Blockers:** none
 
 ## Cross-references

@@ -1,0 +1,464 @@
+<!--
+  Widget: li-ch2-market-trader-sandbox (module 1 of the Logical Induction
+          Ch 2 batch, "The Logical Induction Criterion").
+  Source: Garrabrant, Benson-Tilsen, Critch, Soares, Taylor (2016),
+          "Logical Induction" (arXiv:1609.03543v3), §3 "The Logical
+          Induction Criterion" — esp. §3.4 Traders, §3.5 Exploitation,
+          and Table 1 (worked bets), p. 19-22.
+  Toy system: the three-sentence market from Table 1 — phi := "1+1=2",
+              psi := "1+1 != 2", chi := "Goldbach's conjecture" — with
+              constant prices (90c, 5c, 98c) and a PA-fragment deductive
+              process that resolves phi and refutes psi at day t=8 but
+              leaves chi undecided.
+  Active check: predict whether each candidate trader exploits the market;
+                widget runs the trade and animates the plausible-worth
+                envelope (lower and upper bounds across plausible worlds
+                W in pcworlds(d_n)) over n=1..30.
+
+  Standalone: open this .html directly in a browser. Uses D3 v7 and KaTeX
+              from CDN, no build step. KaTeX is loaded synchronously
+              (no defer) per repo LESSONS.md.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Logical Induction · Ch 2 · A market, a trader, and exploitation</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; color: var(--ink); }
+  h3 { font-size: 0.95rem; margin-top: 1rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .controls { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.6rem 0 0.4rem; }
+  .controls button { padding: 0.4rem 0.7rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.85rem; color: var(--ink); }
+  .controls button:hover { background: #eef3f8; }
+  .controls button.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .layout { display: grid; grid-template-columns: 540px 1fr; gap: 1.6rem; align-items: start; margin-top: 0.5rem; }
+  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+  svg.plot { background: #fff; border: 1px solid #d9e0e7; border-radius: 4px; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  table.market { border-collapse: collapse; margin-top: 0.4rem; font-size: 0.9rem; }
+  table.market th, table.market td { padding: 0.4rem 0.7rem; border-bottom: 1px solid #e5eaf0; text-align: left; }
+  table.market th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .panel-note { color: var(--muted); font-size: 0.92rem; margin-top: 0.4rem; }
+  .choice { display: block; width: 100%; text-align: left; margin: 0.3rem 0; padding: 0.55rem 0.8rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover { background: #eef3f8; }
+  .choice.active { border-color: var(--accent); background: #eef3f8; }
+  .verdict { padding: 0.6rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; display: none; }
+  .verdict.exploits { background: #d1fadf; border-left: 4px solid var(--good); }
+  .verdict.does-not { background: #fee4e2; border-left: 4px solid var(--bad); }
+  .verdict.partial { background: #fef0c7; border-left: 4px solid var(--warn); }
+  .legend { display: flex; gap: 1.2rem; align-items: center; margin: 0.4rem 0; font-size: 0.85rem; color: var(--muted); flex-wrap: wrap; }
+  .legend-swatch { display: inline-block; width: 16px; height: 4px; vertical-align: middle; margin-right: 4px; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .sources li { margin: 0.15rem 0; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  .day-marker { stroke: var(--warn); stroke-dasharray: 4 3; stroke-width: 1.2; }
+  .envelope-fill { fill: rgba(43, 108, 176, 0.18); }
+  .envelope-line { fill: none; stroke: var(--accent); stroke-width: 1.6; }
+  .envelope-line.lower { stroke-dasharray: 4 3; }
+  .zero-line { stroke: #c9d3df; stroke-width: 1; }
+  blockquote.quote { border-left: 3px solid var(--accent); margin: 0.8rem 0; padding: 0.4rem 0.9rem; background: #fafbfc; font-size: 0.94rem; }
+</style>
+</head>
+<body>
+
+<h1>A market, a trader, and what it means to <em>exploit</em></h1>
+<p class="subtitle">Logical Induction companion · widget 1 of the Ch 2 batch on <a href="https://arxiv.org/abs/1609.03543">Garrabrant et&nbsp;al. (2016) §3</a></p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=18">Garrabrant et&nbsp;al. (2016) §3.1 "Markets"</a> — Definitions 3.1.1–3.1.4 (Valuation, Pricing, Market, Belief State).</li>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=19">§3.2 "Deductive Processes"</a> — Definition 3.2.1 (Deductive Process), 3.2.2 (World), 3.2.3 (Propositional Consistency), 3.2.4 ($\mathcal{T}$-Complete).</li>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=20">§3.4 "Traders"</a>, esp. Definitions 3.4.4–3.4.6 and the Table 1 worked example.</li>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=22">§3.5 "Exploitation"</a> — Definition 3.5.1; the "buy $\phi$ each day at 50¢" exploit; the $(\phi \lor \psi)$-arbitrage.</li>
+    <li>Background reading: <a href="https://www.alignmentforum.org/posts/3SG4WbNPoP8fsuZgs/an-intuitive-guide-to-logical-induction-1">Abram Demski, "An Intuitive Guide to Logical Induction"</a> (Alignment Forum, 2017) — §"The Stock Market".</li>
+    <li><a href="https://arxiv.org/abs/2205.12879">Adam Scherlis, "Logical Induction for Software Engineers"</a> (arXiv:2205.12879) — for the algorithmic counterpart of these definitions.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;">A <strong>market</strong> $\overline{\mathbb{P}} = (\mathbb{P}_1, \mathbb{P}_2, \ldots)$ is a computable sequence of pricings; on day $n$, $\mathbb{P}_n(\phi) \in \mathbb{Q} \cap [0,1]$ is the price of a share that pays \$1 if $\phi$ is true and \$0 otherwise. A <strong>deductive process</strong> $\overline{D}$ feeds the market a growing set $D_n$ of provable sentences. A <strong>trader</strong> $\overline{T}$ is a sequence of trading strategies — affine combinations of sentences with continuous coefficients — that buy and sell at the listed prices. The trader <strong>exploits</strong> the market if their plausible net worth $\{\, W(\sum_{i \le n} T_i) : n \in \mathbb{N}^+, W \in \mathrm{PC}(D_n)\,\}$ is bounded below but not above. The Logical Induction Criterion says: <em>no efficiently-computable trader exploits a logical inductor.</em></p>
+</div>
+
+<h2>The toy market</h2>
+<p>Three sentences, each priced constantly across all days (the simplest possible market that's still <em>exploitable</em>):</p>
+<table class="market">
+<thead><tr><th>Sentence</th><th>Price $\mathbb{P}_n$</th><th>Deductive process resolves it on day&hellip;</th><th>Truth in $\mathcal{T}=\mathrm{PA}$</th></tr></thead>
+<tbody>
+  <tr><td>$\varphi := \quot{1+1=2}$</td><td>90¢</td><td>$t_\varphi = 8$ ($\varphi \in D_n$ for $n \ge 8$)</td><td>true (provable)</td></tr>
+  <tr><td>$\psi := \quot{1+1\ne 2}$</td><td>5¢</td><td>$t_\psi = 8$ ($\lnot\psi \in D_n$ for $n \ge 8$)</td><td>false (refutable)</td></tr>
+  <tr><td>$\chi := \quot{\text{Goldbach's conjecture}}$</td><td>98¢</td><td>never (within $n \le 30$)</td><td>undecided</td></tr>
+</tbody>
+</table>
+<p class="panel-note">All four sentences sit in $\mathcal{L}_{\mathrm{PA}}$. The deductive process eventually emits $\varphi$ and $\lnot\psi$ on day&nbsp;$t=8$; $\chi$ stays out of $D_n$ for the lifetime of this widget. (For the price trajectory <em>before</em> a logical inductor learns these sentences, see the convergence and provability-induction widgets later in the chapter.) <strong>Plausible worlds</strong> $\mathrm{PC}(D_n)$ are the <em>propositionally-consistent</em> truth assignments that agree with $D_n$. Before day&nbsp;8 every plausible world is free to set $\varphi=0$ or $\varphi=1$; from day&nbsp;8 on, every plausible world must agree $\varphi=1$ and $\psi=0$. $\chi$ is free at every $n$.</p>
+
+<h2>Pick a trader; read off whether they exploit</h2>
+<p class="panel-note">Each trader is a sequence $T_n$ of trading strategies for day $n$. Reading "$+1\,\varphi$" as "buy one share of $\varphi$ at the prevailing price", the strategy $T_n = \varphi - \mathbb{P}_n(\varphi)$ (the canonical "buy a $\varphi$-share, paying the listed price") is the simplest non-trivial strategy.</p>
+<div id="trader-buttons" class="controls"></div>
+
+<div class="layout">
+  <div>
+    <svg class="plot" id="plot" viewBox="0 0 540 380"></svg>
+    <div class="legend">
+      <span><span class="legend-swatch envelope-fill" style="background: rgba(43, 108, 176, 0.25);"></span> envelope of plausible worth $\,W(\sum_{i \le n} T_i)\,$ over $W \in \mathrm{PC}(D_n)$</span>
+      <span><span class="legend-swatch" style="background: var(--accent);"></span> upper bound $\sup_W$</span>
+      <span><span class="legend-swatch" style="background: var(--accent); border-bottom: 1px dashed var(--accent); height: 1px;"></span> lower bound $\inf_W$</span>
+    </div>
+    <p class="panel-note">The dashed orange vertical line marks day&nbsp;$t=8$, when $\overline{D}$ resolves $\varphi$ and refutes $\psi$. After that day, every plausible world agrees on $\varphi$ and $\psi$, so the upper and lower bounds <em>collapse</em> on those terms. They stay separated for any holdings of $\chi$.</p>
+  </div>
+  <div>
+    <h3>Predict before peeking: does this trader exploit the market?</h3>
+    <div id="prediction-choices"></div>
+    <div class="verdict" id="verdict"></div>
+  </div>
+</div>
+
+<h2>Why this market is exploitable at all</h2>
+<p class="panel-note">A market that prices a <em>provable</em> sentence at less than \$1 is leaving free money on the table once the deductive process catches up. Buying $\varphi$-shares at 90¢ before day&nbsp;8 and holding them past day&nbsp;8 nets 10¢ per share in every plausible world thereafter — a guaranteed positive return that grows linearly. Symmetrically, the trader who <em>sells</em> $\psi$-shares at 5¢ pockets 5¢ per share, and after day&nbsp;8 every plausible world agrees those shares pay nothing, so the seller keeps the cash. Both are exploits.</p>
+<p class="panel-note">The trader who <em>buys $\chi$-shares at 98¢</em>, by contrast, is making a bet. In some plausible worlds Goldbach is true and the bet pays off; in others it's false and the bet loses 98¢ each day. Their plausible worth has both an unbounded ceiling <em>and</em> an unbounded floor — not bounded below — and so by Definition&nbsp;3.5.1 they do not exploit the market. <strong>This distinction is the whole point of the criterion:</strong> exploit ≠ "could possibly profit", but rather "guaranteed not to lose unboundedly while still possibly winning unboundedly".</p>
+
+<blockquote class="quote">"Roughly speaking, we can imagine that there is a person behind the market who acts as a market maker, obligated to buy and sell shares at the listed prices. We can imagine that anyone who sold a $\phi$-share is obligated to pay \$1 if and when $\overline{D}$ says $\phi$. Then, very roughly, a trader exploits the market if they are able to make unbounded returns off of a finite investment." — <a href="https://arxiv.org/pdf/1609.03543v3#page=22">Garrabrant et&nbsp;al. (2016), §3.5</a></blockquote>
+
+<h2>What this widget does <em>not</em> show</h2>
+<p class="panel-note">Two important limitations to flag, since either could mislead a careful reader.</p>
+<ol style="font-size: 0.94rem; color: var(--muted);">
+  <li><strong>Continuous trading strategies.</strong> The paper requires trading strategies' coefficients to be continuous functions of the market history (Definition&nbsp;3.4.4) so that the market-prices fixed-point construction in §5 works. The traders here all have constant coefficients (zeroth-degree polynomials in the price features), which is trivially continuous. The continuity machinery only bites when prices <em>themselves</em> depend on the trader (the $\chi := \quot{\text{I am true iff my price} < 0.5}$ paradox), which is the subject of the next widget.</li>
+  <li><strong>Polynomial-time computability.</strong> The criterion (Definition&nbsp;3.6.1) restricts to <em>efficiently-computable</em> traders. Every strategy here is constant in $n$, so trivially polytime. Less efficient traders (e.g., the buy-low/sell-high trader of the convergence theorem, which would need to sweep the entire price history each day) sit just outside what this widget animates.</li>
+</ol>
+
+<p class="footnote">
+  <strong>How the plot is computed.</strong> For each day $n=1,\ldots,30$, the widget evaluates the trader's holdings $H_n = \sum_{i \le n} T_i$ as an affine combination over $\{1, \varphi, \psi, \chi\}$ — i.e., a constant cash term plus per-sentence share counts. The plausible-worth bounds are then
+  $\inf_{W \in \mathrm{PC}(D_n)} W(H_n)$ and $\sup_{W \in \mathrm{PC}(D_n)} W(H_n)$, computed by enumerating the $2^k$ truth assignments to the sentences left undecided by $D_n$. With three sentences this is $\le 8$ evaluations per day, well inside the bounds of an in-browser computation. The exploitation verdict applies the literal $n \le 30$ window — a trader that exploits "in the limit" but not by day&nbsp;30 would be miscalled here, but for the four candidates listed the verdict on day&nbsp;30 is the verdict in the limit.
+</p>
+
+<nav class="nav">
+  <a href="../README.md">← Ch 2 README</a>
+  <a href="../../../NOTES.md">Logical Induction NOTES.md →</a>
+</nav>
+
+<script>
+// ---- Constants and helpers (mirror project policy: define once at top) ----
+const LINK = {
+  // not used here directly, but centralizing in case future edits need to
+  // share an anchor across multiple <a> elements.
+  paperPdf: 'https://arxiv.org/pdf/1609.03543v3.pdf',
+  demski: 'https://www.alignmentforum.org/posts/3SG4WbNPoP8fsuZgs/an-intuitive-guide-to-logical-induction-1',
+};
+
+const N_DAYS = 30;          // simulation horizon
+const T_RESOLVE = 8;        // day on which D resolves phi and refutes psi
+
+// Constant prices, per Table 1 of the paper.
+const PRICE = { phi: 0.90, psi: 0.05, chi: 0.98 };
+
+// The deductive process. d_n contains "phi" once n >= T_RESOLVE; "not psi"
+// once n >= T_RESOLVE; never contains chi or its negation.
+function decided(n) {
+  // returns the set of truth values forced by D_n.
+  // a sentence is "free" if D_n leaves it undecided.
+  const out = { phi: null, psi: null, chi: null };
+  if (n >= T_RESOLVE) { out.phi = 1; out.psi = 0; }
+  return out;
+}
+
+// Plausible worlds: enumerate the 2^k assignments to the free sentences.
+function plausibleWorlds(n) {
+  const dec = decided(n);
+  const free = ['phi', 'psi', 'chi'].filter(k => dec[k] === null);
+  const worlds = [];
+  for (let mask = 0; mask < (1 << free.length); mask++) {
+    const w = { phi: dec.phi ?? 0, psi: dec.psi ?? 0, chi: dec.chi ?? 0 };
+    free.forEach((k, i) => { w[k] = (mask >> i) & 1; });
+    worlds.push(w);
+  }
+  return worlds;
+}
+
+// A holding is { cash: Number, phi: Number, psi: Number, chi: Number }.
+// Value of a holding in a world: cash + phi*W(phi) + psi*W(psi) + chi*W(chi).
+function valueIn(holding, world) {
+  return holding.cash
+       + holding.phi * world.phi
+       + holding.psi * world.psi
+       + holding.chi * world.chi;
+}
+
+// Trader is a function (n) => trade strategy for day n.
+// A strategy is { phi: shares to buy, psi: shares to buy, chi: shares to buy }.
+// Cash flow is computed automatically: -sum_i shares_i * price_i.
+function executeTrade(holding, strategy) {
+  const cashFlow = - (
+    (strategy.phi || 0) * PRICE.phi +
+    (strategy.psi || 0) * PRICE.psi +
+    (strategy.chi || 0) * PRICE.chi
+  );
+  return {
+    cash: holding.cash + cashFlow,
+    phi: holding.phi + (strategy.phi || 0),
+    psi: holding.psi + (strategy.psi || 0),
+    chi: holding.chi + (strategy.chi || 0),
+  };
+}
+
+// Compute the plausible-worth envelope over n=1..N_DAYS for a trader.
+function envelope(traderFn) {
+  let H = { cash: 0, phi: 0, psi: 0, chi: 0 };
+  const series = [];
+  for (let n = 1; n <= N_DAYS; n++) {
+    H = executeTrade(H, traderFn(n));
+    const worlds = plausibleWorlds(n);
+    const vals = worlds.map(w => valueIn(H, w));
+    series.push({
+      n,
+      lo: Math.min(...vals),
+      hi: Math.max(...vals),
+    });
+  }
+  return series;
+}
+
+// Decide if a trader exploits the market by Definition 3.5.1, applied to
+// the n <= N_DAYS window. Bounded below + unbounded above (in the limit
+// approximated by max-vs-trend over the last 10 days).
+function classify(series) {
+  const lows = series.map(s => s.lo);
+  const highs = series.map(s => s.hi);
+  const minLo = Math.min(...lows);
+  const maxHi = Math.max(...highs);
+
+  // Trend over the last 10 days (positive slope means net worth growing).
+  const tail = series.slice(-10);
+  const tailLoSlope = (tail[tail.length - 1].lo - tail[0].lo) / (tail.length - 1);
+  const tailHiSlope = (tail[tail.length - 1].hi - tail[0].hi) / (tail.length - 1);
+
+  // "Bounded below" = lower envelope is not falling fast at the tail.
+  // "Unbounded above" = upper envelope is rising at the tail.
+  // For these toy traders the verdict is unambiguous after T_RESOLVE.
+  const boundedBelow = tailLoSlope > -1e-6;
+  const unboundedAbove = tailHiSlope > 1e-6;
+
+  if (boundedBelow && unboundedAbove) return { verdict: 'exploits', minLo, maxHi };
+  if (!boundedBelow && unboundedAbove) return { verdict: 'does-not', reason: 'unbounded loss possible', minLo, maxHi };
+  if (boundedBelow && !unboundedAbove) return { verdict: 'partial', reason: 'bounded but not unbounded above', minLo, maxHi };
+  return { verdict: 'does-not', reason: 'no profit potential', minLo, maxHi };
+}
+
+// ---- Trader catalogue ------------------------------------------------------
+
+const TRADERS = [
+  {
+    id: 'buy-phi',
+    label: '(a) Buy 1 share of $\\varphi$ each day',
+    desc: 'The canonical exploit from §3.5. Each day, $T_n = (\\varphi - \\mathbb{P}_n(\\varphi))$. After $t=8$, every plausible world agrees $\\varphi=1$, so each share pays \\$1 and the trader nets 10¢ per share per day.',
+    fn: () => ({ phi: 1 }),
+    correctVerdict: 'exploits',
+    explanation: 'Lower bound: holdings before day 8 cost 0.90 per day in cash and own n shares of $\\varphi$ worth 0 in worlds where $W(\\varphi)=0$. The minimum plausible worth is bounded by $-0.90 \\cdot t$. After day 8, $W(\\varphi) = 1$ in every plausible world, so the holdings are worth $n - 0.90 n = 0.10 n$ in <em>every</em> plausible world. The lower bound is bounded; the upper bound grows like $0.10n \\to \\infty$. <strong>Exploits.</strong>'
+  },
+  {
+    id: 'sell-psi',
+    label: '(b) Sell 1 share of $\\psi$ each day (i.e., buy &minus;1)',
+    desc: 'Symmetric exploit. $T_n = -\\psi - \\mathbb{P}_n(-\\psi)$, equivalently buy $-1$ share of $\\psi$ at the listed price (collect 5¢, owe one $\\psi$-share). After $t=8$, every plausible world agrees $\\psi=0$, so the obligation is worth nothing and the cash is kept.',
+    fn: () => ({ psi: -1 }),
+    correctVerdict: 'exploits',
+    explanation: 'Selling $\\psi$ at 5¢ collects 5¢ in cash on day $n$; after day 8 the trader owes 0 in every plausible world. Lower bound: bounded by zero in fact (in the worst plausible world, $W(\\psi)=1$, the trader owes $n$ but has only collected $0.05 n$ — but those worlds are ruled out from day 8 onward). Upper bound grows like $0.05 n \\to \\infty$. <strong>Exploits.</strong>'
+  },
+  {
+    id: 'buy-chi',
+    label: '(c) Buy 1 share of $\\chi$ each day',
+    desc: 'Bet on Goldbach. Each day, pay 98¢ for a $\\chi$-share. $\\chi$ is never resolved within the window, so plausible worlds remain split.',
+    fn: () => ({ chi: 1 }),
+    correctVerdict: 'does-not',
+    explanation: 'In plausible worlds where $W(\\chi) = 1$, holdings are worth $n - 0.98 n = 0.02 n$ — unbounded above. In plausible worlds where $W(\\chi) = 0$, holdings are worth $-0.98 n$ — unbounded below. The plausible worth is <em>not</em> bounded below; by Def. 3.5.1, this trader does <strong>not</strong> exploit the market — even though the upper bound is unbounded.'
+  },
+  {
+    id: 'mixed-exploit',
+    label: '(d) Both: buy 1 $\\varphi$ and sell 1 $\\psi$ each day',
+    desc: 'Combination of the two clean exploits. $T_n = (\\varphi - \\mathbb{P}_n(\\varphi)) + (-\\psi - \\mathbb{P}_n(-\\psi))$. Costs 0.90 - 0.05 = 0.85 per day; pays 1 - 0 = 1 per day after $t = 8$.',
+    fn: () => ({ phi: 1, psi: -1 }),
+    correctVerdict: 'exploits',
+    explanation: 'After day 8, holdings are worth $1 \\cdot n + 0 \\cdot (-n) - 0.85 n = 0.15 n$ in <em>every</em> plausible world. Lower bound is bounded; upper bound grows linearly. <strong>Exploits.</strong> Note: combining exploits is allowed and remains an exploit.'
+  },
+  {
+    id: 'mixed-balanced',
+    label: '(e) Buy 1 $\\varphi$, buy 1 $\\chi$ each day',
+    desc: 'Combine a clean exploit with a Goldbach bet. $T_n = (\\varphi - \\mathbb{P}_n(\\varphi)) + (\\chi - \\mathbb{P}_n(\\chi))$.',
+    fn: () => ({ phi: 1, chi: 1 }),
+    correctVerdict: 'does-not',
+    explanation: 'In worlds where $W(\\chi) = 0$, holdings after day 8 are worth $n + 0 - (0.90 + 0.98) n = -0.88 n$ — unbounded loss. The $\\chi$-bet contaminates the $\\varphi$-exploit: any single trader that takes both positions inherits the unbounded-loss possibility. <strong>Does not exploit.</strong> A real logical inductor still has to handle this trader, but it does so by being correctly priced on $\\varphi$ specifically — not by neutralizing the $\\chi$-bet.'
+  },
+];
+
+// ---- DOM construction ------------------------------------------------------
+
+const traderButtonsEl = document.getElementById('trader-buttons');
+const predictionChoicesEl = document.getElementById('prediction-choices');
+const verdictEl = document.getElementById('verdict');
+
+let currentTrader = TRADERS[0];
+let currentPrediction = null;
+
+function renderTraderButtons() {
+  traderButtonsEl.innerHTML = '';
+  TRADERS.forEach(t => {
+    const b = document.createElement('button');
+    b.innerHTML = t.label;
+    if (t.id === currentTrader.id) b.classList.add('active');
+    b.onclick = () => {
+      currentTrader = t;
+      currentPrediction = null;
+      renderTraderButtons();
+      renderPredictionChoices();
+      renderVerdict();
+      renderPlot();
+      renderMath();
+    };
+    traderButtonsEl.appendChild(b);
+  });
+}
+
+const PREDICTIONS = [
+  { id: 'exploits', label: 'Yes — exploits the market.' },
+  { id: 'partial',  label: 'Bounded plausible worth (no exploitation possible — but no loss either).' },
+  { id: 'does-not', label: 'No — possible unbounded loss; does not exploit.' },
+];
+
+function renderPredictionChoices() {
+  predictionChoicesEl.innerHTML = '';
+  PREDICTIONS.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'choice';
+    b.textContent = p.label;
+    if (currentPrediction === p.id) b.classList.add('active');
+    b.onclick = () => {
+      currentPrediction = p.id;
+      renderPredictionChoices();
+      renderVerdict();
+    };
+    predictionChoicesEl.appendChild(b);
+  });
+}
+
+function renderVerdict() {
+  if (currentPrediction === null) { verdictEl.style.display = 'none'; return; }
+  const series = envelope(currentTrader.fn);
+  const c = classify(series);
+  const correct = (currentPrediction === currentTrader.correctVerdict);
+  verdictEl.style.display = 'block';
+  verdictEl.className = 'verdict ' + currentTrader.correctVerdict;
+  verdictEl.innerHTML =
+    `<strong>${correct ? '✓ ' : '✗ '}Verdict: ${currentTrader.correctVerdict === 'exploits' ? 'exploits' : currentTrader.correctVerdict === 'partial' ? 'bounded' : 'does not exploit'}.</strong>` +
+    `<div style="margin-top:0.4rem;">${currentTrader.explanation}</div>`;
+  renderMath();
+}
+
+// ---- Plot ------------------------------------------------------------------
+
+const PLOT_W = 540, PLOT_H = 380, PAD_L = 56, PAD_R = 18, PAD_T = 18, PAD_B = 38;
+const svg = d3.select('#plot');
+
+function renderPlot() {
+  const series = envelope(currentTrader.fn);
+
+  // Determine y range with a little headroom.
+  const yMin = Math.min(0, d3.min(series, d => d.lo));
+  const yMax = Math.max(0, d3.max(series, d => d.hi));
+  const yPad = Math.max(0.5, 0.1 * (yMax - yMin));
+
+  const x = d3.scaleLinear().domain([1, N_DAYS]).range([PAD_L, PLOT_W - PAD_R]);
+  const y = d3.scaleLinear().domain([yMin - yPad, yMax + yPad]).range([PLOT_H - PAD_B, PAD_T]);
+
+  svg.selectAll('*').remove();
+
+  // axes
+  const xAxis = d3.axisBottom(x).ticks(8);
+  const yAxis = d3.axisLeft(y).ticks(6).tickFormat(d => '$' + d.toFixed(2));
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${PLOT_H - PAD_B})`).call(xAxis);
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(${PAD_L}, 0)`).call(yAxis);
+
+  svg.append('text').attr('class', 'axis-label').attr('x', (PLOT_W) / 2).attr('y', PLOT_H - 6).attr('text-anchor', 'middle').text('day n');
+  svg.append('text').attr('class', 'axis-label').attr('x', -PLOT_H/2).attr('y', 14).attr('transform', 'rotate(-90)').attr('text-anchor', 'middle').text('plausible net worth');
+
+  // zero line
+  svg.append('line').attr('class', 'zero-line')
+     .attr('x1', PAD_L).attr('x2', PLOT_W - PAD_R)
+     .attr('y1', y(0)).attr('y2', y(0));
+
+  // marker for D-resolution day
+  svg.append('line').attr('class', 'day-marker')
+     .attr('x1', x(T_RESOLVE)).attr('x2', x(T_RESOLVE))
+     .attr('y1', PAD_T).attr('y2', PLOT_H - PAD_B);
+  svg.append('text').attr('x', x(T_RESOLVE) + 4).attr('y', PAD_T + 12)
+     .attr('font-size', 11).attr('fill', 'var(--warn)')
+     .text(`day t=${T_RESOLVE}: D resolves φ, ¬ψ`);
+
+  // envelope as area
+  const area = d3.area()
+    .x(d => x(d.n))
+    .y0(d => y(d.lo))
+    .y1(d => y(d.hi))
+    .curve(d3.curveMonotoneX);
+  svg.append('path').attr('class', 'envelope-fill').attr('d', area(series));
+
+  // upper and lower lines
+  const lineHi = d3.line().x(d => x(d.n)).y(d => y(d.hi)).curve(d3.curveMonotoneX);
+  const lineLo = d3.line().x(d => x(d.n)).y(d => y(d.lo)).curve(d3.curveMonotoneX);
+  svg.append('path').attr('class', 'envelope-line').attr('d', lineHi(series));
+  svg.append('path').attr('class', 'envelope-line lower').attr('d', lineLo(series));
+
+  // dots at each integer day for both bounds
+  svg.selectAll('circle.hi').data(series).enter().append('circle')
+     .attr('class', 'hi').attr('cx', d => x(d.n)).attr('cy', d => y(d.hi))
+     .attr('r', 2.2).attr('fill', 'var(--accent)');
+  svg.selectAll('circle.lo').data(series).enter().append('circle')
+     .attr('class', 'lo').attr('cx', d => x(d.n)).attr('cy', d => y(d.lo))
+     .attr('r', 2.2).attr('fill', 'var(--accent)').attr('fill-opacity', 0.5);
+}
+
+// ---- KaTeX rendering -------------------------------------------------------
+
+function renderMath() {
+  if (!window.renderMathInElement) return;
+  renderMathInElement(document.body, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '\\[', right: '\\]', display: true },
+      { left: '$', right: '$', display: false },
+      { left: '\\(', right: '\\)', display: false },
+    ],
+    macros: {
+      '\\quot': '\\textsf{“}#1\\textsf{”}',
+      '\\Implies': '\\Rightarrow',
+    },
+    throwOnError: false,
+    strict: 'ignore',
+  });
+}
+
+// ---- Boot ------------------------------------------------------------------
+
+renderTraderButtons();
+renderPredictionChoices();
+renderPlot();
+renderMath();
+</script>
+
+</body>
+</html>
