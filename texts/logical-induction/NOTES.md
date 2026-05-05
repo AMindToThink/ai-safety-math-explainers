@@ -46,6 +46,26 @@ keeps abstract.
   claims against the paper.
   - License: arXiv non-exclusive; code is MIT (verify on ingest).
 
+- **Kōshin Alex Flint — *Logical Induction* (Python implementation)**
+  https://github.com/monasticacademy/logical-induction. MIT license,
+  © 2022 Kōshin Alex Flint. A deliberately simplicity-over-efficiency
+  port of §5.4.1 of Garrabrant et al. 2016: `LogicalInductor.update`,
+  `combine_trading_algorithms` (TradingFirm, §5.3.2),
+  `compute_budget_factor` (Budgeter, §5.2), brute-force
+  `find_credences` (MarketMaker via rational enumeration). The
+  closer-to-the-paper companion to Scherlis's higher-level pseudocode;
+  uses the §A.2 trading-formula ADT (Constant, Price, Sum, Product,
+  Max, Min, SafeReciprocal) directly. `examples/` contains four
+  end-to-end runs including `uniform_digits_of_pi.py` and
+  `unbudgeted_digits_of_pi.py` — the right ground truth for the
+  ch1 π-digit widget's "price converges to ≈0.1" claim. Accompanies
+  an unpublished "Logical Induction for Software Engineers" article.
+  - License: MIT. Code can be ported with attribution
+    ("Adapted from Kōshin Alex Flint, monasticacademy/logical-induction"),
+    no copyleft constraint on this repo.
+  - Cross-check completed 2026-05-05 in
+    [issue #12](https://github.com/AMindToThink/ai-safety-math-explainers/issues/12).
+
 - **Demski + Garrabrant — *Embedded Agency*** (2019).
   Background motivation for why LI matters in agent foundations.
   Not load-bearing for the math, but useful for chapter intros.
@@ -78,8 +98,13 @@ puzzles, calibration/coherence dashboard, π-digit canonical example.
     `source/paper/`.
   - LaTeX e-print of arXiv:2205.12879 (Scherlis), unpacked into
     `source/scherlis/`.
-  - `git clone` of `epistax-is/logical-induction` into
-    `source/scherlis-code/`.
+  - `git clone` of `epistax-is/logical-induction` (Scherlis's code)
+    into `source/scherlis-code/`. As of 2026-05 this repo does not
+    resolve; the clone may fail and the Scherlis arXiv source is
+    treated as authoritative for that pseudocode.
+  - `git clone` of `monasticacademy/logical-induction` (Flint's
+    Python LIA, MIT 2022) into `source/flint-code/`. The
+    closer-to-the-paper of the two implementations.
   - HTML of Demski's *Intuitive Guide* posts from Alignment
     Forum / LessWrong, converted to Markdown via `pandoc`.
 - **Reconstruction command:** `bash texts/logical-induction/source/download.sh`
@@ -428,6 +453,54 @@ to its own GitHub repo per `CONTRIBUTING.md`.
 
 Listed above under "Secondary / distillation sources." Credits in
 chapter intros once those chapters are written.
+
+## Things to consider porting from Flint
+
+Surfaced by the issue-#12 cross-check against
+`monasticacademy/logical-induction` (MIT, © 2022 Kōshin Alex Flint).
+Attribution string for any port: *"Adapted from Kōshin Alex Flint,
+monasticacademy/logical-induction"*.
+
+- **`worlds_consistent_with` (`inductor.py`).** Tighter than our
+  ad-hoc `plausibleWorlds` — handles arbitrary propositional
+  observations rather than a hardcoded `decided(n)` table. Useful
+  when a future widget admits arbitrary observation sentences.
+- **`find_credences` + `rationals_between` (`inductor.py`,
+  `enumerator.py`).** A ~30-line MarketMaker over rational
+  enumeration. Direct fit for `li-ch4-lia-walkthrough`'s step-through
+  animator. Caveat: the paper describes MarketMaker as a fixed-point
+  search, not enumeration; check equivalence on multi-trader markets
+  with irrational fixed points before claiming it *is* the LIA's
+  MarketMaker.
+- **`make_s_curve` / `trade_on_probability` (`examples/uniform_digits_of_pi.py`,
+  `unbudgeted_digits_of_pi.py`).** The "trade hard when price differs
+  from $p$" pattern — slope-10 sigmoid clipped to $[-1, 1]$. Would
+  upgrade `01-pi-digit-paradox.html` from a hardcoded-snap toy to a
+  real (small-scale) inductor. Worth a follow-up widget rather than
+  retro-fitting the existing one.
+- **`combine_trading_algorithms` (TradingFirm, §5.3.2).** ~60 lines;
+  the cleanest existing implementation. Backs `li-ch4-lia-walkthrough`.
+- **`SafeReciprocal` / budget-factor pattern.** `1 / max(1, x)`,
+  the cleanest one-liner for the budgeter; expose as a sidebar
+  in any §5.2 widget.
+- **Lean game gap.** Our scaffold (Markets, Exploits) has no
+  analogue for the budgeter / market-maker / trading-firm trio.
+  Add a third world (`Aggregation` or `TradingFirm`) when §5
+  chapters land. Natural sub-levels: (a) compute `quantity_bound`
+  for an affine trading expression; (b) compute the budget divisor
+  for one consistent world; (c) sum two trading policies
+  sentence-wise; (d) prove the aggregate exploits whenever any
+  constituent does.
+
+Open questions to resolve before any port:
+
+- `find_credences` enumerates *rational* credences. Equivalent to
+  the paper's fixed-point MarketMaker on multi-trader markets with
+  irrational fixed points? (Single-sentence continuous-trader case
+  should converge for both; multi-trader case is unclear.)
+- Flint uses `1e-7` / `1e-8` epsilons in `compute_budget_factor`;
+  the paper does not. Numerical-stability fudges. Match the values
+  or document the choice if we deviate.
 
 ## Source issues
 
