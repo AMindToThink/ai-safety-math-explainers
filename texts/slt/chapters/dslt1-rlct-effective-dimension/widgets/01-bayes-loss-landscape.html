@@ -1,0 +1,451 @@
+<!--
+  Widget: dslt1-bayes-loss-landscape (module 1 of 7 for DSLT 1)
+  Source: Liam Carroll, "DSLT 1: The RLCT Measures the Effective Dimension of
+          Neural Networks" (Alignment Forum, 2023-06-17), §"Preliminaries of
+          SLT" and §"Examples of Singular Loss Landscapes"; cross-references
+          Carroll (2021) MSc thesis, Chapter 2; Watanabe (2009), Algebraic
+          Geometry and Statistical Learning Theory, Chapter 1.
+  Toy system: real polynomial KL-divergence landscapes drawn from Carroll
+              Examples 1.1, 1.2, 1.5 in DSLT 1, plus three 1D companion
+              landscapes (w^2, w^4, (w+1)^2(w-1)^4) used in DSLT 2 §Example 1.
+  Active check: predict the topology of W_0 = {K(w) = 0} from the level-set
+                contours, then reveal the answer with the local-RLCT
+                explanation.
+  Standalone: open this .html directly in a browser. Uses D3 v7 and KaTeX from
+              CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SLT companion · DSLT 1 · K(w) and the set of true parameters W₀</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-contour@4"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --w0:#d92d20; --muted:#52606d; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 920px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; color: var(--ink); }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .controls { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.8rem 0 0.4rem; }
+  .controls button { padding: 0.4rem 0.7rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.85rem; color: var(--ink); }
+  .controls button:hover { background: #eef3f8; }
+  .controls button.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .layout { display: grid; grid-template-columns: 480px 1fr; gap: 1.6rem; align-items: start; margin-top: 0.5rem; }
+  @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+  svg.plot { background: #fff; border: 1px solid #d9e0e7; border-radius: 4px; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  .formula-box { font-size: 1.08rem; padding: 0.4rem 0.6rem; background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; min-height: 2.4rem; }
+  .panel-note { color: var(--muted); font-size: 0.92rem; margin-top: 0.4rem; }
+  .choice { display: block; width: 100%; text-align: left; margin: 0.3rem 0; padding: 0.55rem 0.8rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover { background: #eef3f8; }
+  .choice.correct { background: #d1fadf; border-color: #099250; }
+  .choice.wrong { background: #fee4e2; border-color: var(--w0); }
+  .choice:disabled { cursor: default; }
+  .reveal { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.7rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; }
+  .legend { display: flex; gap: 1rem; align-items: center; margin-top: 0.4rem; font-size: 0.86rem; color: var(--muted); }
+  .legend-swatch { display: inline-block; width: 18px; height: 4px; vertical-align: middle; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+</style>
+</head>
+<body>
+
+<h1>The loss landscape $K(w)$ and the set of true parameters $W_0$</h1>
+<p class="subtitle">SLT companion · DSLT 1 widget 1 · <em>The RLCT Measures the Effective Dimension of Neural Networks</em></p>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;">In the Bayesian setup of SLT, the posterior $p(w \mid D_n) = \frac{1}{Z_n}\,\varphi(w)\, e^{-n L_n(w)}$ concentrates as $n \to \infty$ on parameters that minimise the empirical loss $L_n(w)$. The infinite-data limit of this loss is the Kullback&ndash;Leibler divergence between truth and model,
+  $$ K(w) \;=\; \iint q(y \mid x)\, q(x)\, \log \frac{q(y \mid x)}{p(y \mid x, w)}\, dx\, dy \;\geq\; 0, $$
+  which we call the <em>loss landscape</em>. Its zero set
+  $$ W_0 \;=\; \{ w \in W : K(w) = 0 \} $$
+  is the <em>set of true parameters</em>. In <strong>regular</strong> models $W_0$ is a single point and Fisher information is non-degenerate there; in <strong>singular</strong> models $W_0$ can be a curve, an arrangement of curves, or a higher-dimensional variety. That difference is the entire reason classical Bayesian asymptotics break.</p>
+</div>
+
+<h2>Pick a loss landscape</h2>
+<div class="controls" id="model-buttons"></div>
+
+<div class="layout">
+  <div>
+    <svg class="plot" id="plot" viewBox="0 0 480 480"></svg>
+    <div class="legend">
+      <span><span class="legend-swatch" style="background:#246;"></span> level sets $\{K = c\}$</span>
+      <span><span class="legend-swatch" style="background:#d92d20; height:3px;"></span> $W_0$ (where $K = 0$)</span>
+    </div>
+  </div>
+  <div>
+    <div class="formula-box" id="formula"></div>
+    <p class="panel-note" id="model-note"></p>
+    <h2>Predict: what does $W_0$ look like for this $K$?</h2>
+    <div id="choices"></div>
+    <div class="reveal" id="reveal" style="display: none;"></div>
+  </div>
+</div>
+
+<p class="footnote">
+  <strong>How this widget thinks about $W_0$.</strong> For each preset, $W_0$ is computed
+  algebraically from the factorisation of $K$ and drawn in red on top of the level-set
+  contours. The contours come from sampling $K$ on an 80&times;80 grid and running marching
+  squares (D3's <code>d3.contours</code>) at logarithmically-spaced thresholds.
+  The 1D presets switch the plot from a 2D contour to a 1D curve $K(w)$ vs $w$, with the
+  zeros marked. Local Real Log Canonical Threshold (RLCT) values quoted below appear in
+  Carroll's DSLT 1 worked examples and are derived in the next widget,
+  <code>dslt1-volume-scaling-rlct</code>.
+</p>
+
+<script>
+"use strict";
+
+const KATEX_DELIMITERS = [
+  { left: '$$', right: '$$', display: true },
+  { left: '\\[', right: '\\]', display: true },
+  { left: '$', right: '$', display: false },
+  { left: '\\(', right: '\\)', display: false },
+];
+
+function typeset(el) {
+  if (window.renderMathInElement) {
+    renderMathInElement(el, { delimiters: KATEX_DELIMITERS, throwOnError: false });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// MODELS
+// Each model carries:
+//   id, name, dim (1 or 2), tex (formula), f (numerical K),
+//   domain ([min, max], same on both axes for 2D),
+//   note (one-line description shown in panel),
+//   W0  (algebraic description used to overlay the zero set in red),
+//   choices (predict-the-topology multiple choice),
+//   correct (id of correct choice),
+//   explanation (HTML revealed after the user picks)
+// ---------------------------------------------------------------------------
+const MODELS = [
+  // -- 2D presets --
+  {
+    id: 'regular-2d',
+    name: 'K = w₁² + w₂²',
+    dim: 2,
+    tex: 'K(w_1, w_2) = w_1^2 + w_2^2',
+    f: (x, y) => x*x + y*y,
+    domain: [-1.5, 1.5],
+    note: 'A regular model. The Fisher information I(w⁰) = 2·diag(1, 1) is positive definite at the unique minimum.',
+    W0: { type: 'points', pts: [[0, 0]] },
+    correct: 'point',
+    explanation: '$W_0 = \\{(0,0)\\}$ &mdash; a single point. The Hessian at the origin is non-degenerate, so the model is <em>regular</em>. The posterior concentrates as a Gaussian centred at the origin with covariance $\\frac{1}{n}\\,I^{-1}$, exactly as classical Bayesian asymptotics predicts. Local RLCT $\\lambda = d/2 = 1$.',
+  },
+  {
+    id: 'free-param',
+    name: 'K = w₁² (Example 1.1)',
+    dim: 2,
+    tex: 'K(w_1, w_2) = w_1^2',
+    f: (x, y) => x*x,
+    domain: [-1.5, 1.5],
+    note: 'A "minimally singular" landscape from Carroll Example 1.1: w₂ is a free parameter and the Fisher information has a kernel along it.',
+    W0: { type: 'lines', lines: [{ axis: 'x', value: 0 }] },
+    correct: 'line',
+    explanation: '$W_0 = \\{(0, w_2) : w_2 \\in \\mathbb{R}\\}$ &mdash; the entire $w_2$-axis is a curve of true parameters. The Fisher information is rank&nbsp;1 (one zero eigenvalue along $w_2$), so this is strictly singular. But it is the <em>easy</em> kind: drop $w_2$ and you recover a 1-parameter regular model with the same input&ndash;output behaviour. Local RLCT $\\lambda = d_1/2 = 1/2$, where $d_1 = 1$ is the number of non-free parameters.',
+  },
+  {
+    id: 'cross',
+    name: 'K = ½ w₁²w₂² (Example 1.2)',
+    dim: 2,
+    tex: 'K(w_1, w_2) = \\tfrac{1}{2}\\, w_1^2\\, w_2^2',
+    f: (x, y) => 0.5 * x*x * y*y,
+    domain: [-1.5, 1.5],
+    note: 'Carroll Example 1.2: two flat valleys cross at the origin. Fisher information has rank 0 there, but you cannot just delete a coordinate.',
+    W0: { type: 'lines', lines: [{ axis: 'x', value: 0 }, { axis: 'y', value: 0 }] },
+    correct: 'cross',
+    explanation: '$W_0 = \\{w_1 = 0\\} \\cup \\{w_2 = 0\\}$ &mdash; an axis-aligned cross. At the origin both $\\partial^2 K / \\partial w_1^2$ and $\\partial^2 K / \\partial w_2^2$ vanish, so $\\mathrm{rank}(I(0)) = 0$. Unlike the free-parameter case, you cannot just throw out one coordinate &mdash; the two singular curves are genuinely entangled. The local RLCT at the origin is $\\lambda = 1/2$ with multiplicity $m = 2$ (since $K$ is a product of two squared coordinates). This is the prototypical singularity for SLT.',
+  },
+  {
+    id: 'multi',
+    name: 'K = (w₁+1)²·w₁⁴·w₂² (Example 1.5)',
+    dim: 2,
+    tex: 'K(w_1, w_2) = (w_1 + 1)^2\\, w_1^{4}\\, w_2^{2}',
+    f: (x, y) => Math.pow(x + 1, 2) * Math.pow(x, 4) * y*y,
+    domain: [-1.6, 1.0],
+    note: 'Carroll Example 1.5: three lines of true parameters meeting at two distinct singular points with different local RLCTs.',
+    W0: { type: 'lines', lines: [
+      { axis: 'x', value: -1 }, { axis: 'x', value: 0 }, { axis: 'y', value: 0 },
+    ]},
+    correct: 'multi',
+    explanation: '$W_0 = \\{w_1 = -1\\} \\cup \\{w_1 = 0\\} \\cup \\{w_2 = 0\\}$ &mdash; three lines. Two distinguished singular points: at $(-1, 0)$ the local form of $K$ is $\\approx (w_1+1)^2 w_2^2$, giving local RLCT $\\lambda_{-1} = 1/2$ with multiplicity $2$; at $(0, 0)$ the local form is $\\approx w_1^4 w_2^2$, giving $\\lambda_0 = 1/4$ with multiplicity $1$. The <em>global</em> RLCT is the smaller, $\\lambda = 1/4$, so the posterior most prefers the origin even though $(-1, 0)$ is also a true parameter. (DSLT 2 will turn this into a phase preference.)',
+  },
+  // -- 1D presets --
+  {
+    id: '1d-quadratic',
+    name: '1D: K = w² (regular)',
+    dim: 1,
+    tex: 'K(w) = w^2',
+    f: (x) => x*x,
+    domain: [-1.5, 1.5],
+    note: 'The simplest regular model. Posterior converges to a Gaussian.',
+    W0: { type: 'points', pts: [0] },
+    correct: 'point-1d-quadratic',
+    explanation: '$W_0 = \\{0\\}$. Local RLCT $\\lambda = 1/2 = d/2$, the regular value. Asymptotic normality holds: $p(w \\mid D_n) \\to \\mathcal{N}(0, 1/(2n))$.',
+  },
+  {
+    id: '1d-quartic',
+    name: '1D: K = w⁴ (fractional dim, Example 1.3)',
+    dim: 1,
+    tex: 'K(w) = w^4',
+    f: (x) => Math.pow(x, 4),
+    domain: [-1.5, 1.5],
+    note: 'Carroll Example 1.3. Same zero set as the quadratic, but flatter &mdash; and the RLCT is fractional.',
+    W0: { type: 'points', pts: [0] },
+    correct: 'point-1d-flat',
+    explanation: '$W_0 = \\{0\\}$, same as the quadratic, <em>but</em> the volume of $\\{K < \\varepsilon\\}$ scales like $\\varepsilon^{1/4}$ rather than $\\varepsilon^{1/2}$. So the local RLCT is $\\lambda = 1/4$, and the "effective dimension" $2\\lambda = 1/2$ &mdash; half a dimension. The posterior near $0$ does <em>not</em> converge to a Gaussian.',
+  },
+  {
+    id: '1d-two',
+    name: '1D: K = (w+1)²(w−1)⁴ (DSLT 2 Example 1)',
+    dim: 1,
+    tex: 'K(w) = (w + 1)^2\\, (w - 1)^4',
+    f: (x) => Math.pow(x+1, 2) * Math.pow(x-1, 4),
+    domain: [-2, 2],
+    note: 'Two true parameters, different local RLCTs. This is the running example of DSLT 2 §Example 1.',
+    W0: { type: 'points', pts: [-1, 1] },
+    correct: 'two-points-1d',
+    explanation: '$W_0 = \\{-1, +1\\}$. Local form near $-1$: $K(w) \\approx 16\\,(w+1)^2$, giving $\\lambda_{-1} = 1/2$ (regular). Local form near $+1$: $K(w) \\approx 4\\,(w-1)^4$, giving $\\lambda_{+1} = 1/4$. The <em>global</em> RLCT is the smaller, $\\lambda = 1/4$, so the posterior prefers $+1$ as $n \\to \\infty$ even though both points have $K = 0$. This is the punchline of DSLT 2: lower RLCT wins.',
+  },
+];
+
+const CHOICES_2D = [
+  { id: 'point',  text: 'A single point in $\\mathbb{R}^2$' },
+  { id: 'line',   text: 'A single line (one entire coordinate axis, say)' },
+  { id: 'cross',  text: 'Two crossing lines' },
+  { id: 'multi',  text: 'Three or more lines / components' },
+  { id: 'empty',  text: 'Empty (no true parameters in this window)' },
+];
+const CHOICES_1D = [
+  { id: 'point-1d-quadratic', text: 'One zero, with quadratic curvature near it' },
+  { id: 'point-1d-flat',      text: 'One zero, but flatter than quadratic' },
+  { id: 'two-points-1d',      text: 'Exactly two zeros' },
+  { id: 'three-points-1d',    text: 'Three or more zeros' },
+];
+
+const PLOT_W = 480, PLOT_H = 480, PAD = 36;
+const svg = d3.select('#plot');
+
+function renderModel(model) {
+  // formula box
+  document.getElementById('formula').innerHTML = `\\[ ${model.tex} \\]`;
+  document.getElementById('model-note').textContent = model.note;
+  typeset(document.getElementById('formula'));
+
+  // choices
+  const choices = model.dim === 2 ? CHOICES_2D : CHOICES_1D;
+  const cEl = document.getElementById('choices');
+  cEl.innerHTML = '';
+  for (const c of choices) {
+    const btn = document.createElement('button');
+    btn.className = 'choice';
+    btn.innerHTML = c.text;
+    btn.onclick = () => {
+      // disable all choices
+      Array.from(cEl.children).forEach(el => { el.disabled = true; });
+      btn.classList.add(c.id === model.correct ? 'correct' : 'wrong');
+      if (c.id !== model.correct) {
+        // also highlight the correct one in green so the user sees it
+        Array.from(cEl.children).forEach(el => {
+          if (el.dataset.id === model.correct) el.classList.add('correct');
+        });
+      }
+      const reveal = document.getElementById('reveal');
+      reveal.style.display = 'block';
+      reveal.innerHTML = '<strong>Answer.</strong> ' + model.explanation;
+      typeset(reveal);
+    };
+    btn.dataset.id = c.id;
+    cEl.appendChild(btn);
+  }
+  typeset(cEl);
+  document.getElementById('reveal').style.display = 'none';
+
+  // plot
+  svg.selectAll('*').remove();
+  if (model.dim === 2) drawContour2D(model);
+  else drawCurve1D(model);
+}
+
+function drawContour2D(model) {
+  const [a, b] = model.domain;
+  const xS = d3.scaleLinear().domain([a, b]).range([PAD, PLOT_W - PAD]);
+  const yS = d3.scaleLinear().domain([a, b]).range([PLOT_H - PAD, PAD]);
+
+  // axes through origin (clamped to plot rect)
+  const x0px = xS(0), y0px = yS(0);
+  if (x0px >= PAD && x0px <= PLOT_W - PAD) {
+    svg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${y0px})`)
+      .call(d3.axisBottom(xS).ticks(5));
+    svg.append('text').attr('class', 'axis-label').attr('x', PLOT_W - PAD + 4).attr('y', y0px + 4).text('w₁');
+  }
+  if (y0px >= PAD && y0px <= PLOT_H - PAD) {
+    svg.append('g').attr('class', 'axis').attr('transform', `translate(${x0px}, 0)`)
+      .call(d3.axisLeft(yS).ticks(5));
+    svg.append('text').attr('class', 'axis-label').attr('x', x0px + 4).attr('y', PAD - 6).text('w₂');
+  }
+
+  // sample K on a grid
+  const N = 100;
+  const grid = new Float64Array(N * N);
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const x = a + (b - a) * i / (N - 1);
+      const y = a + (b - a) * j / (N - 1);
+      grid[j * N + i] = model.f(x, y);
+    }
+  }
+  const kMax = Math.max(1e-6, d3.max(grid));
+  // log-spaced contour levels (so flat valleys are visible)
+  const levels = d3.range(1, 13).map(k => kMax * Math.pow(k / 13, 2.5));
+
+  const contours = d3.contours().size([N, N]).thresholds(levels)(grid);
+
+  // marching squares emits coordinates in grid units; project to screen
+  const pixelsPerCellX = (PLOT_W - 2*PAD) / (N - 1);
+  const pixelsPerCellY = (PLOT_H - 2*PAD) / (N - 1);
+  const projection = d3.geoTransform({
+    point(x, y) {
+      this.stream.point(PAD + x * pixelsPerCellX, PAD + y * pixelsPerCellY);
+    },
+  });
+  // d3.contours returns coords in image space with y going DOWN (origin top-left).
+  // Our screen yS already has min at bottom (range [PLOT_H-PAD, PAD]), and our grid
+  // was filled with j=0 corresponding to y=a (bottom in math coords). So we need
+  // to flip y when projecting.
+  const projectionFlipped = d3.geoTransform({
+    point(x, y) {
+      this.stream.point(PAD + x * pixelsPerCellX, (PLOT_H - PAD) - y * pixelsPerCellY);
+    },
+  });
+  const path = d3.geoPath(projectionFlipped);
+
+  svg.append('g').attr('class', 'contours')
+    .selectAll('path').data(contours).join('path')
+      .attr('d', path)
+      .attr('fill', 'none')
+      .attr('stroke', '#246')
+      .attr('stroke-opacity', (_, i) => 0.25 + 0.6 * i / contours.length)
+      .attr('stroke-width', 1);
+
+  // overlay W0 explicitly
+  drawW0_2D(model.W0, xS, yS);
+}
+
+function drawW0_2D(W0, xS, yS) {
+  const [xmin, xmax] = xS.domain();
+  const [ymin, ymax] = yS.domain();
+  const layer = svg.append('g').attr('class', 'W0');
+  if (W0.type === 'points') {
+    for (const [x, y] of W0.pts) {
+      layer.append('circle').attr('cx', xS(x)).attr('cy', yS(y)).attr('r', 5)
+        .attr('fill', '#d92d20').attr('stroke', 'white').attr('stroke-width', 1.4);
+    }
+  } else if (W0.type === 'lines') {
+    for (const ln of W0.lines) {
+      if (ln.axis === 'x') {
+        // line at w1 = ln.value, varying w2
+        layer.append('line')
+          .attr('x1', xS(ln.value)).attr('x2', xS(ln.value))
+          .attr('y1', yS(ymin)).attr('y2', yS(ymax))
+          .attr('stroke', '#d92d20').attr('stroke-width', 2.4);
+      } else if (ln.axis === 'y') {
+        layer.append('line')
+          .attr('x1', xS(xmin)).attr('x2', xS(xmax))
+          .attr('y1', yS(ln.value)).attr('y2', yS(ln.value))
+          .attr('stroke', '#d92d20').attr('stroke-width', 2.4);
+      }
+    }
+  }
+}
+
+function drawCurve1D(model) {
+  const [a, b] = model.domain;
+  const samples = d3.range(0, 401).map(i => a + (b - a) * i / 400);
+  const ks = samples.map(model.f);
+  const kMax = Math.max(0.01, d3.max(ks));
+  // Pick a y-axis cap that focuses on the "interesting" interior of the
+  // curve rather than the boundary. Using kMax directly squashes the
+  // information near W_0 when K blows up at the edges (e.g.,
+  // K = (w+1)^2(w-1)^4 has kMax = 81 at w = -2, but the local max
+  // between the zeros is only ~1.4). The 80th-percentile heuristic
+  // keeps both zeros and the interior maximum visible.
+  const sortedK = [...ks].sort((a, b) => a - b);
+  const p80 = sortedK[Math.floor(0.8 * sortedK.length)];
+  const viewYMax = Math.max(p80 * 2.0, kMax * 0.05, 0.01);
+
+  const xS = d3.scaleLinear().domain([a, b]).range([PAD, PLOT_W - PAD]);
+  const yS = d3.scaleLinear().domain([0, viewYMax]).range([PLOT_H - PAD, PAD]);
+
+  // clip the curve so it doesn't draw outside the plot rectangle
+  const clipId = 'plot-clip-' + Math.random().toString(36).slice(2, 8);
+  svg.append('defs').append('clipPath').attr('id', clipId)
+    .append('rect').attr('x', PAD).attr('y', PAD)
+    .attr('width', PLOT_W - 2*PAD).attr('height', PLOT_H - 2*PAD);
+  const plotG = svg.append('g').attr('clip-path', `url(#${clipId})`);
+
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${PLOT_H - PAD})`)
+    .call(d3.axisBottom(xS).ticks(7));
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(${PAD}, 0)`)
+    .call(d3.axisLeft(yS).ticks(5));
+  svg.append('text').attr('class', 'axis-label').attr('x', PLOT_W - PAD).attr('y', PLOT_H - 6).attr('text-anchor', 'end').text('w');
+  svg.append('text').attr('class', 'axis-label').attr('x', 6).attr('y', PAD - 6).text('K(w)');
+
+  // shaded {K < eps} region (foreshadow volume integral V(eps) for DSLT 1
+  // §"Dimensionality as a volume co-dimension")
+  const eps = viewYMax * 0.08;
+  const region = d3.area()
+    .x((_, i) => xS(samples[i]))
+    .y0(yS(0))
+    .y1((d, i) => yS(Math.min(d, eps)));
+  plotG.append('path').datum(ks)
+    .attr('d', region)
+    .attr('fill', '#246').attr('fill-opacity', 0.10);
+  plotG.append('line').attr('x1', PAD).attr('x2', PLOT_W - PAD).attr('y1', yS(eps)).attr('y2', yS(eps))
+    .attr('stroke', '#246').attr('stroke-opacity', 0.4).attr('stroke-dasharray', '4 3');
+  svg.append('text').attr('class', 'axis-label').attr('x', PLOT_W - PAD - 4).attr('y', yS(eps) - 4).attr('text-anchor', 'end')
+    .text('K = ε').attr('fill', '#246');
+
+  // K curve
+  const line = d3.line().x((_, i) => xS(samples[i])).y(d => yS(d));
+  plotG.append('path').datum(ks).attr('d', line).attr('fill', 'none').attr('stroke', '#246').attr('stroke-width', 2);
+
+  // W0 markers (drawn outside clip so they aren't hidden by axis offsets)
+  for (const w of model.W0.pts) {
+    svg.append('circle').attr('cx', xS(w)).attr('cy', yS(0)).attr('r', 5.5)
+      .attr('fill', '#d92d20').attr('stroke', 'white').attr('stroke-width', 1.4);
+  }
+}
+
+function setupButtons() {
+  const c = document.getElementById('model-buttons');
+  for (const m of MODELS) {
+    const b = document.createElement('button');
+    b.textContent = m.name;
+    b.onclick = () => {
+      Array.from(c.children).forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      renderModel(m);
+    };
+    c.appendChild(b);
+  }
+  c.firstChild.classList.add('active');
+}
+
+setupButtons();
+renderModel(MODELS[0]);
+// Render math in the page-level prose (lede, headings, footnote).
+typeset(document.body);
+</script>
+
+</body>
+</html>
