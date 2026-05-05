@@ -65,3 +65,67 @@ per session, newest at the bottom. See
   productive task in this environment requires either a
   network-egress change or pre-populated source files, both of
   which are Matthew-side actions.
+
+## 2026-05-05 ~06:00 (session by autonomous Claude)
+
+- **Worked on:** texts/slt — DSLT 1 module breakdown proposal,
+  module 1 widget build, repo-wide lessons-doc creation, source
+  ingestion follow-through.
+- **What got done:**
+  1. Re-tested sandbox network egress: lesswrong.com, arxiv.org,
+     github.com, therisingsea.org all reachable now (different
+     profile from the prior session — see LESSONS.md).
+     `apt-get install -y poppler-utils pandoc` once, then ran
+     `texts/slt/source/download.sh` end-to-end. Got DSLT 0–4 (HTML
+     + Markdown), Carroll MSc thesis (PDF + .txt extraction),
+     three DevInterp arXiv e-prints, and the `devinterp` git
+     clone. Two Timaeus blog mirror URLs (dslt-1, dslt-4) 404 —
+     LessWrong copies cover them anyway.
+  2. Read DSLT 0 (intro) and DSLT 1 (RLCT chapter) end-to-end and
+     proposed seven modules for DSLT 1 with justifications:
+     `dslt1-bayes-loss-landscape`, `dslt1-fisher-degeneracy`,
+     `dslt1-bic-derivation`, `dslt1-volume-scaling-rlct`,
+     `dslt1-normal-crossing-game`, `dslt1-resolution-primer`,
+     `dslt1-wbic-vs-bic`. Toy family is real polynomial K(w) drawn
+     from Carroll Examples 1.1, 1.2, 1.5 plus the 1D
+     (w+1)²(w−1)⁴ from DSLT 2 §Example 1.
+  3. Claimed module 1 (`dslt1-bayes-loss-landscape`) and built it:
+     `texts/slt/chapters/dslt1-rlct-effective-dimension/widgets/01-bayes-loss-landscape.html`.
+     Single-file standalone, D3 + KaTeX from CDN, seven worked
+     loss landscapes with predict-then-reveal active check.
+     Verified rendering with Playwright headless Chromium and
+     screenshots; KaTeX, contours, W₀ overlays, 1D curves all
+     paint correctly.
+  4. Wrote chapter README at
+     `texts/slt/chapters/dslt1-rlct-effective-dimension/README.md`
+     listing all seven modules and their toy systems.
+  5. Per Matthew's mid-session feedback, *moved* situational tech
+     lessons out of CONTRIBUTING.md (which is read every session)
+     into a new repo-root `LESSONS.md` with explicit "read on
+     demand" framing, leaving only a one-line pointer in
+     CONTRIBUTING.md. First entries cover the widget-build gotchas
+     this session hit (KaTeX load order, d3.contours y-flip, 1D
+     K(w) y-axis heuristic, Playwright-not-Puppeteer on aarch64,
+     apt deps, sandbox egress instability, Timaeus slug drift,
+     no-credentials git push).
+- **What's next:** Have Matthew approve / adjust the six remaining
+  proposed DSLT 1 module rows so subsequent sessions can pick them
+  up. The natural next module to start (after approval) is
+  `dslt1-volume-scaling-rlct` — it's the central conceptual widget
+  for DSLT 1 and the one that turns the level-set picture in
+  module 1 into the RLCT calculation.
+- **Blockers:** None *project*-wise. *Environment* blocker: this
+  sandbox has no GitHub credentials, so every commit in this
+  session is local-only. Next session (or Matthew) needs to push
+  `dcb7659..HEAD` (4 commits ahead of origin/main as of session
+  end). Documented in LESSONS.md.
+- **Proposed for approval:**
+  - All seven DSLT 1 module rows in `texts/slt/NOTES.md` Module
+    breakdown. None of the "Human Approved" / "Human Review"
+    columns were touched per project policy.
+- **Why stopped:** Step-4 criterion #4 (clean repo state, one
+  meaningful unit of work completed: module 1 widget shipped,
+  module list proposed, lessons doc created) combined with
+  diminishing return on continuing without Matthew's reaction to
+  the proposed module set. Continuing into module 2 risks doing
+  several widgets only to have the proposal restructured.
