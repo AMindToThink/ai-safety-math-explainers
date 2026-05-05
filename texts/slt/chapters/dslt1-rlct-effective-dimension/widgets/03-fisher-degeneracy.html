@@ -1,0 +1,650 @@
+<!--
+  Widget: dslt1-fisher-degeneracy. Module 3 for DSLT 1.
+  Source: DSLT 1 §"What is a singular model?" (Carroll 2023, AlignmentForum)
+          + Carroll MSc thesis Definitions 3.1–3.3 and Lemma 3.2 (2021).
+  Toy system: same polynomial K(w) family as widgets 1 and 2 (Carroll Examples
+              1.1, 1.2 from DSLT 1) plus a 1-hidden-unit ReLU regressor that
+              recovers Example 1.2 — concrete forward pointer to DSLT 3
+              ("Neural Networks are Singular").
+  Active check: predict rank(I(w⁰)) before computing it. The point of pain is
+                Example 1.2 / the ReLU model, where naive intuition says
+                rank ≥ 1 (K varies away from the origin) but in fact rank = 0
+                because all second derivatives vanish at the origin — K is
+                "flatter than quadratic" in every direction.
+  Standalone: open this .html in a browser. D3 v7 + KaTeX 0.16 from CDN.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SLT companion · DSLT 1 widget 3 · Fisher information &amp; singularity</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-contour@4"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --w0:#d92d20; --muted:#52606d; --ok:#099250; --okbg:#d1fadf; --bad:#b42318; --badbg:#fee4e2; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 920px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; color: var(--ink); }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .controls { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.8rem 0 0.4rem; }
+  .controls button { padding: 0.4rem 0.7rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.85rem; color: var(--ink); }
+  .controls button:hover { background: #eef3f8; }
+  .controls button.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .layout { display: grid; grid-template-columns: 480px 1fr; gap: 1.6rem; align-items: start; margin-top: 0.5rem; }
+  @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+  svg.plot { background: #fff; border: 1px solid #d9e0e7; border-radius: 4px; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  .formula-box { font-size: 1.08rem; padding: 0.4rem 0.6rem; background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; min-height: 2.4rem; }
+  .panel-note { color: var(--muted); font-size: 0.92rem; margin-top: 0.4rem; }
+  .choice { display: block; width: 100%; text-align: left; margin: 0.3rem 0; padding: 0.55rem 0.8rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover { background: #eef3f8; }
+  .choice.correct { background: var(--okbg); border-color: var(--ok); }
+  .choice.wrong { background: var(--badbg); border-color: var(--w0); }
+  .choice:disabled { cursor: default; }
+  .reveal { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.7rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; }
+  .legend { display: flex; gap: 1rem; align-items: center; margin-top: 0.4rem; font-size: 0.86rem; color: var(--muted); flex-wrap: wrap; }
+  .legend-swatch { display: inline-block; width: 18px; height: 4px; vertical-align: middle; }
+  .legend-swatch.ellipse { width: 14px; height: 14px; border-radius: 50%; background: rgba(43, 108, 176, 0.18); border: 2px solid var(--accent); }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .sources li { margin: 0.15rem 0; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  .true-param-row { display: flex; align-items: center; gap: 0.6rem; margin: 0.5rem 0; flex-wrap: wrap; }
+  .true-param-row label { font-size: 0.92rem; color: var(--muted); }
+  .true-param-row select { padding: 0.3rem 0.5rem; border: 1px solid #c9d3df; border-radius: 3px; font-size: 0.92rem; background: #fff; color: var(--ink); }
+  .fi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; margin-top: 0.6rem; }
+  .fi-grid .lab { color: var(--muted); font-size: 0.86rem; }
+  .fi-grid .val { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.95rem; color: var(--ink); }
+  .badge { display: inline-block; padding: 0.18rem 0.55rem; border-radius: 999px; font-size: 0.82rem; font-weight: 600; }
+  .badge.regular { background: var(--okbg); color: var(--ok); border: 1px solid var(--ok); }
+  .badge.singular { background: var(--badbg); color: var(--bad); border: 1px solid var(--w0); }
+</style>
+</head>
+<body>
+
+<h1>Fisher information &amp; singularity</h1>
+<p class="subtitle">SLT companion · widget 3 of 7 for <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural"><em>DSLT 1: The RLCT Measures the Effective Dimension of Neural Networks</em></a> by Liam Carroll</p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#What_is_a_singular_model_">DSLT 1 §"What is a singular model?"</a> &mdash; the Fisher / Hessian identity at $w^{(0)} \in W_0$ and the regular-vs-singular dichotomy.</li>
+    <li><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#Sometimes_singularities_are_just_free_parameters">DSLT 1 Example 1.1</a> ($K = w_1^2$, minimally singular) and <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#But_not_all_singularities_are_free_parameters">Example 1.2</a> ($K = \tfrac{1}{2}w_1^2 w_2^2$, rank-zero Fisher) &mdash; the killer demonstration that "rank of $I$" is not enough.</li>
+    <li><a href="http://therisingsea.org/notes/MSc-Carroll.pdf">Liam Carroll, MSc thesis "Phase Transitions in Neural Networks"</a> (2021), Chapter 3, Definitions 3.1&ndash;3.3 and Lemma 3.2 &mdash; the formal statement of $I(w) = H_K(w)$ on $W_0$ and the proof that 1-hidden-unit ReLU networks are strictly singular.</li>
+    <li>Sumio Watanabe, <em>Algebraic Geometry and Statistical Learning Theory</em>, Cambridge 2009, Chapter 1 &mdash; the underlying definition and "almost all statistical models are singular" remark. Library / institutional access required.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;">The <a href="https://www.stat.cmu.edu/~cshalizi/ADAfaEPoV/">Fisher information matrix</a> $I(w)$ encodes how sharply the likelihood discriminates parameters near $w$. Its entries are
+  $$ I_{j,k}(w) \;=\; \iint \big(\partial_{w_j} \log p(y \mid x, w)\big)\big(\partial_{w_k} \log p(y \mid x, w)\big)\, p(y \mid x, w)\, q(x)\, dx\, dy. $$
+  At a true parameter $w^{(0)} \in W_0$ the Fisher info equals the <a href="https://www.khanacademy.org/math/multivariable-calculus/applications-of-multivariable-derivatives/quadratic-approximations/v/the-hessian">Hessian</a> of the loss landscape, $I(w^{(0)}) = H_K(w^{(0)})$ &mdash; a fact you can compute directly here.</p>
+  <p style="margin: 0;"><strong>Definition (Carroll, after Watanabe):</strong> a model class is <em>regular</em> if it is identifiable and $I(w)$ is positive definite for every $w \in W$. Otherwise it is <em>strictly singular</em>: there exists some $w^{(0)} \in W$ with $\det I(w^{(0)}) = 0$. Pick a $K$, pick a true parameter, and predict $\mathrm{rank}(I(w^{(0)}))$ before the widget computes it. The Example 1.2 case is the surprise.</p>
+</div>
+
+<h2>Pick a loss landscape</h2>
+<div class="controls" id="model-buttons"></div>
+
+<div class="layout">
+  <div>
+    <svg class="plot" id="plot" viewBox="0 0 480 480"></svg>
+    <div class="legend">
+      <span><span class="legend-swatch" style="background:#246;"></span> level sets $\{K = c\}$</span>
+      <span><span class="legend-swatch" style="background:#d92d20; height:3px;"></span> $W_0$</span>
+      <span><span class="legend-swatch ellipse"></span> Fisher level set $\{\delta w : \tfrac12 \delta w^\top I(w^{(0)}) \delta w = c\}$</span>
+    </div>
+  </div>
+  <div>
+    <div class="formula-box" id="formula"></div>
+    <p class="panel-note" id="model-note"></p>
+
+    <div class="true-param-row">
+      <label for="w0-select">True parameter $w^{(0)}$:</label>
+      <select id="w0-select"></select>
+    </div>
+
+    <h2>Predict: $\mathrm{rank}(I(w^{(0)}))$ at this point?</h2>
+    <div id="choices"></div>
+    <div class="reveal" id="reveal" style="display: none;"></div>
+  </div>
+</div>
+
+<p class="footnote">
+  <strong>How this widget computes $I(w^{(0)})$.</strong> For each preset, $K(w)$ is a polynomial,
+  so the Hessian $H_K$ is hard-coded as an exact symbolic matrix and evaluated at the chosen
+  $w^{(0)}$. The eigenvalues, determinant, and rank are then numerical (with a tolerance
+  of $10^{-9}$ for "is this eigenvalue zero?"). The <em>Fisher level set</em> drawn in 2D is
+  the locus $\{\delta w : \tfrac12 \delta w^\top I(w^{(0)})\, \delta w = c\}$ for a small fixed $c$;
+  for positive-definite $I$ this is an ellipse with semi-axes $\sqrt{2c/\lambda_i}$ along
+  eigendirections, and as $\lambda_i \to 0$ the corresponding semi-axis blows up &mdash; the
+  ellipse degenerates to a strip (rank&nbsp;1) or vanishes into the whole plane (rank&nbsp;0).
+  That degeneration is exactly the geometric content of "the model has free directions at $w^{(0)}$."
+  The 1-hidden-unit ReLU model uses Carroll thesis Lemma 3.2 to express $K(a, b) = \tfrac{1}{4} a^2 b^2$
+  under standard-normal inputs and zero truth; that recovers Example 1.2 verbatim, demonstrating
+  that even the simplest ReLU network is strictly singular.
+</p>
+
+<nav class="nav">
+  <a href="https://github.com/AMindToThink/ai-safety-math-explainers/blob/main/texts/slt/chapters/dslt1-rlct-effective-dimension/README.md">&larr; DSLT 1 chapter index</a>
+  <a href="https://github.com/AMindToThink/ai-safety-math-explainers/blob/main/texts/slt/NOTES.md">SLT companion overview &rarr;</a>
+</nav>
+
+<script>
+"use strict";
+
+const KATEX_DELIMITERS = [
+  { left: '$$', right: '$$', display: true },
+  { left: '\\[', right: '\\]', display: true },
+  { left: '$', right: '$', display: false },
+  { left: '\\(', right: '\\)', display: false },
+];
+function typeset(el) {
+  if (window.renderMathInElement) renderMathInElement(el, { delimiters: KATEX_DELIMITERS, throwOnError: false });
+}
+
+const DSLT1 = 'https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural';
+const DSLT3 = 'https://www.alignmentforum.org/posts/Hxj7DEpKkqTpKcEH3/dslt-3-neural-networks-are-singular';
+const CARROLL = 'http://therisingsea.org/notes/MSc-Carroll.pdf';
+
+// Project policy: do NOT link math/stats terms to Wikipedia (see CONTRIBUTING.md
+// "Linking"). Prefer 3Blue1Brown / Olah / Shalizi / Yudkowsky / Murfet / DSLT.
+const LINK = {
+  fisher:      DSLT1 + '#What_is_a_singular_model_',
+  hessian:     'https://www.khanacademy.org/math/multivariable-calculus/applications-of-multivariable-derivatives/quadratic-approximations/v/the-hessian',
+  rank:        'https://www.youtube.com/watch?v=uQhTuRlWMxw',                            // 3B1B Essence of Linear Algebra Ch 7 (rank/null)
+  eigen:       'https://www.youtube.com/watch?v=PFDu9oVAE-g',                            // 3B1B eigenvectors/eigenvalues
+  identifiable:DSLT1 + '#What_is_a_singular_model_',
+  relu:        'http://neuralnetworksanddeeplearning.com/chap1.html',                    // Nielsen NN&DL Ch 1
+  wat09:       'https://www.cambridge.org/core/books/algebraic-geometry-and-statistical-learning-theory/9C8FD1BDC817E2FC79117027B6B7CFD0',
+  rlct:        DSLT1 + '#The_Real_Log_Canonical_Threshold__aka_the_Learning_Coefficient_',
+  carrollLemma:CARROLL,
+  dsltNN:      DSLT3,
+};
+const a = (href, text) => `<a href="${href}">${text}</a>`;
+
+// ---------------------------------------------------------------------------
+// MODELS
+// Each model carries:
+//   id, name, dim (1 or 2), tex (LaTeX for K),
+//   f(x[, y]) returns K numerically (used for contour shading),
+//   hess(x[, y]) returns Hessian as 1x1 [[a]] for 1D or 2x2 [[a,b],[c,d]] for 2D,
+//   domain ([min, max] used for both axes in 2D),
+//   W0Plot (algebraic description used to overlay W₀ in red on the plot),
+//   trueParams (list of {label, w} pairs offered in the dropdown),
+//   note (one-line description shown in the panel),
+//   correct[label] (id of correct rank choice for that true parameter),
+//   explanation[label] (HTML revealed after a guess).
+// ---------------------------------------------------------------------------
+const MODELS = [
+  // -- 2D --
+  {
+    id: 'regular-2d',
+    name: 'K = w₁² + w₂²',
+    dim: 2,
+    tex: 'K(w_1, w_2) = w_1^2 + w_2^2',
+    f: (x, y) => x*x + y*y,
+    hess: (x, y) => [[2, 0], [0, 2]],
+    domain: [-1.5, 1.5],
+    W0Plot: { type: 'points', pts: [[0, 0]] },
+    trueParams: [{ label: '(0, 0)', w: [0, 0] }],
+    note: `A textbook regular model. Predict ${a(LINK.rank, 'rank')}; the Fisher level set is a circle of radius $\\sqrt{c}$.`,
+    correct: { '(0, 0)': 2 },
+    explanation: {
+      '(0, 0)': `$H_K(w) = \\begin{pmatrix}2 & 0 \\\\ 0 & 2\\end{pmatrix}$ everywhere, so $I(0,0) = 2I_2$ has eigenvalues $\\{2, 2\\}$, rank&nbsp;2, and is positive definite. By Carroll Definition&nbsp;3.3 this model is <strong>regular</strong>. The classical Bayesian asymptotics (BIC, asymptotic normality) all apply at $(0,0)$.`,
+    },
+  },
+  {
+    id: 'min-singular-2d',
+    name: 'K = w₁² (Ex 1.1)',
+    dim: 2,
+    tex: 'K(w_1, w_2) = w_1^2',
+    f: (x, y) => x*x,
+    hess: (x, y) => [[2, 0], [0, 0]],
+    domain: [-1.5, 1.5],
+    W0Plot: { type: 'lineX', x: 0 },                                  // the line w₁ = 0
+    trueParams: [
+      { label: '(0, 0)',   w: [0, 0]   },
+      { label: '(0, 1)',   w: [0, 1]   },
+      { label: '(0, -0.5)',w: [0, -0.5]},
+    ],
+    note: `Carroll Example 1.1: $w_2$ is a free parameter. $W_0$ is the entire $w_1=0$ line.`,
+    correct: { '(0, 0)': 1, '(0, 1)': 1, '(0, -0.5)': 1 },
+    explanation: {
+      '(0, 0)':   `$H_K = \\begin{pmatrix}2 & 0 \\\\ 0 & 0\\end{pmatrix}$ at every point (it does not depend on $w$), so $I(0, 0)$ has eigenvalues $\\{2, 0\\}$ and rank&nbsp;1. The model is <strong>strictly singular</strong>: $\\det I = 0$. The flat direction is $w_2$ (the "free parameter") &mdash; this is the <em>minimally singular</em> case where you could just throw $w_2$ away and recover a regular 1D model with the same input-output map.`,
+      '(0, 1)':   `Same matrix, same rank 1 &mdash; $I$ is constant in this preset. The flat eigenvector $(0, 1)$ corresponds to the entire $w_1 = 0$ line being all true parameters.`,
+      '(0, -0.5)':`Same again. The Fisher info doesn't see motion along $W_0$ (the $w_2$ direction), and that "doesn't see" is exactly what $\\det I = 0$ encodes.`,
+    },
+  },
+  {
+    id: 'deep-singular-2d',
+    name: 'K = ½ w₁² w₂² (Ex 1.2)',
+    dim: 2,
+    tex: 'K(w_1, w_2) = \\tfrac{1}{2} w_1^2 w_2^2',
+    f: (x, y) => 0.5 * x*x * y*y,
+    hess: (x, y) => [[ y*y, 2*x*y ], [ 2*x*y, x*x ]],
+    domain: [-1.5, 1.5],
+    W0Plot: { type: 'cross' },                                        // the union {w₁=0} ∪ {w₂=0}
+    trueParams: [
+      { label: '(0, 0)',   w: [0, 0]   },
+      { label: '(0, 1)',   w: [0, 1]   },
+      { label: '(1, 0)',   w: [1, 0]   },
+    ],
+    note: `Carroll Example 1.2: $W_0$ is two crossing lines. The origin is a <em>deeper</em> singularity than the rest of $W_0$.`,
+    correct: { '(0, 0)': 0, '(0, 1)': 1, '(1, 0)': 1 },
+    explanation: {
+      '(0, 0)':   `<strong>The killer.</strong> $H_K = \\begin{pmatrix}w_2^2 & 2w_1 w_2 \\\\ 2 w_1 w_2 & w_1^2 \\end{pmatrix}$ vanishes identically at $(0,0)$, so $I(0,0)$ is the zero matrix &mdash; rank&nbsp;0. If you reasoned by "look at where K varies and count free directions," you'd guess rank 1 or 2; but the second derivatives in <em>both</em> directions vanish at $(0,0)$, because $K$ is flatter than quadratic everywhere near the origin. This is exactly Carroll's "rank of $I$ is not a good notion of effective dimension" moment, and it motivates the ${a(LINK.rlct, 'RLCT')}.`,
+      '(0, 1)':   `At $(0, 1)$ the Hessian is $\\begin{pmatrix}1 & 0 \\\\ 0 & 0\\end{pmatrix}$ &mdash; rank&nbsp;1. Away from the crossing point, the singularity locally looks like Example 1.1.`,
+      '(1, 0)':   `By the symmetry $w_1 \\leftrightarrow w_2$, $I(1, 0) = \\begin{pmatrix}0 & 0 \\\\ 0 & 1\\end{pmatrix}$ &mdash; rank 1 again. Two different points of $W_0$, two different ranks of $I$, same model class. The notion of "how singular is this model?" has to be local <em>and</em> finer than rank.`,
+    },
+  },
+  // -- 1D --
+  {
+    id: 'regular-1d',
+    name: 'K = w² (1D regular)',
+    dim: 1,
+    tex: 'K(w) = w^2',
+    f: (x) => x*x,
+    hess: (x) => [[2]],
+    domain: [-1.5, 1.5],
+    W0Plot: { type: 'points1d', xs: [0] },
+    trueParams: [{ label: 'w = 0', w: [0] }],
+    note: `1D regular for comparison. Predict the rank of the $1\\times 1$ Fisher matrix.`,
+    correct: { 'w = 0': 1 },
+    explanation: {
+      'w = 0': `$K''(w) = 2$ everywhere, so $I(0) = 2 > 0$ and the model is regular. In 1D, "regular" just means "$K$ has nonzero curvature at the true parameter."`,
+    },
+  },
+  {
+    id: 'singular-1d-quartic',
+    name: 'K = w⁴ (1D singular)',
+    dim: 1,
+    tex: 'K(w) = w^4',
+    f: (x) => x*x*x*x,
+    hess: (x) => [[12 * x * x]],
+    domain: [-1.2, 1.2],
+    W0Plot: { type: 'points1d', xs: [0] },
+    trueParams: [{ label: 'w = 0', w: [0] }],
+    note: `1D quartic. $K$ is flatter than quadratic at $0$; predict rank.`,
+    correct: { 'w = 0': 0 },
+    explanation: {
+      'w = 0': `$K''(w) = 12 w^2$ vanishes at $w=0$, so $I(0) = 0$ and the model is strictly singular. "Effective dimension" via rank would say $0$, which is silly &mdash; the model class is clearly nontrivial. ${a(LINK.rlct, 'The RLCT')} resolves this: $\\lambda = 1/4$ here, giving an effective dimension of $2\\lambda = 1/2$. This is widget&nbsp;5's territory.`,
+    },
+  },
+  // -- ReLU forward pointer --
+  {
+    id: 'relu-1unit',
+    name: 'K(a,b) = ¼ a² b² (1-unit ReLU)',
+    dim: 2,
+    tex: 'K(a, b) \\;=\\; \\tfrac{1}{4} a^2 b^2',                     // computed below
+    f: (a, b) => 0.25 * a*a * b*b,
+    hess: (a, b) => [[ 0.5 * b*b, a*b ], [ a*b, 0.5 * a*a ]],
+    domain: [-1.5, 1.5],
+    W0Plot: { type: 'cross' },
+    trueParams: [
+      { label: '(0, 0)', w: [0, 0] },
+      { label: '(0, 1)', w: [0, 1] },
+      { label: '(1, 0)', w: [1, 0] },
+    ],
+    note: `1-hidden-unit ReLU $f(x;a,b) = a\\,\\max(0, b x)$ regressing on a zero target with $x \\sim \\mathcal{N}(0, 1)$. Predict rank at the origin.`,
+    correct: { '(0, 0)': 0, '(0, 1)': 1, '(1, 0)': 1 },
+    explanation: {
+      '(0, 0)':   `Plug $f(x; a, b) = a \\max(0, bx)$ into the regression KL with $x \\sim \\mathcal{N}(0, 1)$ and zero truth. $\\mathbb{E}[\\max(0, bx)^2] = b^2/2$, so $K(a,b) = \\tfrac{1}{4} a^2 b^2$ &mdash; <em>identical</em> to Example 1.2 up to a factor. Therefore $I(0, 0) = 0$, rank&nbsp;0, and the model class is strictly singular. ${a(LINK.carrollLemma, 'Carroll thesis Lemma 3.2')} proves this generally: 1-hidden-unit ReLU networks always have degenerate Fisher info at parameters where $a = 0$ or $b = 0$. ${a(LINK.dsltNN, 'DSLT 3')} extends this to multi-unit ReLU.`,
+      '(0, 1)':   `$a = 0, b = 1$: the network outputs zero regardless of $x$, but only because the output weight $a$ is zero. The Hessian is $\\begin{pmatrix}1/2 & 0 \\\\ 0 & 0\\end{pmatrix}$ &mdash; rank 1, with a flat direction along $b$ (changing $b$ when $a = 0$ doesn't change the function). Strictly singular by definition.`,
+      '(1, 0)':   `$a = 1, b = 0$: the input weight is zero, so the hidden unit always outputs $0$ and the network outputs zero. By symmetry $H_K = \\begin{pmatrix}0 & 0 \\\\ 0 & 1/2\\end{pmatrix}$ &mdash; rank 1 again, with the flat direction along $a$. The "two crossing lines" structure of $W_0$ is geometrically the same as Example 1.2's.`,
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// LINEAR ALGEBRA HELPERS — symbolic 2x2 / 1x1 only
+// ---------------------------------------------------------------------------
+const TOL = 1e-9;
+
+function eig2x2(M) {
+  // Symmetric 2x2: [[a, b], [b, d]]. Eigenvalues by quadratic formula.
+  const a = M[0][0], b = M[0][1], d = M[1][1];
+  const tr = a + d;
+  const det = a * d - b * b;
+  const disc = Math.max(0, tr*tr/4 - det);
+  const s = Math.sqrt(disc);
+  const lam1 = tr/2 + s;          // larger
+  const lam2 = tr/2 - s;          // smaller
+  // Eigenvectors. If b != 0, eigenvector for λ is (b, λ - a) (normalised).
+  // If b == 0 (matrix already diagonal), eigenvectors are (1, 0) and (0, 1)
+  // matched with (a, d).
+  let v1, v2;
+  if (Math.abs(b) > TOL) {
+    const n1 = Math.hypot(b, lam1 - a) || 1;
+    const n2 = Math.hypot(b, lam2 - a) || 1;
+    v1 = [b / n1, (lam1 - a) / n1];
+    v2 = [b / n2, (lam2 - a) / n2];
+  } else {
+    v1 = a >= d ? [1, 0] : [0, 1];
+    v2 = a >= d ? [0, 1] : [1, 0];
+  }
+  return { lam1, lam2, v1, v2, det, tr };
+}
+
+function eig1x1(M) {
+  return { lam1: M[0][0], lam2: null, v1: [1], v2: null, det: M[0][0], tr: M[0][0] };
+}
+
+function rank(M) {
+  const eigs = M.length === 1 ? [eig1x1(M).lam1] : [eig2x2(M).lam1, eig2x2(M).lam2];
+  return eigs.filter(l => Math.abs(l) > TOL).length;
+}
+
+function fmt(x) {
+  if (Math.abs(x) < TOL) return '0';
+  if (Math.abs(x - Math.round(x)) < TOL) return String(Math.round(x));
+  return x.toFixed(3).replace(/\.?0+$/, '');
+}
+
+function matrixTeX(M) {
+  if (M.length === 1) return `I(w^{(0)}) = (${fmt(M[0][0])})`;
+  return `I(w^{(0)}) = \\begin{pmatrix} ${fmt(M[0][0])} & ${fmt(M[0][1])} \\\\ ${fmt(M[1][0])} & ${fmt(M[1][1])} \\end{pmatrix}`;
+}
+
+// ---------------------------------------------------------------------------
+// PLOT — same conventions as widget 1, plus a Fisher-ellipse overlay at w⁰.
+// ---------------------------------------------------------------------------
+const PLOT_W = 480, PLOT_H = 480, PAD = 36;
+const svg = d3.select('#plot');
+
+function clearPlot() { svg.selectAll('*').remove(); }
+
+function drawAxes(scaleX, scaleY, xLabel, yLabel) {
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${PLOT_H - PAD})`).call(d3.axisBottom(scaleX).ticks(5));
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(${PAD}, 0)`).call(d3.axisLeft(scaleY).ticks(5));
+  svg.append('text').attr('class', 'axis-label').attr('x', PLOT_W - PAD).attr('y', PLOT_H - PAD - 6).attr('text-anchor', 'end').text(xLabel);
+  svg.append('text').attr('class', 'axis-label').attr('x', PAD + 6).attr('y', PAD).text(yLabel);
+}
+
+function plot2D(model, w0) {
+  clearPlot();
+  const [a, b] = model.domain;
+  const x = d3.scaleLinear().domain([a, b]).range([PAD, PLOT_W - PAD]);
+  const y = d3.scaleLinear().domain([a, b]).range([PLOT_H - PAD, PAD]);
+  drawAxes(x, y, model.dim === 2 ? 'w₁' : 'w', model.dim === 2 ? 'w₂' : 'K(w)');
+
+  // Contour grid.
+  const N = 80;
+  const grid = new Array(N * N);
+  let kMax = 0;
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const xv = a + (b - a) * i / (N - 1);
+      const yv = a + (b - a) * j / (N - 1);
+      const k = model.f(xv, yv);
+      grid[j * N + i] = k;
+      if (k > kMax) kMax = k;
+    }
+  }
+  const thresholds = d3.range(1, 8).map(i => kMax * Math.pow(2, -i));
+  const contours = d3.contours().size([N, N]).thresholds(thresholds)(grid);
+
+  // d3.contours uses image-pixel coordinates with y flipped relative to math.
+  // Build an explicit projection.
+  const xi = d3.scaleLinear().domain([0, N - 1]).range([PAD, PLOT_W - PAD]);
+  const yi = d3.scaleLinear().domain([0, N - 1]).range([PAD, PLOT_H - PAD]);                     // NB: not flipped, so we flip in path
+  const path = d3.geoPath(d3.geoTransform({
+    point(xPx, yPx) {
+      // d3.contours emits positions in [0, N] with origin top-left of grid.
+      // Map column → x, row → y. Our grid has row j = bottom-to-top in *math*
+      // (j=0 → y=a, j=N-1 → y=b), but d3.contours uses image rows (j=0 top).
+      // So we flip: yPx_math = (N - 1) - yPx.
+      this.stream.point(xi(xPx), yi((N - 1) - yPx));
+    }
+  }));
+
+  svg.append('g').selectAll('path').data(contours).join('path')
+    .attr('d', path).attr('fill', 'none').attr('stroke', '#246').attr('stroke-width', 0.7).attr('opacity', 0.55);
+
+  // W₀ overlay.
+  if (model.W0Plot.type === 'points') {
+    for (const [px, py] of model.W0Plot.pts) {
+      svg.append('circle').attr('cx', x(px)).attr('cy', y(py)).attr('r', 5).attr('fill', '#d92d20');
+    }
+  } else if (model.W0Plot.type === 'lineX') {
+    svg.append('line').attr('x1', x(model.W0Plot.x)).attr('x2', x(model.W0Plot.x))
+      .attr('y1', y(b)).attr('y2', y(a)).attr('stroke', '#d92d20').attr('stroke-width', 2.4);
+  } else if (model.W0Plot.type === 'cross') {
+    svg.append('line').attr('x1', x(0)).attr('x2', x(0)).attr('y1', y(b)).attr('y2', y(a))
+      .attr('stroke', '#d92d20').attr('stroke-width', 2.4);
+    svg.append('line').attr('x1', x(a)).attr('x2', x(b)).attr('y1', y(0)).attr('y2', y(0))
+      .attr('stroke', '#d92d20').attr('stroke-width', 2.4);
+  }
+
+  // w⁰ marker (filled blue circle on top of W₀).
+  svg.append('circle').attr('cx', x(w0[0])).attr('cy', y(w0[1])).attr('r', 6.5)
+    .attr('fill', '#1a3a8e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+
+  // Fisher level set.
+  const M = model.hess(w0[0], w0[1]);
+  drawFisherLevelSet(M, w0, x, y, a, b);
+}
+
+function drawFisherLevelSet(M, w0, x, y, lo, hi) {
+  // Level set ½ δwᵀ M δw = c (so semi-axis = √(2c/λᵢ) along eigenvector vᵢ).
+  // Choose c so the largest semi-axis is ~12% of the plot range.
+  const E = eig2x2(M);
+  const target = (hi - lo) * 0.12;
+  // For positive-definite M: largest semi-axis is along the smaller eigenvalue.
+  const smallerNonzero = (Math.abs(E.lam1) > TOL && Math.abs(E.lam2) > TOL) ? Math.min(E.lam1, E.lam2) : null;
+
+  if (smallerNonzero !== null) {
+    // Full ellipse.
+    const c = 0.5 * smallerNonzero * target * target;
+    const r1 = Math.sqrt(2 * c / E.lam1);
+    const r2 = Math.sqrt(2 * c / E.lam2);
+    // Build ellipse as polyline, rotated by the eigenframe.
+    const pts = [];
+    const N = 80;
+    for (let i = 0; i <= N; i++) {
+      const t = i / N * 2 * Math.PI;
+      const u = r1 * Math.cos(t);
+      const v = r2 * Math.sin(t);
+      // Rotate (u, v) into world frame via eigenvectors v1, v2.
+      const dx = u * E.v1[0] + v * E.v2[0];
+      const dy = u * E.v1[1] + v * E.v2[1];
+      pts.push([w0[0] + dx, w0[1] + dy]);
+    }
+    const line = d3.line().x(d => x(d[0])).y(d => y(d[1]));
+    svg.append('path').attr('d', line(pts))
+      .attr('fill', 'rgba(43, 108, 176, 0.18)').attr('stroke', '#2b6cb0').attr('stroke-width', 1.8);
+  } else if (Math.abs(E.lam1) > TOL || Math.abs(E.lam2) > TOL) {
+    // Rank 1: degenerate to two parallel lines along the null eigenvector,
+    // separated by 2·√(2c/λ_nonzero) along the active eigenvector. Visualise
+    // as a translucent strip clipped to the plot.
+    const lamNZ = Math.abs(E.lam1) > TOL ? E.lam1 : E.lam2;
+    const vActive = Math.abs(E.lam1) > TOL ? E.v1 : E.v2;
+    const vNull   = Math.abs(E.lam1) > TOL ? E.v2 : E.v1;
+    const c = 0.5 * lamNZ * (target * 0.4) ** 2;       // narrower strip than the full ellipse would be
+    const halfWidth = Math.sqrt(2 * c / lamNZ);
+    // Strip endpoints far along vNull.
+    const T = (hi - lo) * 1.2;                                                                     // long enough to clip outside the plot
+    const corners = [
+      [w0[0] +  T * vNull[0] + halfWidth * vActive[0], w0[1] +  T * vNull[1] + halfWidth * vActive[1]],
+      [w0[0] -  T * vNull[0] + halfWidth * vActive[0], w0[1] -  T * vNull[1] + halfWidth * vActive[1]],
+      [w0[0] -  T * vNull[0] - halfWidth * vActive[0], w0[1] -  T * vNull[1] - halfWidth * vActive[1]],
+      [w0[0] +  T * vNull[0] - halfWidth * vActive[0], w0[1] +  T * vNull[1] - halfWidth * vActive[1]],
+    ];
+    const line = d3.line().x(d => x(d[0])).y(d => y(d[1]));
+    svg.append('path').attr('d', line(corners) + 'Z')
+      .attr('fill', 'rgba(43, 108, 176, 0.18)').attr('stroke', '#2b6cb0').attr('stroke-width', 1.5)
+      .attr('stroke-dasharray', '4 3');
+  }
+  // Rank 0: nothing to draw — the whole plane is "free."
+}
+
+function plot1D(model, w0) {
+  clearPlot();
+  const [a, b] = model.domain;
+  const N = 401;
+  const ws = new Array(N), ks = new Array(N);
+  let kMax = 0;
+  for (let i = 0; i < N; i++) {
+    ws[i] = a + (b - a) * i / (N - 1);
+    ks[i] = model.f(ws[i]);
+    if (ks[i] > kMax) kMax = ks[i];
+  }
+  const x = d3.scaleLinear().domain([a, b]).range([PAD, PLOT_W - PAD]);
+  const y = d3.scaleLinear().domain([0, kMax * 1.1 || 1]).range([PLOT_H - PAD, PAD]);
+  drawAxes(x, y, 'w', 'K(w)');
+
+  const line = d3.line().x((_, i) => x(ws[i])).y((_, i) => y(ks[i]));
+  svg.append('path').datum(ks).attr('d', line)
+    .attr('fill', 'none').attr('stroke', '#246').attr('stroke-width', 1.6);
+
+  // W₀ marks.
+  if (model.W0Plot.type === 'points1d') {
+    for (const xs of model.W0Plot.xs) {
+      svg.append('line').attr('x1', x(xs)).attr('x2', x(xs)).attr('y1', y(0)).attr('y2', y(kMax))
+        .attr('stroke', '#d92d20').attr('stroke-width', 2).attr('stroke-dasharray', '4 3');
+      svg.append('circle').attr('cx', x(xs)).attr('cy', y(0)).attr('r', 4.5).attr('fill', '#d92d20');
+    }
+  }
+
+  // w⁰ marker on x-axis.
+  svg.append('circle').attr('cx', x(w0[0])).attr('cy', y(0)).attr('r', 6).attr('fill', '#1a3a8e').attr('stroke', '#fff').attr('stroke-width', 1.5);
+
+  // 1D "Fisher level set" = the local quadratic approximation. If I = K''(w⁰)
+  // is positive, draw the parabola K(w⁰) + ½ I (w - w⁰)². If I = 0, draw
+  // a flat horizontal line at K(w⁰) — the Fisher-level "strip" degenerates.
+  const I = model.hess(w0[0])[0][0];
+  const k0 = model.f(w0[0]);
+  const xs = d3.range(60).map(i => w0[0] - 0.6 + i / 59 * 1.2);
+  const approx = xs.map(xv => k0 + 0.5 * I * (xv - w0[0]) ** 2);
+  const line2 = d3.line().x((_, i) => x(xs[i])).y((_, i) => y(approx[i]));
+  svg.append('path').datum(approx).attr('d', line2)
+    .attr('fill', 'none').attr('stroke', '#2b6cb0').attr('stroke-width', 1.8).attr('stroke-dasharray', I > TOL ? '0' : '4 3');
+}
+
+// ---------------------------------------------------------------------------
+// UI WIRING
+// ---------------------------------------------------------------------------
+let currentModel = MODELS[0];
+let currentW0 = currentModel.trueParams[0];
+let answered = false;
+
+function buildModelButtons() {
+  const root = d3.select('#model-buttons');
+  root.selectAll('button').data(MODELS).join('button')
+    .text(m => m.name).classed('active', m => m.id === currentModel.id)
+    .on('click', (_, m) => { currentModel = m; currentW0 = m.trueParams[0]; answered = false; render(); });
+}
+
+function buildW0Select() {
+  const sel = d3.select('#w0-select');
+  sel.selectAll('option').remove();
+  sel.selectAll('option').data(currentModel.trueParams).join('option')
+    .attr('value', d => d.label).text(d => d.label);
+  sel.property('value', currentW0.label);
+  sel.on('change', function () {
+    const v = this.value;
+    currentW0 = currentModel.trueParams.find(p => p.label === v);
+    answered = false;
+    render();
+  });
+}
+
+function buildChoices() {
+  const root = d3.select('#choices');
+  root.selectAll('*').remove();
+  const opts = currentModel.dim === 1 ? [0, 1] : [0, 1, 2];
+  const correct = currentModel.correct[currentW0.label];
+  const reveal = d3.select('#reveal');
+  reveal.style('display', 'none');
+
+  for (const k of opts) {
+    const btn = root.append('button').attr('class', 'choice')
+      .html(`$\\mathrm{rank}(I(w^{(0)})) = ${k}$`);
+    btn.on('click', function () {
+      if (answered) return;
+      answered = true;
+      const buttons = root.selectAll('button').nodes();
+      buttons.forEach((b, i) => {
+        b.disabled = true;
+        if (opts[i] === correct) b.classList.add('correct');
+        else if (b === this) b.classList.add('wrong');
+      });
+      revealAnswer();
+    });
+  }
+  typeset(root.node());
+}
+
+function revealAnswer() {
+  const w0 = currentW0.w;
+  const M = currentModel.dim === 1 ? currentModel.hess(w0[0]) : currentModel.hess(w0[0], w0[1]);
+  const E = currentModel.dim === 1 ? eig1x1(M) : eig2x2(M);
+  const r = rank(M);
+  const isRegularPoint = r === currentModel.dim;                        // rank == dimension
+  const det = M.length === 1 ? M[0][0] : M[0][0] * M[1][1] - M[0][1] * M[1][0];
+  const eigsTeX = M.length === 1
+    ? `\\{${fmt(E.lam1)}\\}`
+    : `\\{${fmt(E.lam1)},\\, ${fmt(E.lam2)}\\}`;
+
+  const explanation = currentModel.explanation[currentW0.label];
+  const badge = isRegularPoint
+    ? `<span class="badge regular">regular at this $w^{(0)}$</span>`
+    : `<span class="badge singular">$\\det I = 0$ &mdash; strictly singular</span>`;
+
+  const html = `
+    <div>${badge}</div>
+    <div class="fi-grid" style="margin-top: 0.5rem;">
+      <div class="lab">$I(w^{(0)})$</div>
+      <div class="val">$${matrixTeX(M).replace('I(w^{(0)}) = ', '')}$</div>
+      <div class="lab">eigenvalues</div>
+      <div class="val">$${eigsTeX}$</div>
+      <div class="lab">$\\det I$</div>
+      <div class="val">$${fmt(det)}$</div>
+      <div class="lab">rank</div>
+      <div class="val">$${r}$</div>
+    </div>
+    <p style="margin-top: 0.7rem;">${explanation}</p>
+  `;
+  const reveal = d3.select('#reveal');
+  reveal.style('display', 'block').html(html);
+  typeset(reveal.node());
+}
+
+function render() {
+  // Highlight active model button.
+  d3.select('#model-buttons').selectAll('button').classed('active', m => m.id === currentModel.id);
+  // Plot.
+  if (currentModel.dim === 2) plot2D(currentModel, currentW0.w);
+  else plot1D(currentModel, currentW0.w);
+  // Formula + note.
+  d3.select('#formula').html(`$$ ${currentModel.tex} $$`);
+  d3.select('#model-note').html(currentModel.note);
+  typeset(document.querySelector('#formula'));
+  typeset(document.querySelector('#model-note'));
+  // Selector + choices.
+  buildW0Select();
+  buildChoices();
+}
+
+function init() {
+  buildModelButtons();
+  render();
+  // Re-typeset prose blocks once on load.
+  typeset(document.body);
+}
+
+init();
+</script>
+</body>
+</html>

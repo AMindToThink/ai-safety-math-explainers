@@ -58,7 +58,7 @@ Status definitions match `texts/slt/NOTES.md`:
 |---|------|--------|
 | 1 | [`dslt1-bayes-loss-landscape`](widgets/01-bayes-loss-landscape.html) | drafted |
 | 2 | [`dslt1-singular-posterior`](widgets/02-singular-posterior.html) | drafted |
-| 3 | `dslt1-fisher-degeneracy` | not started |
+| 3 | [`dslt1-fisher-degeneracy`](widgets/03-fisher-degeneracy.html) | drafted |
 | 4 | `dslt1-bic-derivation` | not started |
 | 5 | `dslt1-volume-scaling-rlct` | not started |
 | 6 | `dslt1-normal-crossing-game` | not started |
@@ -100,6 +100,26 @@ The active check asks the reader to predict the asymptotic posterior
 shape for each preset *before* dragging $n$ to the asymptote and
 checking. The reveal text explains why each case behaves as it
 does in terms of local RLCT.
+
+### Module 3 — `dslt1-fisher-degeneracy`
+
+[`widgets/03-fisher-degeneracy.html`](widgets/03-fisher-degeneracy.html)
+makes the operational definition of "singular" tangible. The reader
+picks a $K$ and a true parameter $w^{(0)} \in W_0$, predicts
+$\mathrm{rank}(I(w^{(0)}))$, then sees the Hessian computed
+symbolically, eigenvalues + determinant + rank reported, and a
+*Fisher level set* drawn over the contours: a small ellipse for
+positive-definite $I$, a degenerate strip for rank&nbsp;1, and an
+empty plane for rank&nbsp;0.
+
+The pedagogical fulcrum is Carroll Example 1.2: at $(0, 0)$ for
+$K = \tfrac{1}{2}\, w_1^2 w_2^2$, every second derivative vanishes
+and $I(0, 0) = 0$ &mdash; rank&nbsp;0, even though $K$ is plainly
+nontrivial nearby. This is the moment that motivates the RLCT.
+A 1-hidden-unit ReLU regressor (with target $0$ and $x \sim
+\mathcal{N}(0, 1)$) appears as a final preset and recovers Example
+1.2 verbatim, demonstrating the Carroll thesis Lemma 3.2 result that
+ReLU networks are strictly singular.
 
 ## Pedagogical decisions
 
