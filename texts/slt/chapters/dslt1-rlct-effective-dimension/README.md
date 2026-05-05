@@ -61,7 +61,7 @@ Status definitions match `texts/slt/NOTES.md`:
 | 3 | [`dslt1-fisher-degeneracy`](widgets/03-fisher-degeneracy.html) | drafted |
 | 4 | [`dslt1-bic-derivation`](widgets/04-bic-derivation.html) | drafted |
 | 5 | [`dslt1-volume-scaling-rlct`](widgets/05-volume-scaling-rlct.html) | drafted |
-| 6 | `dslt1-normal-crossing-game` | not started |
+| 6 | [`dslt1-normal-crossing-game`](widgets/06-normal-crossing-game.html) | drafted |
 | 7 | `dslt1-resolution-primer` | not started |
 | 8 | `dslt1-wbic-vs-bic` | not started |
 
@@ -120,6 +120,19 @@ A 1-hidden-unit ReLU regressor (with target $0$ and $x \sim
 \mathcal{N}(0, 1)$) appears as a final preset and recovers Example
 1.2 verbatim, demonstrating the Carroll thesis Lemma 3.2 result that
 ReLU networks are strictly singular.
+
+### Module 6 — `dslt1-normal-crossing-game`
+
+[`widgets/06-normal-crossing-game.html`](widgets/06-normal-crossing-game.html)
+turns the RLCT calculation for normal-crossing $K$ into a six-round
+game. Each round shows a $K$ in normal-crossing form (1D mono, 1D
+dual-singularity, 2D tied, 2D mixed, 2D restricted-to-origin Carroll
+Example 1.5, 3D fully-tied) and asks the player to predict
+$(\lambda, m)$. After both choices are locked, the reveal walks
+through the calculation: local $\lambda_j = 1/(2 k_j)$, global
+$\lambda = \min_j \lambda_j$, and $m$ counts the $j$'s tied for the
+minimum. Score is reported live; an end-of-game card invites the
+player on to module 7's resolution-of-singularities primer.
 
 ### Module 5 — `dslt1-volume-scaling-rlct`
 

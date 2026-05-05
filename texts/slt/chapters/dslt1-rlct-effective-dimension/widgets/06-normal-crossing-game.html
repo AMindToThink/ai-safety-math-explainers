@@ -1,0 +1,338 @@
+<!--
+  Widget: dslt1-normal-crossing-game. Module 6 for DSLT 1.
+  Source: DSLT 1 §"The RLCT can be read off when K(w) is in normal crossing
+          form" (Carroll 2023). 1D case formula
+              K(w) = (w - c_1)^{2k_1} ... (w - c_J)^{2k_J}
+                  ⇒ local λ_j = 1/(2k_j), global λ = min_j λ_j;
+          and multidim normal-crossing case
+              K(w) = w_1^{2k_1} ... w_d^{2k_d}
+                  ⇒ λ = min_j 1/(2k_j),
+              with multiplicity m = #{j : k_j attains the min}.
+  Toy system: a sequence of normal-crossing K's of increasing complexity
+              (1D mono, 1D dual-singularity, 2D mono, 2D mixed, 2D tied,
+              3D mono).
+  Active check: for each round, predict (global λ, multiplicity m) from
+                multiple choice. The widget runs as a six-round game with
+                a running score tally; at the end the player can reset.
+  Standalone: open this .html in a browser. KaTeX 0.16 from CDN. (No D3
+              needed — pure DOM updates.)
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SLT companion · DSLT 1 widget 6 · The normal-crossing RLCT game</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --w0:#d92d20; --muted:#52606d; --ok:#099250; --okbg:#d1fadf; --bad:#b42318; --badbg:#fee4e2; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; color: var(--ink); }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .sources li { margin: 0.15rem 0; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  .game { background: #fff; border: 1px solid #d9e0e7; border-radius: 6px; padding: 1.1rem 1.3rem; margin-top: 0.8rem; }
+  .scorebar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.7rem; font-size: 0.95rem; }
+  .scorebar .progress { color: var(--muted); font-size: 0.88rem; }
+  .scorebar .score { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1.1rem; }
+  .K-display { font-size: 1.18rem; padding: 0.7rem 1rem; background: #f4f6f8; border-radius: 4px; margin: 0.6rem 0 0.9rem; }
+  .question-row { margin: 0.6rem 0; }
+  .question-row .qlabel { font-size: 0.95rem; color: var(--ink); margin-right: 0.6rem; }
+  .choice-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.3rem; }
+  .choice { padding: 0.4rem 0.8rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover:not(:disabled) { background: #eef3f8; }
+  .choice.correct { background: var(--okbg); border-color: var(--ok); color: var(--ok); }
+  .choice.wrong { background: var(--badbg); border-color: var(--w0); color: var(--bad); }
+  .choice:disabled { cursor: default; }
+  .reveal { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.7rem 0.9rem; border-radius: 4px; margin-top: 0.7rem; font-size: 0.95rem; }
+  .game-controls { display: flex; gap: 0.5rem; margin-top: 0.8rem; }
+  .btn { padding: 0.5rem 1rem; border: 1px solid var(--accent); background: var(--accent); color: white; cursor: pointer; border-radius: 4px; font-size: 0.95rem; }
+  .btn:hover { background: #1e4f8d; }
+  .btn.secondary { background: #fff; color: var(--accent); }
+  .btn.secondary:hover { background: #eef3f8; }
+  .btn:disabled { background: #c9d3df; border-color: #c9d3df; color: #fff; cursor: not-allowed; }
+  .endcard { padding: 1rem 1.2rem; background: var(--okbg); border: 1px solid var(--ok); border-radius: 6px; margin-top: 0.8rem; font-size: 1rem; }
+</style>
+</head>
+<body>
+
+<h1>The normal-crossing RLCT game</h1>
+<p class="subtitle">SLT companion · widget 6 of 7 for <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural"><em>DSLT 1: The RLCT Measures the Effective Dimension of Neural Networks</em></a> by Liam Carroll</p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#The_RLCT_can_be_read_off_when_K_w__is_in_normal_crossing_form">DSLT 1 §"The RLCT can be read off when K(w) is in normal crossing form"</a> &mdash; the closed-form RLCT formulas this game tests.</li>
+    <li><a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#An_example_of_fractional_dimension">DSLT 1 Example 1.3</a>, Example 1.4 (the dual-singularity 1D case), Example 1.5 (the multi-component 2D case) &mdash; rounds 2, 4, and 5 of the game are direct paraphrases of these.</li>
+    <li>Watanabe, Grey Book §1.6 &mdash; the underlying definition of RLCT via Mellin / zeta-function poles, of which the normal-crossing formula is the easy case.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;">Once $K(w)$ is in <strong>normal-crossing form</strong>, the <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#The_Real_Log_Canonical_Threshold__aka_the_Learning_Coefficient_">RLCT</a> stops being an asymptotic and becomes a <em>calculation</em>:
+    $$ K(w) = w_1^{2k_1} \cdots w_d^{2k_d} \quad\Longrightarrow\quad \lambda = \min_{j} \frac{1}{2 k_j},\quad m = \#\{ j : 1/(2 k_j) = \lambda \}. $$
+  The 1D case extends to products $K(w) = (w - c_1)^{2 k_1} \cdots (w - c_J)^{2 k_J}$: each $c_j$ contributes a local RLCT $\lambda_j = 1/(2 k_j)$, and the <em>global</em> RLCT is the smallest. After widget 7's resolution-of-singularities primer, this calculation will work for <em>any</em> analytic $K$ (modulo a Jacobian factor).</p>
+  <p style="margin: 0;">Six rounds, increasing in complexity. For each, predict $(\lambda, m)$ from the choices. Score is reported live; click <em>Reveal</em> to see the calculation worked out.</p>
+</div>
+
+<div class="game">
+  <div class="scorebar">
+    <span class="progress" id="progress">Round 1 of 6</span>
+    <span class="score" id="score">Score: 0 / 0</span>
+  </div>
+
+  <div class="K-display" id="K-display"></div>
+  <p style="font-size: 0.93rem; color: var(--muted); margin: 0;" id="hint"></p>
+
+  <div class="question-row">
+    <span class="qlabel"><strong>Global RLCT $\lambda$:</strong></span>
+    <div class="choice-row" id="lambda-choices"></div>
+  </div>
+  <div class="question-row">
+    <span class="qlabel"><strong>Multiplicity $m$:</strong></span>
+    <div class="choice-row" id="m-choices"></div>
+  </div>
+
+  <div class="reveal" id="reveal" style="display: none;"></div>
+
+  <div class="game-controls">
+    <button class="btn" id="next-btn" disabled>Next round →</button>
+    <button class="btn secondary" id="reset-btn">Reset game</button>
+  </div>
+</div>
+
+<p class="footnote">
+  <strong>How the game scores you.</strong> Each round you pick $\lambda$ and $m$ separately; both must be right for the round to count, and you only get one shot per question (after either choice is locked, the buttons disable and the reveal explains the calculation in detail). For 1D $K = (w - c_1)^{2 k_1} \cdots (w - c_J)^{2 k_J}$ the local RLCT at $w = c_j$ is $\lambda_j = 1/(2 k_j)$, the global is $\lambda = \min_j \lambda_j$, and the multiplicity is the number of $c_j$'s that achieve that minimum. For multidim normal-crossing $K = w_1^{2 k_1} \cdots w_d^{2 k_d}$, $\lambda = \min_j 1/(2 k_j)$ and $m$ is the number of $k_j$ tied for the minimum (i.e. for the maximum exponent). Carroll's <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#An_example_of_fractional_dimension">Example 1.4</a> and <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#The_RLCT_can_be_read_off_when_K_w__is_in_normal_crossing_form">Example 1.5</a> are the templates for rounds 2 and 5.
+</p>
+
+<nav class="nav">
+  <a href="https://github.com/AMindToThink/ai-safety-math-explainers/blob/main/texts/slt/chapters/dslt1-rlct-effective-dimension/README.md">&larr; DSLT 1 chapter index</a>
+  <a href="https://github.com/AMindToThink/ai-safety-math-explainers/blob/main/texts/slt/NOTES.md">SLT companion overview &rarr;</a>
+</nav>
+
+<script>
+"use strict";
+
+const KATEX_DELIMITERS = [
+  { left: '$$', right: '$$', display: true },
+  { left: '\\[', right: '\\]', display: true },
+  { left: '$', right: '$', display: false },
+  { left: '\\(', right: '\\)', display: false },
+];
+function typeset(el) { if (window.renderMathInElement) renderMathInElement(el, { delimiters: KATEX_DELIMITERS, throwOnError: false }); }
+
+// ---------------------------------------------------------------------------
+// ROUNDS — six normal-crossing K's of increasing complexity.
+// Each round defines:
+//   tex          : the LaTeX K display
+//   hint         : a one-line description shown above the questions
+//   lambdaCorrect: numeric correct λ (use exact fractions like 1/4, 1/6)
+//   mCorrect     : correct multiplicity (positive integer)
+//   lambdaChoices: array of numeric choices (must include lambdaCorrect)
+//   mChoices     : array of integer choices (must include mCorrect)
+//   reveal       : HTML explanation of the calculation
+// ---------------------------------------------------------------------------
+const ROUNDS = [
+  {
+    tex: 'K(w) = w^{6}',
+    hint: 'Round 1 — single 1D singularity. Read $2k_1$ off the exponent.',
+    lambdaCorrect: 1/6,
+    mCorrect: 1,
+    lambdaChoices: [1/6, 1/3, 1/4, 1/2],
+    mChoices: [1, 2, 3],
+    reveal: `One factor: $K = w^{2 \\cdot 3}$, so $k_1 = 3$ and $\\lambda_1 = 1/(2 \\cdot 3) = 1/6$. Only one singularity, so the global RLCT equals the local $\\lambda = 1/6$ with multiplicity $m = 1$. Effective dimension $2\\lambda = 1/3$.`,
+  },
+  {
+    tex: 'K(w) = (w + 1)^{2}\\,(w - 1)^{4}',
+    hint: 'Round 2 — Carroll Example 1.4. Two 1D singularities; the global RLCT is the smaller of the local ones.',
+    lambdaCorrect: 1/4,
+    mCorrect: 1,
+    lambdaChoices: [1/4, 1/3, 1/2, 1],
+    mChoices: [1, 2],
+    reveal: `Local RLCTs:
+      <ul style="margin:0.3rem 0;">
+        <li>at $w = -1$: $(w + 1)^{2 \\cdot 1}$, so $k = 1$ and $\\lambda_{-1} = 1/2$;</li>
+        <li>at $w = +1$: $(w - 1)^{2 \\cdot 2}$, so $k = 2$ and $\\lambda_{+1} = 1/4$.</li>
+      </ul>
+      The global RLCT is the smaller: $\\lambda = \\min(1/2,\\, 1/4) = 1/4$, attained only at $w = +1$, so multiplicity $m = 1$. As widget 2 demonstrated, the lower-RLCT singularity is also the one the posterior concentrates on as $n \\to \\infty$.`,
+  },
+  {
+    tex: 'K(w_1, w_2) = w_1^{2}\\, w_2^{2}',
+    hint: 'Round 3 — Carroll Example 1.2 in normal-crossing language. Tied exponents.',
+    lambdaCorrect: 1/2,
+    mCorrect: 2,
+    lambdaChoices: [1/4, 1/2, 1],
+    mChoices: [1, 2, 3],
+    reveal: `Both $k_1 = k_2 = 1$, so $\\lambda_1 = \\lambda_2 = 1/2$. The global RLCT is $\\lambda = 1/2$ with multiplicity $m = 2$ (both directions tie for the minimum). The multiplicity shows up as a $\\log(1/\\varepsilon)$ correction in the volume integral: $V(\\varepsilon) \\sim \\varepsilon^{1/2} \\log(1/\\varepsilon)$. This is the slight curvature you saw on the log-log plot in widget 5.`,
+  },
+  {
+    tex: 'K(w_1, w_2) = w_1^{2}\\, w_2^{6}',
+    hint: 'Round 4 — multidim normal-crossing with non-tied exponents. The slow direction wins.',
+    lambdaCorrect: 1/6,
+    mCorrect: 1,
+    lambdaChoices: [1/2, 1/4, 1/6, 1/8],
+    mChoices: [1, 2],
+    reveal: `$k_1 = 1$ gives $\\lambda_1 = 1/2$; $k_2 = 3$ gives $\\lambda_2 = 1/6$. The global RLCT is $\\lambda = \\min(1/2,\\, 1/6) = 1/6$, attained only along the $w_2$ direction, so $m = 1$. Effective dimension $2\\lambda = 1/3$. Intuition: $w_2^6$ is much flatter near $0$ than $w_1^2$, so the volume integral is dominated by motion along $w_2$.`,
+  },
+  {
+    tex: 'K(w_1, w_2) = w_1^{4}\\, w_2^{2}\\;\\text{(near origin only)}',
+    hint: 'Round 5 — Carroll Example 1.5 restricted to a neighbourhood of the origin singularity.',
+    lambdaCorrect: 1/4,
+    mCorrect: 1,
+    lambdaChoices: [1/4, 1/2, 1/6, 1],
+    mChoices: [1, 2],
+    reveal: `Carroll Example 1.5: $K = (w_1 + 1)^2\\, w_1^4\\, w_2^2$. Near the origin the $(w_1+1)^2$ factor is bounded away from zero (it equals $1$ at the origin), so locally $K \\approx w_1^4 w_2^2$. Then $k_1 = 2,\\, k_2 = 1$, giving $\\lambda_1 = 1/4,\\, \\lambda_2 = 1/2$. The global at this singularity is $\\lambda_0 = 1/4$, attained only along $w_1$, so $m_0 = 1$. The other singularity at $(-1, 0)$ has local RLCT $1/2$ (with multiplicity 2), so the <em>global</em> RLCT of the full $K$ is again $\\lambda = 1/4$. Compare with widget 1's "(w_1+1)² w_1⁴ w_2²" preset.`,
+  },
+  {
+    tex: 'K(w_1, w_2, w_3) = w_1^{2}\\, w_2^{2}\\, w_3^{2}',
+    hint: 'Round 6 — fully tied 3D normal-crossing. The multiplicity matches the dimension.',
+    lambdaCorrect: 1/2,
+    mCorrect: 3,
+    lambdaChoices: [1/2, 1/4, 1/6, 3/2],
+    mChoices: [1, 2, 3, 4],
+    reveal: `All $k_j = 1$, so $\\lambda_j = 1/2$ for $j = 1, 2, 3$. The global $\\lambda = 1/2$ with multiplicity $m = 3$ (all directions tie). The volume integral picks up a $(\\log 1/\\varepsilon)^{m - 1} = (\\log 1/\\varepsilon)^{2}$ factor. Effective dimension $2\\lambda = 1$ &mdash; one whole dimension worth of "effective parameters" out of $d = 3$ total.`,
+  },
+];
+
+// ---------------------------------------------------------------------------
+// FRACTIONAL FORMATTING
+// ---------------------------------------------------------------------------
+function fracTeX(x) {
+  if (Math.abs(x - 1) < 1e-9) return '1';
+  if (Math.abs(x - 2) < 1e-9) return '2';
+  if (Math.abs(x - 1.5) < 1e-9) return '3/2';
+  for (let n = 2; n <= 12; n++) {
+    if (Math.abs(x - 1/n) < 1e-9) return `1/${n}`;
+  }
+  return x.toFixed(3);
+}
+
+// ---------------------------------------------------------------------------
+// GAME STATE
+// ---------------------------------------------------------------------------
+const state = {
+  roundIdx: 0,
+  score: 0,
+  attempted: 0,
+  pickedLambda: null,
+  pickedM: null,
+};
+
+function buildChoices(rootSel, options, correct, isFraction, onPick) {
+  const root = document.querySelector(rootSel);
+  root.innerHTML = '';
+  for (const opt of options) {
+    const btn = document.createElement('button');
+    btn.className = 'choice';
+    btn.innerHTML = `$${isFraction ? fracTeX(opt) : opt}$`;
+    btn.addEventListener('click', () => onPick(opt, btn));
+    root.appendChild(btn);
+  }
+  typeset(root);
+}
+
+function lockChoices(rootSel, correct, picked, isFraction) {
+  const buttons = document.querySelectorAll(`${rootSel} button`);
+  for (const b of buttons) {
+    const txt = b.textContent.trim();
+    const correctTxt = isFraction ? fracTeX(correct) : String(correct);
+    b.disabled = true;
+    if (txt === correctTxt) b.classList.add('correct');
+    else if (txt === (isFraction ? fracTeX(picked) : String(picked))) b.classList.add('wrong');
+  }
+}
+
+function maybeFinishRound() {
+  if (state.pickedLambda === null || state.pickedM === null) return;
+  const r = ROUNDS[state.roundIdx];
+  const ok = (Math.abs(state.pickedLambda - r.lambdaCorrect) < 1e-9) && (state.pickedM === r.mCorrect);
+  state.attempted += 1;
+  if (ok) state.score += 1;
+
+  document.getElementById('score').textContent = `Score: ${state.score} / ${state.attempted}`;
+  const reveal = document.getElementById('reveal');
+  reveal.style.display = 'block';
+  reveal.innerHTML = (ok ? '<strong>Correct.</strong> ' : '<strong>Not quite.</strong> ') + r.reveal;
+  typeset(reveal);
+  document.getElementById('next-btn').disabled = (state.roundIdx >= ROUNDS.length - 1);
+  if (state.roundIdx >= ROUNDS.length - 1) renderEndcard();
+}
+
+function renderEndcard() {
+  // Show end-of-game card after all 6 rounds.
+  const game = document.querySelector('.game');
+  let card = document.querySelector('.endcard');
+  if (!card) {
+    card = document.createElement('div');
+    card.className = 'endcard';
+    game.appendChild(card);
+  }
+  card.innerHTML = `Game complete &mdash; <strong>${state.score} / ${ROUNDS.length}</strong>. Click <em>Reset game</em> to play again, or <a href="https://www.alignmentforum.org/posts/4eZtmwaqhAgdJQDEg/dslt-1-the-rlct-measures-the-effective-dimension-of-neural#Resolution_of_Singularities">read on</a> to see how Hironaka's resolution of singularities lets us put <em>any</em> analytic $K$ into normal-crossing form, making this calculation universal.`;
+  typeset(card);
+}
+
+function renderRound() {
+  const r = ROUNDS[state.roundIdx];
+  document.getElementById('progress').textContent = `Round ${state.roundIdx + 1} of ${ROUNDS.length}`;
+  document.getElementById('K-display').innerHTML = `$$ ${r.tex} $$`;
+  document.getElementById('hint').textContent = r.hint;
+  document.getElementById('reveal').style.display = 'none';
+  document.getElementById('next-btn').disabled = true;
+
+  state.pickedLambda = null;
+  state.pickedM = null;
+
+  buildChoices('#lambda-choices', r.lambdaChoices, r.lambdaCorrect, true, (opt) => {
+    if (state.pickedLambda !== null) return;
+    state.pickedLambda = opt;
+    lockChoices('#lambda-choices', r.lambdaCorrect, opt, true);
+    maybeFinishRound();
+  });
+  buildChoices('#m-choices', r.mChoices, r.mCorrect, false, (opt) => {
+    if (state.pickedM !== null) return;
+    state.pickedM = opt;
+    lockChoices('#m-choices', r.mCorrect, opt, false);
+    maybeFinishRound();
+  });
+  typeset(document.getElementById('K-display'));
+}
+
+function nextRound() {
+  if (state.roundIdx < ROUNDS.length - 1) {
+    state.roundIdx += 1;
+    renderRound();
+  }
+}
+
+function resetGame() {
+  state.roundIdx = 0;
+  state.score = 0;
+  state.attempted = 0;
+  document.getElementById('score').textContent = 'Score: 0 / 0';
+  const card = document.querySelector('.endcard');
+  if (card) card.remove();
+  renderRound();
+}
+
+function init() {
+  document.getElementById('next-btn').addEventListener('click', nextRound);
+  document.getElementById('reset-btn').addEventListener('click', resetGame);
+  renderRound();
+  typeset(document.body);
+}
+
+init();
+</script>
+</body>
+</html>
