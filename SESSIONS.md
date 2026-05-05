@@ -36,3 +36,32 @@ per session, newest at the bottom. See
 - **Proposed for approval:** none yet (Module breakdown is
   intentionally still empty; first rows will land after the
   Chapter 1 read).
+
+## 2026-05-05 ~12:00 (session by autonomous Claude)
+
+- **Worked on:** sandbox connectivity audit for the SLT corpus;
+  no chapter or widget work.
+- **What got done:** Re-ran `texts/slt/source/download.sh` to
+  confirm the previous session's firewall finding. Result is the
+  same: the GitHub clone of `timaeus-research/devinterp`
+  succeeds, and every other host (arxiv.org, lesswrong.com,
+  alignmentforum.org, greaterwrong.com, timaeus.co,
+  devinterp.com, therisingsea.org) returns 403 from this
+  environment. WebFetch is blocked on the same hosts. Concluded
+  with Matthew that this sandbox is too restrictive for SLT
+  work, since the project's pedagogy requires the parent to
+  actually read DSLT / Carroll thesis / Watanabe — material this
+  environment cannot reach. Decision: future sessions run
+  locally instead.
+- **What's next:** Run `download.sh` on a local machine with
+  general egress, place the Watanabe Grey/Green PDFs into
+  `source/watanabe/` per the README there, and resume the
+  Chapter 1 read from there. First module rows still to be
+  proposed in the next session.
+- **Blockers:** none for the project; the sandbox-egress issue
+  is resolved by switching execution environment.
+- **Proposed for approval:** none.
+- **Why stopped:** Step-4 criterion #2 — every remaining
+  productive task in this environment requires either a
+  network-egress change or pre-populated source files, both of
+  which are Matthew-side actions.
