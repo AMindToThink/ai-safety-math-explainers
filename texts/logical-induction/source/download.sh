@@ -17,6 +17,14 @@
 #     paper/                # arXiv:1609.03543 LaTeX e-print, extracted
 #     scherlis/             # arXiv:2205.12879 LaTeX e-print, extracted
 #     scherlis-code/        # epistax-is/logical-induction Python repo
+#                           #   (NOTE: as of 2026-05, this GitHub repo
+#                           #   does not resolve. Clone may fail; the
+#                           #   Scherlis arXiv source is still the
+#                           #   authoritative pseudocode reference.)
+#     flint-code/           # monasticacademy/logical-induction Python repo
+#                           #   (Kōshin Alex Flint, MIT 2022). Closer-to-
+#                           #   the-paper LIA implementation. See NOTES.md
+#                           #   "Things to consider porting from Flint".
 #     demski/               # Demski's intuitive-guide posts (HTML + .md)
 #     embedded-agency/      # Demski + Garrabrant's Embedded Agency posts
 #     README.md             # this directory's pinned README
@@ -30,7 +38,7 @@ set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 cd "$HERE"
 
-mkdir -p paper scherlis scherlis-code demski embedded-agency
+mkdir -p paper scherlis scherlis-code flint-code demski embedded-agency
 
 log() { printf '[download.sh] %s\n' "$*"; }
 fetch() {
@@ -141,15 +149,41 @@ fi
 # 3. Scherlis's accompanying Python code
 #    https://github.com/epistax-is/logical-induction (MIT)
 #    Used as ground truth for runnable LIA-toy semantics.
+#
+#    NOTE (2026-05): the epistax-is/logical-induction GitHub repo
+#    does not resolve as of this writing — the org or repo appears
+#    to have been renamed/removed. We attempt the clone but tolerate
+#    failure; the Scherlis arXiv source above is still authoritative
+#    for the pseudocode. If a working mirror is found, replace the
+#    URL below.
 # ---------------------------------------------------------------------
 if [ -d scherlis-code/.git ]; then
   log "scherlis-code already cloned; pulling latest"
   ( cd scherlis-code && git pull --ff-only ) || log "scherlis-code git pull failed"
 else
   rm -rf scherlis-code
-  log "cloning epistax-is/logical-induction"
+  log "cloning epistax-is/logical-induction (may 404; see note above)"
   git clone --depth 1 https://github.com/epistax-is/logical-induction.git scherlis-code \
-    || log "git clone of scherlis-code failed"
+    || log "git clone of scherlis-code failed (expected; repo not currently public)"
+fi
+
+# ---------------------------------------------------------------------
+# 3b. Flint's Python implementation
+#     https://github.com/monasticacademy/logical-induction (MIT, 2022)
+#     A closer-to-the-paper port of §5.4.1 (LogicalInductor.update,
+#     find_credences, combine_trading_algorithms, compute_budget_factor),
+#     with end-to-end runnable examples in examples/. See
+#     ../NOTES.md "Things to consider porting from Flint" and
+#     issue #12 for the cross-check.
+# ---------------------------------------------------------------------
+if [ -d flint-code/.git ]; then
+  log "flint-code already cloned; pulling latest"
+  ( cd flint-code && git pull --ff-only ) || log "flint-code git pull failed"
+else
+  rm -rf flint-code
+  log "cloning monasticacademy/logical-induction"
+  git clone --depth 1 https://github.com/monasticacademy/logical-induction.git flint-code \
+    || log "git clone of flint-code failed"
 fi
 
 # ---------------------------------------------------------------------
