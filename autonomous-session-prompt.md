@@ -16,9 +16,11 @@ doesn't block on every tool call.
 3. Pass this entire file to Claude as the session prompt. The "How to
    schedule" block is harmless context for Claude to read.
 
-The whole prompt is designed to fail-safe. If Claude is unsure, the
-default action is to open a GitHub issue describing the situation and
-move on, rather than push forward with a guess.
+The whole prompt is designed to fail-safe. If Claude is unsure on a
+particular task, the default action is to open a GitHub issue
+describing the situation and move on to the **next task on the
+priority list** — not to end the session. Sessions are loops; see
+Step 2 and Step 4 for what that means concretely.
 
 ---
 
@@ -51,7 +53,17 @@ Before doing anything else, in this order:
    (create the file if it doesn't exist) so you know what previous
    sessions did.
 
-## Step 2: Decide what to work on
+## Step 2: Pick the next task
+
+A session is **a loop, not a single shot.** Step 1 runs once at the
+start; Steps 2 and 3 cycle until you hit a real terminus (defined in
+Step 4). Each pass through Step 2 picks one new task, Step 3 finishes
+it (with commits + push), and then you come back here and pick the
+next one. Do not stop just because you finished a task — finishing a
+task is the normal trigger to loop, not to end. A typical session
+should chew through several tasks. A ten-minute session that does one
+small task and stops is a failure mode of this prompt; if you find
+yourself about to do that, re-read this paragraph.
 
 **Bootstrap case.** If no text directories exist in `texts/`, scaffold
 the project's currently-prioritized first text before walking the
@@ -62,15 +74,16 @@ is queued as the second text after SLT is well underway.
 To scaffold: create `texts/slt/`, copy `NOTES.template.md` to
 `texts/slt/NOTES.md`, and fill in the Source section based on the
 Singular Learning Theory entry in `math-heavy-texts-for-explanations.md`.
-Commit and push. Then walk the priority list normally; you'll fall
-into step 4 (source ingestion) on the next pass.
+Commit and push. Then come back to this step and walk the priority
+list normally; you'll fall into item 4 (source ingestion) on the
+next pass, then item 5 on the pass after that, and so on.
 
 When SLT reaches a stable point and Matthew gives the go-ahead (in a
 session note, a comment in `NOTES.md`, or by editing this prompt),
 scaffold Logical Induction the same way. Don't autonomously decide to
 start a second text.
 
-Pick exactly one task from the priority list, walking top to bottom:
+Pick the next task from the priority list, walking top to bottom:
 
 1. **Continue an in-progress module.** First row in any `NOTES.md`
    Module breakdown with `Status = in progress`. This is the default.
@@ -82,14 +95,20 @@ Pick exactly one task from the priority list, walking top to bottom:
    row to `Status = in progress` and commit that update so concurrent
    sessions don't double-start it.
 4. **Source ingestion or scaffolding.** If a text exists in `texts/`
-   with a filled-out `NOTES.md` but no populated `source/` directory,
-   do the source ingestion per the "Source ingestion" section of
-   `CONTRIBUTING.md`. Write `download.sh`. Verify the source is
-   readable.
+   with a filled-out `NOTES.md` but `source/` has neither a
+   `download.sh` nor any actual source content, do the source
+   ingestion per the "Source ingestion" section of `CONTRIBUTING.md`.
+   Write `download.sh`. Run it. Verify the source is readable. (If
+   `download.sh` already exists and ran successfully on a previous
+   pass, treat ingestion as done and fall through to item 5, even if
+   the current sandbox firewalls some hosts — that's an environmental
+   issue, not a project task.)
 5. **Read source material and propose new modules.** If none of the
    above apply, read deeper into a source text and add new module
-   rows to the Module breakdown. Add a brief justification under
-   each new row.
+   rows to the Module breakdown. Add a brief justification under each
+   new row. This is also the right step when the Module breakdown
+   table is empty after scaffolding/ingestion: read the source's
+   first chapter, then write the first batch of module rows.
 
 You may NOT autonomously:
 
@@ -127,29 +146,61 @@ Follow `CONTRIBUTING.md` strictly. Highlights:
 If you get stuck (source unclear, math doesn't check out, central
 concept resists visualization), do not push through with a guess. Write
 a "Blocker" entry in `NOTES.md` describing what you tried and why it
-didn't work. Commit it. Then pick a different task from the priority
-list.
+didn't work. Commit it. Then loop back to Step 2 and pick a different
+task from the priority list — getting stuck on one task is not a
+session-end signal.
 
-## Step 4: End the session cleanly
+When the task is finished (or you've recorded a blocker for it), commit
+and push. Then go back to Step 2 and pick the next task. Repeat until
+the stopping criteria in Step 4 are satisfied.
 
-Before ending:
+## Step 4: When to stop, and how to stop cleanly
+
+**Don't stop just because you finished a task.** Loop back to Step 2.
+The session ends only when one of these is true:
+
+- **No more tractable work on the priority list.** You walked items
+  1–5 and there's genuinely nothing actionable: no in-progress module,
+  no blocker you can address, no not-started module, ingestion is
+  done, and you've already proposed enough module rows in this session
+  that proposing more without doing them would be padding.
+- **Every remaining task needs human input.** You'd open the same
+  GitHub issue twice. Open it once and stop.
+- **Token / context budget is genuinely tight.** Not "I've been at
+  this a while" — actually tight, where another full task would risk
+  truncating mid-commit. Push what you have first.
+- **Repository state is clean and you've completed at least one
+  meaningful unit of work.** This is an *enabling* condition for
+  stopping, not a *trigger*. Never stop with uncommitted changes;
+  never stop right after Step 1 just because nothing was obviously
+  in progress (Step 2 item 5 is always available).
+
+A normal session goes through several priority-list passes. If a
+session ended after one pass, ask whether it really hit one of the
+above conditions or whether it just felt like a stopping point.
+
+When stopping for real, before exiting:
 
 1. All changes committed.
 2. `git push` to `main`.
 3. Relevant `NOTES.md` files updated: `Status`, `Last updated`, any
    blockers, any new proposed module rows.
-4. Append a session entry to `SESSIONS.md` at the repo root with this
-   format:
+4. Append **one** session entry to `SESSIONS.md` at the repo root
+   covering the whole session (not one per task) with this format:
 
    ```
    ## YYYY-MM-DD HH:MM (session by autonomous Claude)
 
-   - **Worked on:** texts/<slug>, module <slug>
-   - **What got done:** one or two sentences
-   - **What's next:** one sentence
+   - **Worked on:** texts/<slug>, module <slug> (list multiple if the
+     session touched several)
+   - **What got done:** two to four sentences covering the full
+     session, not just the last task
+   - **What's next:** one sentence; this is the handoff pointer the
+     next autonomous Claude will read first
    - **Blockers:** none, or brief description
    - **Proposed for approval:** any new module rows added with blank
      Human Approved
+   - **Why stopped:** which Step-4 criterion fired
    ```
 
 5. Final commit and push including the `SESSIONS.md` update.
