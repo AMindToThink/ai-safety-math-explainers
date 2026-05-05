@@ -191,13 +191,28 @@ there is no plan-approval gate. The "Human Review" column points to
 the GitHub issue tracking human review of the implementation, when one
 exists. Empty cell = no issue opened.
 
+Drafted after reading the ingested source (`source/book/extracted/fnt/*.tex`)
+in this session. One row per planned chapter, mirroring Albarghouthi's
+own chapter breakdown plus a bridging α,β-CROWN module that the 2021
+book pre-dates. Toy systems and active checks are *initial proposals*
+to be refined by whichever Claude takes the chapter.
+
 | Source location | Module slug | Toy system | Active check | Status | Human Review |
 |-----------------|-------------|------------|--------------|--------|--------------|
-|                 |             |            |              |        |              |
-
-The first pass through the module breakdown will be drafted after the
-parent reads Albarghouthi's Chapter 1 in full from the ingested source.
-That's the next session's job.
+| Ch 1 `beginning.tex` (A New Beginning) | `nnv-ch1-motivation` | Stop-sign-vs-cupboard adversarial photo; ACAS-Xu collision-avoidance spec | Predict-then-reveal: which Turing 1948/1949 paper seeded which thread? + drag-the-perturbation widget on a 2D toy classifier | not started | |
+| Ch 2 `semantics.tex` (Neural Networks as Graphs) | `nnv-ch2-nn-as-dag` | 2-input, 1-hidden-layer (2 ReLU) → 1-output ReLU net; reused throughout the companion | Construct-the-DAG: drag affine + ReLU nodes onto canvas, site verifies the resulting `outs(·)` matches a target piecewise-linear function | not started | |
+| Ch 3 `correctness.tex` (Correctness Properties) | `nnv-ch3-specs` | Same 2-2-1 ReLU net + an MNIST-3vs5 micro-classifier | Spec-writing exercise: translate an English property (robustness, monotonicity, ACAS-Xu turn-right) into a `{P}f{Q}` Hoare-style triple; site checks against a reference encoding | not started | |
+| Ch 4 `fol.tex` (Logics and Satisfiability) | `nnv-ch4-fol-lra` | 3-variable LRA formulas; the 2-2-1 net's encoding | SAT-or-counterexample: given a small LRA formula, click "SAT" with a model or "UNSAT" with a short proof outline | not started | |
+| Ch 5 `encodings.tex` (Encodings of Neural Networks) | `nnv-ch5-encoding` | 2-2-1 ReLU net; single ReLU node | Construct the MILP/LRA encoding of a node, then of a 2-layer net; site grades by SMT-equivalence on a small input grid | not started | |
+| Ch 6 `dp.tex` (DPLL Modulo Theories) | `nnv-ch6-dpll-t` | A 4-clause CNF + a tiny LRA theory atom set | Step-through DPLL(T) trace: pick the next decision/propagation/backjump; site validates each step | not started | |
+| Ch 7 `specialized.tex` (Neural Theory Solvers — Simplex / Reluplex) | `nnv-ch7-reluplex` | Simplex tableau on 3 vars; Reluplex case-split on a 2-2-1 net | Reluplex case-splitter game: pick which ReLU to split next, watch the SAT search tree shrink/explode | not started | |
+| Ch 8 `absint.tex` (Neural Interval Abstraction) | `nnv-ch8-intervals` | 2-2-1 ReLU net under interval bounds on a 2D ε-ball input | Drag the ε-ball, watch the interval bounds propagate; predict whether the output bound certifies robustness before the site reveals | not started | |
+| Ch 9 `numerical.tex` (Neural Zonotope Abstraction) | `nnv-ch9-zonotopes` | Same 2-2-1 net; zonotope of generators visualized in 2D | Construct-the-ReLU-transformer: pick the linear lower bound for the [l,u] ReLU case-split that minimizes the upper bound's area; site grades against the optimal | not started | |
+| Ch 10 `polyhedra.tex` (Neural Polyhedron Abstraction / DeepPoly) | `nnv-ch10-deeppoly` | Same 2-2-1 net; polyhedron viewed as a system of half-spaces | Adversarial-or-certificate verification game (the headline widget): given a 2-input net + ε-ball, the reader either constructs an adversarial input *or* a CROWN-style linear bound proving robustness; site grades both | not started | |
+| Ch 11 `absver.tex` (Verifying with Abstract Interpretation) | `nnv-ch11-end-to-end` | 2-2-1 net + a tiny MNIST-3vs5 with both ℓ∞ and ℓ₂ adversaries | End-to-end verification arena: pick a domain (interval / zonotope / polyhedra), watch precision-vs-runtime trade-off on a benchmark suite; predict-then-reveal on which domain certifies which spec | not started | |
+| Ch 12 `absintnn.tex` (Abstract Training) | `nnv-ch12-abstract-training` | Same 2-2-1 net; trained vs. abstract-trained side by side on a 2D dataset | Slider over (clean loss, robust loss) Pareto frontier; reader picks training schedule and watches certified accuracy on held-out ε-balls | not started | |
+| (Bridge — book pre-dates this) α,β-CROWN + branch-and-bound | `nnv-bridge-ab-crown` | Larger 5-input ReLU net; α/β tightening parameters as sliders | Pick splitting heuristics in branch-and-bound, race α,β-CROWN's defaults on a small VNN-COMP-style benchmark leaderboard | not started | |
+| Epilogue (`epilogue.tex`) — Lyapunov-NN / Safeguarded-AI capstone (open scope question) | `nnv-capstone-lyapunov` | Learned controller for a 2D inverted pendulum; Lyapunov function as a small NN | Construct a candidate Lyapunov NN, verifier checks the decreasing-along-trajectories condition via Part-III machinery | not started | |
 
 ## Pedagogical decisions
 
@@ -249,8 +264,10 @@ entry should cite the location and link the critique if one exists.
 
 - **Last updated:** 2026-05-05
 - **Chapters complete:** none
-- **Currently being drafted:** none — text just scaffolded; module
-  breakdown to be filled in after Chapter 1 is read in detail.
+- **Currently being drafted:** none yet. Module breakdown drafted in
+  this session after reading Part I in full from the ingested LaTeX
+  source plus skimming Parts II–III chapter headings. Awaiting human
+  approval on the row set before any chapter is started.
 - **Blockers:** none.
 
 ## Cross-references
