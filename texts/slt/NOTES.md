@@ -226,6 +226,7 @@ secondary toys are noted in the justification.
 | Source location | Module slug | Toy system | Active check | Status | Human Review |
 |-----------------|-------------|------------|--------------|--------|--------------|
 | DSLT 1 §Preliminaries (Carroll thesis Ch 2) | `dslt1-bayes-loss-landscape` | 1D & 2D polynomial K(w) (Examples 1.1, 1.2) | Pan a 2D K(w); identify W₀; predict whether it is a point, a curve, or an intersecting arrangement | drafted | |
+| DSLT 1 §Preliminaries + DSLT 2 §"Free Energy, Generalisation and Model Selection" / §"Animation 1" | `dslt1-singular-posterior` | Same polynomial K family from widget 1; slider on n | Drag n; predict the asymptotic posterior shape (Gaussian spike vs spread along W₀ vs preference for the lowest-local-RLCT singularity) | in progress | |
 | DSLT 1 §"What is a singular model?" | `dslt1-fisher-degeneracy` | Same polynomial K family + a 1-hidden-unit ReLU regressor for contrast | Compute I(w₀); classify regular vs strictly singular by det I(w₀) = 0 | not started | |
 | DSLT 1 §"Classical Bayesian inference breaks down" | `dslt1-bic-derivation` | Comparison K = w² (regular) vs K = w⁴ (singular) | Step through the BIC derivation; pinpoint the line that fails under degenerate I(w₀) | not started | |
 | DSLT 1 §"Dimensionality as a volume co-dimension" | `dslt1-volume-scaling-rlct` | 1D K(w) = w^(2k) and 2D normal-crossing K | Scrub ε; plot log V(ε) vs log ε; read slope = λ. Tune k so 2λ matches a target effective dimension | not started | |
@@ -239,6 +240,16 @@ secondary toys are noted in the justification.
   (K(w), W₀, posterior, free energy) before any RLCT machinery. Lets
   the reader internalise that the loss landscape's *level sets*, not
   just its *minima*, carry the information.
+- `dslt1-singular-posterior` — added 2026-05-05 at Matthew's
+  request. The singular posterior is the most visceral "this is
+  not your textbook Bayesian setting" demonstration: as $n \to
+  \infty$, regular posteriors spike to a Gaussian, but singular
+  posteriors trail along $W_0$ or split unevenly across
+  singularities by RLCT. Reuses the toy K family from widget 1 so
+  the reader's mental model of $K$ carries over directly. Borrows
+  the n-slider framing from DSLT 2 §Animation 1 but puts it in
+  Chapter 1's lap so the funkiness lands before the formal RLCT
+  derivation does.
 - `dslt1-fisher-degeneracy` — makes the operational definition of
   "singular" tangible: the reader computes a small Fisher matrix and
   reads off its rank. Includes a 1-hidden-unit ReLU example as a
