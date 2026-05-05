@@ -154,6 +154,32 @@ When the task is finished (or you've recorded a blocker for it), commit
 and push. Then go back to Step 2 and pick the next task. Repeat until
 the stopping criteria in Step 4 are satisfied.
 
+### Compacting mid-session
+
+If conversation context is getting full but the session still has
+productive work in front of it, run `/compact` rather than ending the
+session. After compaction continue developing widgets — but **re-read
+the relevant primary sources first**. Compaction summarises everything
+that has happened so far, so you keep the project context (which
+modules are drafted, what was decided) but you lose the verbatim source
+prose and the formula-by-formula understanding you built up by reading
+DSLT / Carroll / Watanabe end-to-end. Without reloading the source you
+will fabricate plausible-sounding but subtly-wrong notation, theorem
+numbers, and constants.
+
+Practically:
+
+1. Hit a clean stopping point: all changes committed and pushed,
+   `NOTES.md` and `SESSIONS.md` reflect current reality.
+2. Run `/compact`.
+3. Re-read whichever source files are relevant to the next module
+   from `texts/<slug>/source/` (the markdown extractions, Carroll's
+   `.txt`, and the arXiv `.tex` are the cheapest to load).
+4. Then loop back to Step 2 and continue.
+
+This is the recommended way to extend a productive session past a
+single context window.
+
 ## Step 4: When to stop, and how to stop cleanly
 
 **Don't stop just because you finished a task.** Loop back to Step 2.
