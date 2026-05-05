@@ -66,25 +66,47 @@ distillation passes that the Watanabe books deliberately omit.
 
 ## Source ingestion
 
-To be populated when `source/` is built. See
-`texts/slt/source/download.sh`.
+`texts/slt/source/download.sh` is the lockfile for the SLT corpus. See
+also `texts/slt/source/README.md` for the directory layout.
 
-- **Format(s) downloaded:** TBD (planned: arXiv LaTeX for DSLT entries
-  that have arXiv versions; HTML→pandoc→Markdown for Alignment Forum
-  posts; `git clone` for `devinterp`; PDFs of the Watanabe books left
-  out of automated download — manual procurement noted in
-  `download.sh`).
-- **Reconstruction command(s):** `texts/slt/source/download.sh` once
-  written.
-- **Chosen authoritative format for imports:** Watanabe books — PDF,
-  with `pdftotext -layout` extractions for grepping. DSLT and DevInterp
-  papers — LaTeX where possible, HTML→Markdown otherwise.
-- **Known extraction issues:** TBD. Expect Watanabe's heavy use of
-  algebraic-geometry notation (e.g., resolution-of-singularities
-  diagrams) to garble in `pdftotext`; keep PDFs around for figures.
+- **Format(s) downloaded:**
+  - HTML for the Carroll DSLT 0–4 posts (LessWrong / AlignmentForum /
+    GreaterWrong fallbacks) — converted to Markdown locally if
+    `pandoc` is installed.
+  - PDF for Carroll's MSc thesis (freely posted at
+    `therisingsea.org`) plus a `pdftotext -layout` extraction.
+  - `git clone` of `timaeus-research/devinterp` (MIT).
+  - LaTeX e-prints for selected DevInterp arXiv papers via
+    `arxiv.org/e-print/<id>`.
+  - HTML mirror of the same content from the Timaeus / DevInterp blog
+    (`timaeus.co` / `devinterp.com`), as backup and for the SLT
+    exercises page.
+- **Manually placed (not auto-downloaded):** Watanabe Grey Book and
+  Green Book PDFs — see `source/watanabe/README.md` for expected file
+  names. Cambridge / CRC copyright; not redistributable.
+- **Reconstruction command:** `bash texts/slt/source/download.sh`
+  (idempotent; tolerant of partial network failures).
+- **Chosen authoritative format for imports:** order of preference for
+  prose quotation is documented in `source/README.md`. Briefly:
+  Carroll thesis `.txt` extraction or DSLT markdown for the
+  distillation arc; arXiv LaTeX for DevInterp paper claims; Watanabe
+  PDFs (page-numbered) for the canonical theorem statements.
+- **Known extraction issues:**
+  - `pdftotext` will mangle Watanabe's algebraic-geometry diagrams
+    (resolution-of-singularities, blow-up illustrations); always keep
+    the PDFs around for figures.
+  - LessWrong HTML embeds MathJax; equations survive a `pandoc`
+    conversion to GFM but inline math sometimes loses surrounding
+    whitespace.
+  - Some sandboxed environments (e.g., the autonomous Claude session
+    that scaffolded this directory) firewall lesswrong.com,
+    arxiv.org, and the Timaeus blog. Run `download.sh` from a
+    machine with general internet egress to populate fully.
 - **Gitignored?** Yes. Repo-level `.gitignore` excludes
-  `texts/*/source/` except for `download.sh` and any explicitly
-  free-license file.
+  `texts/*/source/*` except for `download.sh` and `README.md`. Nested
+  READMEs inside subdirectories (e.g., `watanabe/README.md`,
+  `metauni/README.md`) are written by `download.sh` itself on each
+  run and stay gitignored — they're regenerated, not committed.
 
 ## Why this text matters for safety
 
