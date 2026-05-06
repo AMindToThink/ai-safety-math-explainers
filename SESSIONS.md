@@ -466,3 +466,53 @@ per session, newest at the bottom. See
   README, widget, smoke test, and grader correctness check all
   green. Continuing into Ch 3 would start a new unit of work on
   a different source section and is a natural session boundary.
+
+## 2026-05-06 (session — li-ch1-desiderata-tour)
+
+- **Worked on:** Module 2 of the Logical Induction Ch 1 batch:
+  the 17-desiderata compatibility tour. Picked off NOTES.md row
+  `li-ch1-desiderata-tour` per the prior session's "what's next".
+- **What got done:**
+  1. Re-read paper §1.1 in full
+     (`texts/logical-induction/source/paper/main.tex` lines 351–482)
+     to recover the verbatim list of 17 desiderata, their formal
+     glosses, and the closing impossibility paragraph
+     (Computable + Coherent + Gaifman incompatible; Sawin's
+     stronger result on Computable + Non-Dogmatism + Gaifman +
+     weak-Coherence).
+  2. Built `chapters/ch1-introduction/widgets/02-desiderata-tour.html`
+     — single-file D3 v7 + KaTeX widget, no build step. 17 chips in
+     a responsive grid with name + number + one-line gloss; click
+     to toggle membership; verdict panel reports either "no known
+     obstruction" (with a side-call when the subset is contained in
+     LI's own achievement set 1–12) or names the impossibility
+     tuple(s) hit, highlighting culprit chips in red. Buttons:
+     "Show what LI itself achieves" (preselects 1–12), "Clear",
+     "Select all 17". Footnote spells out the
+     no-known-obstruction ≠ jointly-realised caveat.
+  3. Syntax-checked the inline script with `node --check` — passed.
+  4. Updated `chapters/ch1-introduction/README.md` Modules table
+     to mark module 2 `drafted` and link the file.
+  5. Updated `NOTES.md` row to `drafted` with a corrected source
+     pointer (§1.1, not "§1 + Table 1").
+  6. Opened Human Review issue
+     [#13](https://github.com/AMindToThink/ai-safety-math-explainers/issues/13)
+     with `review` + `logical-induction` labels; flagged three
+     specific things to scrutinise (gloss fidelity, the LI-achieves
+     list, weak-vs-full Coherence in Sawin's tuple).
+  7. Linked #13 from the NOTES.md row.
+- **Commits / push:** `247ad74` (widget + README + NOTES) and
+  `5beed60` (link #13 from NOTES). Pushed to origin/main.
+- **What's next:** Best candidates, in order of payoff —
+  1. `li-ch2-continuity-paradox` (the χ self-referential sentence,
+     toggle continuous vs discontinuous strategies, Brouwer fixed
+     point). High payoff: continuity is the central technical
+     lever of §3.4 and the most counterintuitive chapter-2 idea.
+  2. `li-ch2-deductive-process` (drag $n$, watch p.c.-worlds get
+     ruled out by `dt_n`). Lower payoff but a natural visual.
+  3. `li-ch4-lia-walkthrough` — the natural place to cash in the
+     Flint port candidates listed in NOTES.md.
+- **Blockers:** none.
+- **Why stopped:** clean unit boundary — widget, README, NOTES,
+  review issue all aligned and pushed. Continuing into Ch 2 starts
+  a new source section.
