@@ -1,0 +1,515 @@
+<!--
+  Widget: nnv-ch2-construct-the-dag (module 1 of nn-verification Ch 2,
+          "Neural Networks as Graphs").
+  Source: Albarghouthi (2021) Ch 2, semantics.tex (arXiv:2109.10317).
+          Esp. §2.5 (DAG semantics, recursive outs(.)) and §2.6
+          (piecewise-linearity of ReLU networks).
+  Toy system: 2-input, 1-hidden-layer (2 ReLU), 1-output ReLU MLP.
+              The canonical network for this companion.
+  Active check: construct-the-DAG. Reader picks weights for the
+                hidden + output nodes, the site evaluates outs(.) on
+                a grid and grades agreement with the target PWL
+                function. The reveal explains why the target factors
+                as a sum of two ReLU pieces in exactly the way it
+                does.
+
+  Standalone: open this .html directly in a browser. Uses D3 v7 and
+              KaTeX from CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NN Verification · Ch 2 · Construct the DAG</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; --soft:#eef3f8; --line:#d9e0e7; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 1040px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: var(--soft); border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.6rem; align-items: start; margin-top: 0.5rem; }
+  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+  .panel { border: 1px solid var(--line); border-radius: 6px; padding: 0.9rem 1rem; background: #fff; }
+  .panel h3 { margin: 0 0 0.5rem 0; font-size: 0.98rem; }
+  svg.plot { background: #fff; border: 1px solid var(--line); border-radius: 4px; display: block; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  table.weights { border-collapse: collapse; margin: 0.4rem 0; font-size: 0.92rem; }
+  table.weights th, table.weights td { border: 1px solid var(--line); padding: 0.25rem 0.5rem; text-align: center; }
+  table.weights th { background: var(--soft); font-weight: 500; color: var(--muted); }
+  table.weights input[type=number] { width: 4.5rem; font: inherit; padding: 0.15rem 0.3rem; border: 1px solid var(--line); border-radius: 3px; text-align: right; }
+  .controls { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin: 0.6rem 0; }
+  select, button { font: inherit; padding: 0.35rem 0.7rem; border: 1px solid var(--line); border-radius: 4px; background: #fff; cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:hover { background: #1f5a92; }
+  button:hover { background: var(--soft); }
+  .verdict { padding: 0.6rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; font-weight: 500; }
+  .verdict.ok { background: #ecfdf3; color: var(--good); border-left: 4px solid var(--good); }
+  .verdict.bad { background: #fef3f2; color: var(--bad); border-left: 4px solid var(--bad); }
+  .verdict.idle { background: var(--soft); color: var(--muted); border-left: 4px solid var(--line); }
+  .reveal { padding: 0.7rem 0.9rem; border-radius: 4px; margin-top: 0.8rem; font-size: 0.95rem; background: var(--soft); border-left: 4px solid var(--accent); display: none; }
+  .reveal.shown { display: block; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  .legend { display: flex; gap: 0.6rem; align-items: center; font-size: 0.86rem; color: var(--muted); margin-top: 0.3rem; }
+  .legend .swatch { width: 96px; height: 10px; border-radius: 2px; background: linear-gradient(to right, #f7fbff, #08306b); border: 1px solid var(--line); }
+  .dag-svg text { font-family: inherit; font-size: 12px; }
+  .dag-svg .node-circle { stroke: var(--ink); stroke-width: 1.4; }
+  .dag-svg .edge { stroke: var(--muted); stroke-width: 1.2; fill: none; marker-end: url(#arrow); }
+  .dag-svg .edge-label { fill: var(--muted); font-size: 11px; }
+</style>
+</head>
+<body>
+
+<h1>Construct the DAG</h1>
+<p class="subtitle">
+  NN Verification · Chapter 2 · companion to Albarghouthi (2021) §2.5–2.6.
+</p>
+
+<div class="lede">
+  <p style="margin: 0;">
+    Albarghouthi defines a neural network as a directed acyclic graph
+    $G = (V, E)$ in which every non-input node $v$ carries a function
+    $f_v : \mathbb{R}^{n_v} \to \mathbb{R}$ and the network's value
+    at each node is given recursively by
+    $\mathrm{outs}(v) = f_v(\mathrm{outs}(v_1), \ldots,
+    \mathrm{outs}(v_{n_v}))$.
+    Below is the canonical 2-2-1 ReLU network that this companion
+    will reuse in every later chapter, drawn as a DAG with empty
+    weight slots. The right-hand panel shows a target piecewise-linear
+    function on the input square $[-2, 2]^2$. <strong>Fill in the
+    weights so that your network's <code>outs(y)</code> matches the
+    target on every grid point.</strong>
+  </p>
+</div>
+
+<div class="controls" style="margin-top: 1rem;">
+  <label for="target">Target function:</label>
+  <select id="target">
+    <option value="sum-relus">$y = \mathrm{ReLU}(x_1) + \mathrm{ReLU}(x_2)$ (warm-up)</option>
+    <option value="abs-sum" selected>$y = \mathrm{ReLU}(x_1+x_2) + \mathrm{ReLU}(x_1-x_2)$ (canonical)</option>
+    <option value="ridge">$y = \mathrm{ReLU}(2x_1 + x_2 - 1)$ (single-ReLU ridge; use only one hidden node)</option>
+  </select>
+  <button id="check" class="primary">Check my DAG</button>
+  <button id="reveal-btn">Reveal canonical answer</button>
+  <button id="reset">Reset weights</button>
+</div>
+
+<div class="layout">
+
+  <div class="panel">
+    <h3>Your DAG</h3>
+    <svg class="dag-svg" id="dag" viewBox="0 0 460 280" width="100%" height="280" aria-label="Neural network DAG with editable weights"></svg>
+
+    <p style="margin: 0.6rem 0 0.2rem 0; font-size: 0.92rem; color: var(--muted);">
+      Hidden-layer affine weights $a_j = w^{(j)}_1 x_1 + w^{(j)}_2 x_2 + b^{(j)}$:
+    </p>
+    <table class="weights" id="hidden-weights">
+      <thead>
+        <tr><th></th><th>$w_1$</th><th>$w_2$</th><th>$b$</th></tr>
+      </thead>
+      <tbody>
+        <tr><th>$a_1 \to h_1$</th>
+          <td><input type="number" step="0.5" data-w="W1.0"></td>
+          <td><input type="number" step="0.5" data-w="W1.1"></td>
+          <td><input type="number" step="0.5" data-w="W1.2"></td></tr>
+        <tr><th>$a_2 \to h_2$</th>
+          <td><input type="number" step="0.5" data-w="W2.0"></td>
+          <td><input type="number" step="0.5" data-w="W2.1"></td>
+          <td><input type="number" step="0.5" data-w="W2.2"></td></tr>
+      </tbody>
+    </table>
+
+    <p style="margin: 0.6rem 0 0.2rem 0; font-size: 0.92rem; color: var(--muted);">
+      Output mixing $y = c_1 h_1 + c_2 h_2 + b_y$:
+    </p>
+    <table class="weights" id="out-weights">
+      <thead>
+        <tr><th></th><th>$c_1$</th><th>$c_2$</th><th>$b_y$</th></tr>
+      </thead>
+      <tbody>
+        <tr><th>$y$</th>
+          <td><input type="number" step="0.5" data-w="C.0"></td>
+          <td><input type="number" step="0.5" data-w="C.1"></td>
+          <td><input type="number" step="0.5" data-w="C.2"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Output surfaces on $[-2, 2]^2$</h3>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+      <div>
+        <div style="font-size: 0.86rem; color: var(--muted); margin-bottom: 0.2rem;">Target $y^\star(x_1, x_2)$</div>
+        <svg id="target-plot" viewBox="0 0 220 220" width="100%"></svg>
+      </div>
+      <div>
+        <div style="font-size: 0.86rem; color: var(--muted); margin-bottom: 0.2rem;">Your $\mathrm{outs}(y)$</div>
+        <svg id="user-plot" viewBox="0 0 220 220" width="100%"></svg>
+      </div>
+    </div>
+    <div class="legend"><span>0</span><span class="swatch"></span><span id="legend-max">max</span></div>
+    <div id="verdict" class="verdict idle">Pick weights and press <em>Check my DAG</em>.</div>
+    <div id="reveal" class="reveal"></div>
+  </div>
+</div>
+
+<div class="footnote">
+  <p>
+    Reference: Albarghouthi, <em>Introduction to Neural Network Verification</em>,
+    Ch 2 (arXiv:<a href="https://arxiv.org/abs/2109.10317">2109.10317</a>).
+    The DAG semantics are §2.5; the piecewise-linear-functions
+    discussion that justifies the &ldquo;target factors as a small
+    sum of ReLU pieces&rdquo; framing is §2.6.
+    For an interactive primer on universal approximation that motivates
+    the existence of <em>some</em> ReLU expression for any continuous
+    target, see <a href="http://neuralnetworksanddeeplearning.com/chap4.html">Nielsen Ch 4</a>.
+  </p>
+  <p>
+    Why these three targets? <code>sum-relus</code> uses the identity
+    weight matrix and rules out the trap of always reaching for the
+    canonical $(1,1)/(1,-1)$ split. <code>abs-sum</code> is the
+    network this companion reuses in every later chapter — its four
+    activation patterns split $[-2,2]^2$ into four linear pieces,
+    which is what the abstract domains of Part III approximate.
+    <code>ridge</code> illustrates that a piecewise-linear target with
+    a single &ldquo;kink&rdquo; only needs one ReLU, even though the
+    architecture has two hidden units (set the unused weights to zero).
+  </p>
+</div>
+
+<script>
+"use strict";
+
+// --- Toy network -----------------------------------------------------------
+// Architecture: x in R^2 -> a = W x + b in R^2 -> h = ReLU(a) in R^2
+//               -> y = c . h + b_y in R.
+// W is 2x3 with the bias column; C is length 3 (two coefs + bias).
+
+const relu = (x) => Math.max(0, x);
+
+function evalNet(x1, x2, W, C) {
+  const a1 = W[0][0] * x1 + W[0][1] * x2 + W[0][2];
+  const a2 = W[1][0] * x1 + W[1][1] * x2 + W[1][2];
+  const h1 = relu(a1);
+  const h2 = relu(a2);
+  return C[0] * h1 + C[1] * h2 + C[2];
+}
+
+// --- Targets ---------------------------------------------------------------
+const TARGETS = {
+  "sum-relus": {
+    fn: (x1, x2) => relu(x1) + relu(x2),
+    canonical: { W: [[1, 0, 0], [0, 1, 0]], C: [1, 1, 0] },
+    blurb: "<strong>Canonical answer.</strong> The target is already a sum of two ReLU pieces, " +
+           "each touching only one input. The hidden affine layer is the identity: " +
+           "$a_1 = x_1$, $a_2 = x_2$. The output mixes $h_1, h_2$ with coefficients $1, 1$. " +
+           "There are infinitely many other answers — e.g., swap rows 1 and 2 — but every " +
+           "valid answer must produce the same <code>outs(y)</code> on every input."
+  },
+  "abs-sum": {
+    fn: (x1, x2) => relu(x1 + x2) + relu(x1 - x2),
+    canonical: { W: [[1, 1, 0], [1, -1, 0]], C: [1, 1, 0] },
+    blurb: "<strong>Canonical answer.</strong> The target factors as " +
+           "$\\mathrm{ReLU}(x_1+x_2) + \\mathrm{ReLU}(x_1-x_2)$, so the two hidden affine " +
+           "rows are $(1, 1, 0)$ and $(1, -1, 0)$, and the output mixing is $(1, 1, 0)$. " +
+           "On the four sign-quadrants of $(x_1+x_2, x_1-x_2)$ the network simplifies to a " +
+           "different linear function — these are the four <em>activation patterns</em> of " +
+           "the ReLU layer, and they are exactly the linear pieces that the abstract " +
+           "domains of Part III will approximate."
+  },
+  "ridge": {
+    fn: (x1, x2) => relu(2 * x1 + x2 - 1),
+    canonical: { W: [[2, 1, -1], [0, 0, 0]], C: [1, 0, 0] },
+    blurb: "<strong>Canonical answer.</strong> One ReLU is enough: $a_1 = 2 x_1 + x_2 - 1$, " +
+           "$a_2 = 0$ (unused). The output is $c_1 = 1$, $c_2 = 0$. This illustrates two " +
+           "things. First, an architecture is an <em>upper bound</em> on the target's " +
+           "complexity, not a tight description; second, the dead ReLU $a_2$ is a hidden " +
+           "trap for verifiers — it is provably zero on all inputs but a generic SMT " +
+           "encoding still introduces a case-split for it (Ch 5)."
+  }
+};
+
+// --- DOM refs --------------------------------------------------------------
+const inputs = Array.from(document.querySelectorAll('input[data-w]'));
+const targetSel = document.getElementById('target');
+const checkBtn = document.getElementById('check');
+const revealBtn = document.getElementById('reveal-btn');
+const resetBtn = document.getElementById('reset');
+const verdictEl = document.getElementById('verdict');
+const revealEl = document.getElementById('reveal');
+const legendMaxEl = document.getElementById('legend-max');
+
+function readWeights() {
+  const W = [[0, 0, 0], [0, 0, 0]];
+  const C = [0, 0, 0];
+  for (const inp of inputs) {
+    const [tag, idx] = inp.dataset.w.split('.');
+    const v = inp.value === '' ? NaN : parseFloat(inp.value);
+    if (tag === 'W1') W[0][parseInt(idx)] = v;
+    else if (tag === 'W2') W[1][parseInt(idx)] = v;
+    else if (tag === 'C') C[parseInt(idx)] = v;
+  }
+  return { W, C };
+}
+
+function setWeights(W, C) {
+  for (const inp of inputs) {
+    const [tag, idx] = inp.dataset.w.split('.');
+    const i = parseInt(idx);
+    if (tag === 'W1') inp.value = W[0][i];
+    else if (tag === 'W2') inp.value = W[1][i];
+    else if (tag === 'C') inp.value = C[i];
+  }
+}
+
+function clearWeights() {
+  for (const inp of inputs) inp.value = '';
+}
+
+// --- Plotting --------------------------------------------------------------
+const PLOT_SIZE = 220;
+const PAD = 28;
+const GRID_N = 41; // 41x41 grid for plotting and grading
+
+function plotSurface(svgEl, fn, sharedMax) {
+  const svg = d3.select(svgEl);
+  svg.selectAll('*').remove();
+
+  const xs = d3.range(GRID_N).map(i => -2 + (4 * i) / (GRID_N - 1));
+  const cells = [];
+  let minV = Infinity, maxV = -Infinity;
+  for (let i = 0; i < GRID_N; i++) {
+    for (let j = 0; j < GRID_N; j++) {
+      const v = fn(xs[i], xs[j]);
+      cells.push({ i, j, x1: xs[i], x2: xs[j], v });
+      if (Number.isFinite(v)) {
+        if (v < minV) minV = v;
+        if (v > maxV) maxV = v;
+      }
+    }
+  }
+  const lo = Math.min(0, minV);
+  const hi = sharedMax !== undefined ? sharedMax : Math.max(0.001, maxV);
+  const color = d3.scaleSequential(d3.interpolateBlues).domain([lo, hi]);
+
+  const innerW = PLOT_SIZE - 2 * PAD;
+  const innerH = PLOT_SIZE - 2 * PAD;
+  const cellW = innerW / GRID_N;
+  const cellH = innerH / GRID_N;
+
+  const g = svg.append('g').attr('transform', `translate(${PAD},${PAD})`);
+  g.selectAll('rect').data(cells).enter().append('rect')
+    .attr('x', d => d.i * cellW)
+    .attr('y', d => innerH - (d.j + 1) * cellH)
+    .attr('width', cellW + 0.5)
+    .attr('height', cellH + 0.5)
+    .attr('fill', d => Number.isFinite(d.v) ? color(d.v) : '#fff5f5');
+
+  // Axes
+  const xScale = d3.scaleLinear().domain([-2, 2]).range([0, innerW]);
+  const yScale = d3.scaleLinear().domain([-2, 2]).range([innerH, 0]);
+  g.append('g').attr('class', 'axis').attr('transform', `translate(0,${innerH})`)
+    .call(d3.axisBottom(xScale).ticks(5));
+  g.append('g').attr('class', 'axis').call(d3.axisLeft(yScale).ticks(5));
+  g.append('text').attr('class', 'axis-label').attr('x', innerW).attr('y', innerH + 22).attr('text-anchor', 'end').text('x₁');
+  g.append('text').attr('class', 'axis-label').attr('x', -4).attr('y', -8).attr('text-anchor', 'start').text('x₂');
+  return { lo, hi };
+}
+
+// --- DAG diagram with weight labels ---------------------------------------
+function renderDAG() {
+  const svg = d3.select('#dag');
+  svg.selectAll('*').remove();
+
+  const defs = svg.append('defs');
+  defs.append('marker').attr('id', 'arrow')
+    .attr('viewBox', '0 -5 10 10').attr('refX', 8).attr('refY', 0)
+    .attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto')
+    .append('path').attr('d', 'M0,-4L8,0L0,4').attr('fill', '#52606d');
+
+  const nodes = [
+    { id: 'x1', x: 40, y: 80, label: 'x₁', kind: 'input' },
+    { id: 'x2', x: 40, y: 200, label: 'x₂', kind: 'input' },
+    { id: 'a1', x: 170, y: 80, label: 'a₁', kind: 'affine' },
+    { id: 'a2', x: 170, y: 200, label: 'a₂', kind: 'affine' },
+    { id: 'h1', x: 280, y: 80, label: 'h₁\nReLU', kind: 'relu' },
+    { id: 'h2', x: 280, y: 200, label: 'h₂\nReLU', kind: 'relu' },
+    { id: 'y', x: 410, y: 140, label: 'y', kind: 'output' }
+  ];
+  const fillFor = { input: '#fde2e4', affine: '#dde7f5', relu: '#cfe8d8', output: '#f9e6c4' };
+  const edges = [
+    ['x1', 'a1'], ['x2', 'a1'],
+    ['x1', 'a2'], ['x2', 'a2'],
+    ['a1', 'h1'], ['a2', 'h2'],
+    ['h1', 'y'], ['h2', 'y']
+  ];
+
+  const nodeMap = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const g = svg.append('g');
+  for (const [s, t] of edges) {
+    const a = nodeMap[s], b = nodeMap[t];
+    g.append('path').attr('class', 'edge')
+      .attr('d', `M${a.x + 18},${a.y} L${b.x - 22},${b.y}`);
+  }
+  for (const n of nodes) {
+    g.append('circle').attr('class', 'node-circle')
+      .attr('cx', n.x).attr('cy', n.y).attr('r', 22)
+      .attr('fill', fillFor[n.kind]);
+    const lines = n.label.split('\n');
+    lines.forEach((ln, i) => {
+      g.append('text').attr('x', n.x).attr('y', n.y + 4 + (i - (lines.length - 1) / 2) * 12)
+        .attr('text-anchor', 'middle').attr('font-size', 11).text(ln);
+    });
+  }
+  // Legend strip under the DAG
+  const legend = svg.append('g').attr('transform', 'translate(20, 252)');
+  const items = [
+    { label: 'input', kind: 'input' },
+    { label: 'affine', kind: 'affine' },
+    { label: 'ReLU', kind: 'relu' },
+    { label: 'output', kind: 'output' }
+  ];
+  items.forEach((it, i) => {
+    const dx = i * 100;
+    legend.append('rect').attr('x', dx).attr('y', 0).attr('width', 14).attr('height', 10)
+      .attr('fill', fillFor[it.kind]).attr('stroke', '#1f2933');
+    legend.append('text').attr('x', dx + 18).attr('y', 9).attr('font-size', 11).text(it.label);
+  });
+}
+
+// --- Grading ---------------------------------------------------------------
+function gradeDAG(targetFn, W, C) {
+  // Validate weights
+  for (const row of W) for (const v of row) if (!Number.isFinite(v)) return { ok: false, reason: 'Some hidden-layer weights are blank or non-numeric.' };
+  for (const v of C) if (!Number.isFinite(v)) return { ok: false, reason: 'Some output weights are blank or non-numeric.' };
+  const TOL = 1e-6;
+  let maxErr = 0;
+  let worst = null;
+  const xs = d3.range(GRID_N).map(i => -2 + (4 * i) / (GRID_N - 1));
+  for (let i = 0; i < GRID_N; i++) {
+    for (let j = 0; j < GRID_N; j++) {
+      const x1 = xs[i], x2 = xs[j];
+      const ty = targetFn(x1, x2);
+      const uy = evalNet(x1, x2, W, C);
+      const e = Math.abs(ty - uy);
+      if (e > maxErr) { maxErr = e; worst = { x1, x2, ty, uy }; }
+    }
+  }
+  return { ok: maxErr < TOL, maxErr, worst };
+}
+
+// --- Wire it up ------------------------------------------------------------
+function refreshTargetPlot() {
+  const targetKey = targetSel.value;
+  const fn = TARGETS[targetKey].fn;
+  // Compute target's max for shared color scale
+  const xs = d3.range(GRID_N).map(i => -2 + (4 * i) / (GRID_N - 1));
+  let hi = 0;
+  for (const a of xs) for (const b of xs) hi = Math.max(hi, fn(a, b));
+  hi = Math.max(0.001, hi);
+  plotSurface(document.getElementById('target-plot'), fn, hi);
+  // User plot also needs the shared scale; render zero net on first load
+  const { W, C } = readWeights();
+  const valid = W.flat().every(Number.isFinite) && C.every(Number.isFinite);
+  const userFn = valid ? (a, b) => evalNet(a, b, W, C) : () => 0;
+  plotSurface(document.getElementById('user-plot'), userFn, hi);
+  legendMaxEl.textContent = hi.toFixed(2);
+  return hi;
+}
+
+function refreshUserPlot(sharedMax) {
+  const { W, C } = readWeights();
+  const valid = W.flat().every(Number.isFinite) && C.every(Number.isFinite);
+  const userFn = valid ? (a, b) => evalNet(a, b, W, C) : () => 0;
+  plotSurface(document.getElementById('user-plot'), userFn, sharedMax);
+}
+
+let sharedMax = 1;
+
+function onWeightsChange() {
+  refreshUserPlot(sharedMax);
+  verdictEl.className = 'verdict idle';
+  verdictEl.innerHTML = 'Pick weights and press <em>Check my DAG</em>.';
+}
+
+function onTargetChange() {
+  clearWeights();
+  sharedMax = refreshTargetPlot();
+  revealEl.classList.remove('shown');
+  verdictEl.className = 'verdict idle';
+  verdictEl.innerHTML = 'Pick weights and press <em>Check my DAG</em>.';
+}
+
+function onCheck() {
+  const { W, C } = readWeights();
+  const targetKey = targetSel.value;
+  const result = gradeDAG(TARGETS[targetKey].fn, W, C);
+  refreshUserPlot(sharedMax);
+  if (result.reason) {
+    verdictEl.className = 'verdict bad';
+    verdictEl.textContent = result.reason;
+    return;
+  }
+  if (result.ok) {
+    verdictEl.className = 'verdict ok';
+    verdictEl.textContent = `Match. Worst-case error on the 41×41 grid is ${result.maxErr.toExponential(2)} — within floating-point tolerance.`;
+  } else {
+    verdictEl.className = 'verdict bad';
+    const w = result.worst;
+    verdictEl.innerHTML = `Mismatch. Worst-case error <strong>${result.maxErr.toFixed(3)}</strong> at $(x_1, x_2) = (${w.x1.toFixed(2)}, ${w.x2.toFixed(2)})$: target ${w.ty.toFixed(3)}, your network ${w.uy.toFixed(3)}.`;
+    if (window.renderMathInElement) renderMathInElement(verdictEl);
+  }
+}
+
+function onReveal() {
+  const targetKey = targetSel.value;
+  const t = TARGETS[targetKey];
+  setWeights(t.canonical.W, t.canonical.C);
+  refreshUserPlot(sharedMax);
+  revealEl.classList.add('shown');
+  revealEl.innerHTML = t.blurb;
+  if (window.renderMathInElement) renderMathInElement(revealEl);
+  // Trigger a check so the verdict reflects the canonical answer.
+  onCheck();
+}
+
+function onReset() {
+  clearWeights();
+  refreshUserPlot(sharedMax);
+  revealEl.classList.remove('shown');
+  verdictEl.className = 'verdict idle';
+  verdictEl.innerHTML = 'Pick weights and press <em>Check my DAG</em>.';
+}
+
+inputs.forEach(inp => inp.addEventListener('input', onWeightsChange));
+targetSel.addEventListener('change', onTargetChange);
+checkBtn.addEventListener('click', onCheck);
+revealBtn.addEventListener('click', onReveal);
+resetBtn.addEventListener('click', onReset);
+
+renderDAG();
+sharedMax = refreshTargetPlot();
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.renderMathInElement) {
+    renderMathInElement(document.body, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "$", right: "$", display: false }
+      ],
+      throwOnError: false
+    });
+  }
+});
+</script>
+
+</body>
+</html>

@@ -407,3 +407,62 @@ per session, newest at the bottom. See
   LIA-walkthrough widget. Continuing into a new module would
   start a different unit of work; better to stop on a clean
   boundary.
+
+## 2026-05-06 21:15 (session — first nn-verification chapter)
+
+- **Worked on:** Picked `nnv-ch2-nn-as-dag` off the module
+  breakdown drafted in the previous session and shipped its first
+  deliverable. Chose Ch 2 over Ch 1 because the DAG-semantics
+  section is the load-bearing formalism that every later chapter
+  reuses, and because the canonical 2-2-1 ReLU toy network needed
+  to be pinned down concretely before Parts II / III chapters can
+  refer back to it.
+- **What got done:**
+  1. Re-read `texts/nn-verification/source/book/extracted/fnt/semantics.tex`
+     in full (613 lines) to ground the chapter in the source's own
+     language — DAG $G = (V, E)$ with per-node $f_v : \mathbb{R}^{n_v}
+     \to \mathbb{R}$, recursive `outs(·)`, structural well-formedness
+     conditions, piecewise-linearity, monotonicity.
+  2. Flipped the `nnv-ch2-nn-as-dag` row in
+     `texts/nn-verification/NOTES.md` to status `in progress` and
+     refreshed the Status block to point at this chapter as the
+     currently-drafting unit.
+  3. Created `texts/nn-verification/chapters/nnv-ch2-nn-as-dag/`
+     with a chapter `README.md` that pins down (a) why DAG
+     semantics matter for verification, (b) reading order through
+     §2.1–§2.6, (c) the canonical 2-input → 2-ReLU-hidden → 1-output
+     toy network with explicit affine weights, and (d) the active
+     check.
+  4. Built the construct-the-DAG widget at
+     `widgets/01-construct-the-dag.html`: standalone HTML using
+     D3 v7 + KaTeX from CDN, no build step. The reader picks the
+     hidden-layer affine weights $(w_1, w_2, b)$ for two ReLU nodes
+     plus output mixing $(c_1, c_2, b_y)$, and the site grades by
+     evaluating `outs(·)` on a 41×41 grid against one of three
+     target piecewise-linear functions: $\mathrm{ReLU}(x_1) +
+     \mathrm{ReLU}(x_2)$ (warm-up), $\mathrm{ReLU}(x_1+x_2) +
+     \mathrm{ReLU}(x_1-x_2)$ (the canonical companion network), and
+     $\mathrm{ReLU}(2x_1 + x_2 - 1)$ (single-ReLU ridge — illustrates
+     dead nodes). Side-by-side D3 heatmaps, "Reveal canonical answer"
+     button auto-fills weights and explains the construction.
+  5. Smoke-tested via `scripts/widget-smoke-test.py` — passed
+     (no console / page errors).
+  6. Wrote a one-shot interactive Playwright check that verified
+     the grader correctly accepts each canonical answer (max grid
+     error 0.00e+0) and rejects the all-zeros network on the
+     canonical target (worst-case error 4.0 at $(2, -2)$). PASS.
+- **What's next:** `nnv-ch3-specs` (Hoare-style spec-writing
+  exercise on the same toy network), or — if a more visual
+  on-ramp is preferred — `nnv-ch1-motivation` (Turing 1948/1949
+  reveal + drag-the-perturbation widget). Ch 3 has the higher
+  pedagogical payoff because it is the prerequisite for every
+  Part-II encoding chapter and the verification literature
+  consistently cites spec-writing as the underemphasised skill.
+- **Blockers:** none.
+- **Proposed for approval:** the `nnv-ch2-nn-as-dag` chapter
+  README + widget. Human review issue not yet opened (the Module
+  breakdown row's Human Review column is still blank).
+- **Why stopped:** chapter is a clean, self-contained unit —
+  README, widget, smoke test, and grader correctness check all
+  green. Continuing into Ch 3 would start a new unit of work on
+  a different source section and is a natural session boundary.
