@@ -1,0 +1,305 @@
+<!--
+  Widget: li-ch1-desiderata-tour (module 2 of the Logical Induction Ch 1
+          batch, "Introduction").
+  Source: Garrabrant et al. (2016) §1.1 "Desiderata for Reasoning under
+          Logical Uncertainty" (arXiv:1609.03543v3, pp. 5-9). The
+          seventeen desiderata, with the impossibility paragraph at the
+          end of the section: {Computable, Coherent, Gaifman} are
+          jointly inconsistent, and Sawin (2013) showed that even
+          {Computable, Non-Dogmatism, Gaifman, weak Coherence} is.
+  Toy system: the 17 desiderata as a clickable chip grid; a subset is
+              "achievable" iff it does not contain any of the known
+              impossibility tuples.
+  Active check: build a subset of desiderata; the widget reports
+                whether the subset is achievable, and if not, names
+                the impossibility result that rules it out.
+
+  Standalone: open this .html directly in a browser. Uses D3 v7 and
+              KaTeX from CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Logical Induction · Ch 1 · Tour of the 17 desiderata</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 920px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .panel-note { color: var(--muted); font-size: 0.92rem; margin-top: 0.4rem; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  .panel { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.8rem 1rem; }
+  blockquote.quote { border-left: 3px solid var(--accent); margin: 0.8rem 0; padding: 0.4rem 0.9rem; background: #fafbfc; font-size: 0.94rem; }
+
+  .chip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.5rem; margin: 0.6rem 0 0.8rem; }
+  .chip { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.55rem 0.7rem; border: 1px solid #c9d3df; background: #fff; border-radius: 6px; cursor: pointer; user-select: none; transition: all 0.12s; }
+  .chip:hover { border-color: var(--accent); background: #f4f8fc; }
+  .chip.selected { border-color: var(--accent); background: #e6effa; box-shadow: inset 0 0 0 1px var(--accent); }
+  .chip.culprit { border-color: var(--bad); background: #fdecec; box-shadow: inset 0 0 0 1px var(--bad); }
+  .chip-name { font-weight: 600; font-size: 0.9rem; color: var(--ink); }
+  .chip-num { color: var(--muted); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+  .chip-blurb { color: var(--muted); font-size: 0.82rem; line-height: 1.35; }
+
+  .verdict { padding: 0.85rem 1rem; border-radius: 6px; margin: 0.8rem 0; font-size: 0.95rem; border-left: 4px solid var(--muted); background: #f4f6f8; }
+  .verdict.ok { border-left-color: var(--good); background: #ecfdf3; }
+  .verdict.bad { border-left-color: var(--bad); background: #fdecec; }
+  .verdict.empty { border-left-color: var(--muted); background: #f4f6f8; }
+  .verdict-headline { font-weight: 600; margin-bottom: 0.3rem; }
+
+  .controls-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.4rem 0 0.6rem; }
+  button.btn { background: #fff; border: 1px solid #c9d3df; color: var(--ink); border-radius: 4px; padding: 0.4rem 0.75rem; cursor: pointer; font-size: 0.88rem; }
+  button.btn:hover { background: #eef3f8; border-color: var(--accent); }
+  button.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.btn.primary:hover { background: #1e4f85; }
+
+  .legend { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: var(--muted); margin: 0.4rem 0 0.6rem; }
+  .legend .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: middle; margin-right: 0.3rem; border: 1px solid; }
+
+  details { margin: 0.5rem 0; }
+  details summary { cursor: pointer; font-weight: 600; color: var(--accent); padding: 0.3rem 0; }
+  details[open] summary { margin-bottom: 0.4rem; }
+
+  .imp-list { font-size: 0.92rem; }
+  .imp-list li { margin: 0.3rem 0; }
+  .imp-tag { display: inline-block; padding: 0.05rem 0.4rem; background: #fdecec; color: var(--bad); border-radius: 3px; font-size: 0.78rem; font-weight: 600; margin-right: 0.3rem; }
+</style>
+</head>
+<body>
+
+<h1>The 17 desiderata: which combinations are achievable?</h1>
+<p class="subtitle">Logical Induction companion · widget 2 of the Ch 1 batch on <a href="https://arxiv.org/abs/1609.03543">Garrabrant et&nbsp;al. (2016) §1.1</a></p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=5">Garrabrant et&nbsp;al. (2016) §1.1 "Desiderata for Reasoning under Logical Uncertainty"</a> — the verbatim list of seventeen, plus the closing impossibility paragraph (p. 9).</li>
+    <li>Sawin &amp; Demski (2013), <a href="https://intelligence.org/files/Non-Omniscience.pdf">Non-Omniscience, Probabilistic Inference, and Metamathematics</a>, §6 — the impossibility of $\{$Computable, Non-Dogmatism, Gaifman, weak Coherence$\}$ in combination. (The paper-level citation in Garrabrant et al. is "Sawin 2013, $\Pi_1$$\Pi_2$".)</li>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=8">§1.1 closing paragraph</a> — "Desiderata 1, 2, and 13 cannot be satisfied simultaneously"; LI achieves desiderata 1 through 12, and explicitly fails 13, 14, 15.</li>
+    <li>Background reading: <a href="https://www.alignmentforum.org/posts/3SG4WbNPoP8fsuZgs/an-intuitive-guide-to-logical-induction-1">Demski, "An Intuitive Guide to Logical Induction"</a> — the "what would we want?" framing.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;">Section 1.1 of the paper lists <strong>seventeen</strong> properties that have been proposed as desirable for a reasoner facing logical uncertainty. Some are mild ("be computable"); others are heroic ("dominate the universal semimeasure"). They are not independent — several known results say certain combinations are impossible.</p>
+  <p style="margin: 0;">Click the chips below to build a subset. The widget tells you whether the subset is achievable, and if not, names the impossibility result.</p>
+</div>
+
+<h2>Pick a subset</h2>
+<div class="legend">
+  <span><span class="swatch" style="background:#e6effa; border-color:var(--accent);"></span>selected</span>
+  <span><span class="swatch" style="background:#fdecec; border-color:var(--bad);"></span>part of the impossibility tuple ruling your subset out</span>
+  <span><span class="swatch" style="background:#fff; border-color:#c9d3df;"></span>unselected</span>
+</div>
+<div class="controls-row">
+  <button class="btn primary" id="btn-li">Show what LI itself achieves</button>
+  <button class="btn" id="btn-clear">Clear</button>
+  <button class="btn" id="btn-all">Select all 17</button>
+</div>
+
+<div class="chip-grid" id="chip-grid"></div>
+
+<div class="verdict empty" id="verdict">
+  <div class="verdict-headline">Pick at least two desiderata to start.</div>
+  <div>The single-desideratum subsets are all trivially achievable (the constant-zero or constant-one belief state usually does the job, modulo computability). Interesting impossibilities only emerge from pairs and triples.</div>
+</div>
+
+<h2>Which combinations are known to be impossible?</h2>
+<ul class="imp-list" id="imp-list"></ul>
+<p class="panel-note">These are the only impossibility tuples this widget checks. Section 1.1 mentions exactly these; further impossibility results in the LI literature (e.g., on self-trust + self-knowledge, or on coherence + self-reference) live in later sections and other papers, and are out of scope here.</p>
+
+<h2>What does LI itself achieve?</h2>
+<p>Per the closing paragraph of §1.1: the LI algorithm of §5 satisfies <strong>desiderata 1 through 12</strong> (Computable Approximability through Approximate Inexploitability). It explicitly <em>fails</em> Gaifman Inductivity (13), Efficiency (14), and Decision Rationality (15) — the first by Sawin's incompatibility, the latter two because LI is purely inductive and pays no attention to the cost of thinking. Counterpossibles (16) and Old Evidence (17) are listed by Garrabrant et al. as "interesting but unclear".</p>
+
+<blockquote class="quote">"Our algorithm does satisfy desiderata 1 through 12. In fact, our algorithm is designed to meet only $\{$1$\}$ and $\{$12$\}$, from which 2–11 will all be shown to follow." — <a href="https://arxiv.org/pdf/1609.03543v3#page=8">Garrabrant et&nbsp;al. (2016), §1.1</a></blockquote>
+
+<details>
+  <summary>Why this matters for the rest of the paper</summary>
+  <p>The point of §1.1 is not to enumerate trivia. It frames the paper's central design choice: LI is built around <em>just two</em> desiderata — Computable Approximability (#1) and Approximate Inexploitability (#12) — and the other ten that LI achieves are <strong>theorems</strong> derived from those two. That mirrors how classical probability theory is built around a single criterion (don't be Dutch-bookable) from which the Kolmogorov axioms follow. So the seemingly-arbitrary list of 17 is doing real work: it tells you which properties the authors thought were worth building around (1, 12), which are bonuses (2–11), and which have to be given up (13, 14, 15).</p>
+</details>
+
+<p class="footnote">
+  <strong>How this widget thinks about achievability.</strong> A subset is reported "achievable" when it contains no known incompatibility tuple — but absence of a known impossibility is <em>not</em> proof of joint achievability. The space of 17 desiderata has $2^{17} = 131{,}072$ subsets, and the open-questions section of the paper makes clear that several joint achievability questions are not settled. Treat green verdicts as "no known obstruction" rather than "constructed". The two impossibility tuples checked here are exactly those named in §1.1's closing paragraph; the LI's twelve achievements are exactly those claimed (and proved later in the paper). For the formal definitions of each desideratum, see the linked paragraphs in §1.1.
+</p>
+
+<nav class="nav">
+  <a href="01-pi-digit-paradox.html">← Module 1: π-digit paradox</a>
+  <a href="../README.md">Ch 1 README →</a>
+</nav>
+
+<script>
+// ---------------------------------------------------------------------------
+// The 17 desiderata, in the order they appear in §1.1.
+// `id` matches the paper's \label{des:...} key, for traceability.
+// `blurb` is a one-line gloss; click into the paper for the formal version.
+// ---------------------------------------------------------------------------
+const DESIDERATA = [
+  { n:  1, id: 'computable',         name: 'Computable Approximability',  blurb: 'The probability assignment can be computed.' },
+  { n:  2, id: 'coherent',           name: 'Coherence in the Limit',      blurb: 'The limit belief state is logically consistent.' },
+  { n:  3, id: 'ic',                 name: 'Approximate Coherence',       blurb: 'Beliefs are approximately coherent at finite times.' },
+  { n:  4, id: 'stats',              name: 'Statistical Patterns',        blurb: 'Beliefs default to base rates when no other evidence applies.' },
+  { n:  5, id: 'calibration',        name: 'Calibration',                 blurb: 'Among p-probability claims, about p of them are true.' },
+  { n:  6, id: 'nondogmatism',       name: 'Non-Dogmatism',               blurb: 'No 0/1 beliefs without proof.' },
+  { n:  7, id: 'pa',                 name: 'Uniform Non-Dogmatism',       blurb: 'Every c.e. consistent theory gets non-zero limit credence.' },
+  { n:  8, id: 'solomonoff',         name: 'Universal Inductivity',       blurb: 'Beliefs dominate the universal semimeasure in the limit.' },
+  { n:  9, id: 'bayes',              name: 'Approximate Bayesianism',     blurb: 'Conditionals satisfy Bayes\' theorem approximately.' },
+  { n: 10, id: 'introspection',      name: 'Introspection',               blurb: 'If the reasoner knows X, she knows that she knows X.' },
+  { n: 11, id: 'lob',                name: 'Self-Trust',                  blurb: 'The reasoner expects her future beliefs to be more accurate.' },
+  { n: 12, id: 'inexp',              name: 'Approximate Inexploitability', blurb: 'No polynomial-time Dutch book.' },
+  { n: 13, id: 'gaifman',            name: 'Gaifman Inductivity',         blurb: 'Π₁ statements get certainty as evidence accumulates.' },
+  { n: 14, id: 'efficient',          name: 'Efficiency',                  blurb: 'The probability assignment runs efficiently.' },
+  { n: 15, id: 'br',                 name: 'Decision Rationality',        blurb: 'Targets specific decision-relevant claims with bounded compute.' },
+  { n: 16, id: 'counterpossibilities', name: 'Counterpossibles',          blurb: 'Gives reasonable answers to questions about contradictions.' },
+  { n: 17, id: 'oldevidence',        name: 'Old Evidence',                blurb: 'Pre-existing evidence boosts newly-formulated theories.' },
+];
+
+// ---------------------------------------------------------------------------
+// The impossibility tuples named in §1.1's closing paragraph.
+// `tuple` is the set of desiderata-ids that are jointly inconsistent.
+// `name` is the named result; `gloss` is one line of why.
+// ---------------------------------------------------------------------------
+const IMPOSSIBILITIES = [
+  {
+    name: 'Computable + (full) Coherence + Gaifman',
+    tuple: ['computable', 'coherent', 'gaifman'],
+    gloss: 'A computable, fully coherent, Gaifman-inductive belief state cannot exist (Garrabrant et al. 2016, §1.1 closing paragraph). The Gaifman condition forces certainty on Π₁-claims, full coherence forces consistency, and computability cannot keep up — the limit object is essentially a complete extension of the theory, and there is no computable such extension.',
+  },
+  {
+    name: 'Sawin: Computable + Non-Dogmatism + Gaifman + weak Coherence',
+    tuple: ['computable', 'nondogmatism', 'gaifman', 'coherent'],
+    gloss: 'Sawin (2013) showed even a very weak form of coherence, combined with non-dogmatism and Gaifman inductivity, has no computable approximation. This is the stronger of the two: it rules out Gaifman + Non-Dogmatism even after weakening Coherence almost to nothing, so a computable reasoner aiming for Non-Dogmatism must abandon Gaifman.',
+  },
+];
+
+// LI's achievements per §1.1's closing paragraph.
+const LI_ACHIEVES = ['computable','coherent','ic','stats','calibration','nondogmatism','pa','solomonoff','bayes','introspection','lob','inexp'];
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+const selected = new Set();
+
+const gridEl = document.getElementById('chip-grid');
+const verdictEl = document.getElementById('verdict');
+const impListEl = document.getElementById('imp-list');
+
+function chipMatches(d, culpritIds) {
+  const classes = ['chip'];
+  if (selected.has(d.id)) classes.push('selected');
+  if (culpritIds.has(d.id)) classes.push('culprit');
+  return classes.join(' ');
+}
+
+function findViolatedTuples() {
+  return IMPOSSIBILITIES.filter(imp => imp.tuple.every(id => selected.has(id)));
+}
+
+function render() {
+  // chips
+  const violated = findViolatedTuples();
+  const culpritIds = new Set();
+  violated.forEach(imp => imp.tuple.forEach(id => culpritIds.add(id)));
+
+  gridEl.innerHTML = '';
+  DESIDERATA.forEach(d => {
+    const chip = document.createElement('div');
+    chip.className = chipMatches(d, culpritIds);
+    chip.innerHTML =
+      `<div class="chip-num">#${d.n}</div>` +
+      `<div class="chip-name">${d.name}</div>` +
+      `<div class="chip-blurb">${d.blurb}</div>`;
+    chip.onclick = () => {
+      if (selected.has(d.id)) selected.delete(d.id);
+      else selected.add(d.id);
+      render();
+    };
+    gridEl.appendChild(chip);
+  });
+
+  // verdict
+  verdictEl.classList.remove('ok','bad','empty');
+  if (selected.size === 0) {
+    verdictEl.classList.add('empty');
+    verdictEl.innerHTML =
+      `<div class="verdict-headline">Pick at least two desiderata to start.</div>` +
+      `<div>The single-desideratum subsets are all trivially achievable. Interesting impossibilities only emerge from pairs and triples.</div>`;
+  } else if (violated.length === 0) {
+    verdictEl.classList.add('ok');
+    const names = [...selected].map(id => '#' + DESIDERATA.find(d => d.id === id).n).sort((a,b) => +a.slice(1) - +b.slice(1)).join(', ');
+    const liMatch = (selected.size <= LI_ACHIEVES.length) && [...selected].every(id => LI_ACHIEVES.includes(id));
+    verdictEl.innerHTML =
+      `<div class="verdict-headline">No known obstruction.</div>` +
+      `<div>Subset $\\{${names}\\}$ does not contain any of the impossibility tuples named in §1.1.${liMatch ? ' In fact, this subset is contained in what LI itself achieves (desiderata 1–12) — so it is not just achievable but constructively realised by the algorithm of §5.' : ''}</div>` +
+      `<div class="panel-note" style="margin-top:0.4rem;">Caveat: green here means "no known obstruction in §1.1", not "proved jointly achievable". See the footnote.</div>`;
+  } else {
+    verdictEl.classList.add('bad');
+    const lines = violated.map(imp => {
+      const nums = imp.tuple.map(id => '#' + DESIDERATA.find(d => d.id === id).n).join(', ');
+      return `<li><strong>${imp.name}</strong> — tuple $\\{${nums}\\}$: ${imp.gloss}</li>`;
+    }).join('');
+    verdictEl.innerHTML =
+      `<div class="verdict-headline">This subset contains ${violated.length === 1 ? 'an impossibility tuple' : violated.length + ' impossibility tuples'}.</div>` +
+      `<ul style="margin: 0.4rem 0 0; padding-left: 1.2rem;">${lines}</ul>` +
+      `<div class="panel-note" style="margin-top:0.4rem;">Drop any one of the highlighted (red-bordered) chips to escape.</div>`;
+  }
+
+  renderMath();
+}
+
+function renderImpList() {
+  impListEl.innerHTML = IMPOSSIBILITIES.map(imp => {
+    const nums = imp.tuple.map(id => '#' + DESIDERATA.find(d => d.id === id).n).join(', ');
+    return `<li><span class="imp-tag">impossible</span><strong>${imp.name}</strong> — $\\{${nums}\\}$: ${imp.gloss}</li>`;
+  }).join('');
+}
+
+document.getElementById('btn-li').onclick = () => {
+  selected.clear();
+  LI_ACHIEVES.forEach(id => selected.add(id));
+  render();
+};
+document.getElementById('btn-clear').onclick = () => {
+  selected.clear();
+  render();
+};
+document.getElementById('btn-all').onclick = () => {
+  selected.clear();
+  DESIDERATA.forEach(d => selected.add(d.id));
+  render();
+};
+
+// ---- KaTeX ----------------------------------------------------------------
+function renderMath() {
+  if (!window.renderMathInElement) return;
+  renderMathInElement(document.body, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '\\[', right: '\\]', display: true },
+      { left: '$', right: '$', display: false },
+      { left: '\\(', right: '\\)', display: false },
+    ],
+    throwOnError: false,
+    strict: 'ignore',
+  });
+}
+
+renderImpList();
+render();
+</script>
+
+</body>
+</html>

@@ -27,11 +27,10 @@ substitute would meet.
 | # | Module | Source | Status |
 |---|--------|--------|--------|
 | 1 | [`01-pi-digit-paradox.html`](widgets/01-pi-digit-paradox.html) | §1 ¶3 (the π[87,653]=7 example) | drafted |
-| 2 | `02-desiderata-tour.html` | §1.1 (the 17 desiderata as a compatibility graph) | proposed |
+| 2 | [`02-desiderata-tour.html`](widgets/02-desiderata-tour.html) | §1.1 (the 17 desiderata as a clickable compatibility chip grid) | drafted |
 
-(Module 2 is a stub in the breakdown; see
-[`NOTES.md`](../../NOTES.md#module-breakdown) for the table of
-statuses.)
+See [`NOTES.md`](../../NOTES.md#module-breakdown) for the table of
+statuses across the whole companion.
 
 ## Toy system
 
