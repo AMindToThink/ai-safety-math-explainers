@@ -1,0 +1,472 @@
+<!--
+  Widget: nnv-ch5-encode-and-verify (module 1 of nn-verification
+          Ch 5, "Encodings of Neural Networks").
+  Source: Albarghouthi (2021) Ch 5, encodings.tex (arXiv:2109.10317).
+          §5.1–§5.4 — per-node LRA encoding, edge wiring,
+          verification condition (P AND graph_G) IMPLIES Q.
+  Toy system: the canonical 2-2-1 ReLU net from Ch 2.
+              y = ReLU(x1+x2) + ReLU(x1-x2). Two ReLUs => four
+              activation patterns => four polytopes partitioning R^2.
+  Active check: verify-or-counterexample arena. Reader sets a
+                robustness query (anchor c, eps, output upper bound
+                M). Site shows the four activation regions intersected
+                with the eps-ball and the violation set {y > M}, then
+                on press of Verify enumerates the four patterns and
+                reports SAT (with counterexample) or UNSAT.
+
+  Standalone: open this .html directly in a browser. Uses D3 v7 and
+              KaTeX from CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NN Verification · Ch 5 · Encode and Verify</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; --soft:#eef3f8; --line:#d9e0e7; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: var(--soft); border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .layout { display: grid; grid-template-columns: 460px 1fr; gap: 1.4rem; align-items: start; margin-top: 1rem; }
+  @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
+  .panel { border: 1px solid var(--line); border-radius: 6px; padding: 0.9rem 1rem; background: #fff; }
+  .panel h3 { margin: 0 0 0.5rem 0; font-size: 0.98rem; }
+  .controls-row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin: 0.4rem 0; font-size: 0.92rem; }
+  .controls-row label { min-width: 4.5rem; color: var(--muted); }
+  input[type=number] { width: 5rem; font: inherit; padding: 0.2rem 0.4rem; border: 1px solid var(--line); border-radius: 3px; text-align: right; }
+  input[type=range] { width: 180px; }
+  button { font: inherit; padding: 0.35rem 0.7rem; border: 1px solid var(--line); border-radius: 4px; background: #fff; cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:hover { background: #1f5a92; }
+  button:hover { background: var(--soft); }
+  .verdict { padding: 0.6rem 0.85rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.93rem; font-weight: 500; }
+  .verdict.ok { background: #ecfdf3; color: var(--good); border-left: 4px solid var(--good); }
+  .verdict.bad { background: #fef3f2; color: var(--bad); border-left: 4px solid var(--bad); }
+  .verdict.idle { background: var(--soft); color: var(--muted); border-left: 4px solid var(--line); }
+  .encoding-block { font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.86rem; background: #fafbfc; border: 1px solid var(--line); border-radius: 4px; padding: 0.6rem 0.8rem; margin-top: 0.4rem; line-height: 1.7; }
+  .encoding-block .lab { color: var(--muted); }
+  table.patterns { border-collapse: collapse; font-size: 0.86rem; margin-top: 0.5rem; width: 100%; }
+  table.patterns th, table.patterns td { border: 1px solid var(--line); padding: 0.25rem 0.5rem; text-align: center; }
+  table.patterns th { background: var(--soft); font-weight: 500; color: var(--muted); }
+  table.patterns td.empty { background: #ecfdf3; color: var(--good); }
+  table.patterns td.live { background: #fef3f2; color: var(--bad); font-weight: 600; }
+  table.patterns td.unreachable { background: #f4f4f5; color: var(--muted); font-style: italic; }
+  svg.plane { background: #fff; border: 1px solid var(--line); border-radius: 4px; display: block; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  .legend-item { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.86rem; color: var(--muted); margin-right: 0.8rem; }
+  .legend-item .sw { width: 14px; height: 10px; display: inline-block; border: 1px solid #1f2933; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+</style>
+</head>
+<body>
+
+<h1>Encode and Verify</h1>
+<p class="subtitle">
+  NN Verification · Chapter 5 · companion to Albarghouthi (2021) §5.1–§5.4.
+</p>
+
+<div class="lede">
+  <p style="margin: 0;">
+    The canonical 2-2-1 ReLU toy network from Ch 2,
+    $y = \mathrm{ReLU}(x_1 + x_2) + \mathrm{ReLU}(x_1 - x_2)$,
+    encoded as an LRA formula. Each affine node becomes an equality;
+    each ReLU becomes a disjunction
+    $(\mathrm{in} > 0 \Rightarrow \mathrm{out} = \mathrm{in})
+    \wedge (\mathrm{in} \le 0 \Rightarrow \mathrm{out} = 0)$. With
+    two ReLUs the verifier sees up to $2^2 = 4$ activation patterns
+    — drawn below as four colored regions partitioning the input
+    plane. Pose a robustness query, then press <em>Verify</em> and
+    watch the case-split decide whether the spec holds.
+  </p>
+</div>
+
+<div class="layout">
+
+  <div class="panel">
+    <h3>Network encoding</h3>
+    <p style="font-size: 0.92rem; margin: 0.2rem 0;">
+      Free variables: $x_1, x_2$ (inputs); $a_1, a_2$ (affine);
+      $h_1, h_2$ (post-ReLU hidden); $y$ (output).
+    </p>
+    <div class="encoding-block" id="enc-affine"></div>
+    <div class="encoding-block" id="enc-relu"></div>
+    <div class="encoding-block" id="enc-output"></div>
+
+    <h3 style="margin-top: 1rem;">Verification condition</h3>
+    <p style="font-size: 0.86rem; color: var(--muted); margin: 0.2rem 0;">
+      The query: $\{P\}\;y \gets f(x_1, x_2)\;\{Q\}$ for the spec
+      below. The site checks whether $P \wedge \varphi_G \wedge
+      \neg Q$ is satisfiable — a model is a counterexample.
+    </p>
+
+    <h3 style="margin-top: 1rem;">Spec</h3>
+    <div class="controls-row">
+      <label>$\vec c$:</label>
+      <span>$($</span>
+      <input id="cx1" type="number" step="0.1" value="1.0">
+      <span>$,$</span>
+      <input id="cx2" type="number" step="0.1" value="0.5">
+      <span>$)$</span>
+    </div>
+    <div class="controls-row">
+      <label>$\varepsilon$:</label>
+      <input id="eps" type="range" min="0.05" max="1.5" step="0.05" value="0.4">
+      <span id="eps-val">0.40</span>
+    </div>
+    <div class="controls-row">
+      <label>$M$:</label>
+      <input id="M" type="range" min="0" max="6" step="0.05" value="2.5">
+      <span id="M-val">2.50</span>
+    </div>
+    <p style="font-size: 0.86rem; color: var(--muted); margin: 0.2rem 0;">
+      $P \;=\; \|\vec x - \vec c\|_\infty \le \varepsilon$,
+      $\quad Q \;=\; y \le M$.
+    </p>
+
+    <div class="controls-row">
+      <button id="verify-btn" class="primary">Verify</button>
+      <button id="reset-btn">Reset spec</button>
+    </div>
+    <div id="verdict" class="verdict idle">Choose a spec and press <em>Verify</em>.</div>
+
+    <h3 style="margin-top: 1rem;">Pattern-by-pattern verdict</h3>
+    <table class="patterns" id="pattern-table">
+      <thead>
+        <tr><th>Pattern</th><th>$a_1 \ge 0$?</th><th>$a_2 \ge 0$?</th><th>Reduced $y$</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <tr data-pat="++"><td>$(+, +)$</td><td>yes</td><td>yes</td><td>$2 x_1$</td><td class="empty">unchecked</td></tr>
+        <tr data-pat="+-"><td>$(+, -)$</td><td>yes</td><td>no</td><td>$x_1 + x_2$</td><td class="empty">unchecked</td></tr>
+        <tr data-pat="-+"><td>$(-, +)$</td><td>no</td><td>yes</td><td>$x_1 - x_2$</td><td class="empty">unchecked</td></tr>
+        <tr data-pat="--"><td>$(-, -)$</td><td>no</td><td>no</td><td>$0$</td><td class="empty">unchecked</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Input space $[-3, 3]^2$</h3>
+    <svg id="plane" class="plane" viewBox="0 0 460 460" width="100%" height="460" aria-label="Input space showing four ReLU activation regions, eps-ball, and violation set"></svg>
+    <div style="margin-top: 0.4rem;">
+      <span class="legend-item"><span class="sw" style="background:#dde7f5"></span>$(+,+)$: $y = 2x_1$</span>
+      <span class="legend-item"><span class="sw" style="background:#cfe8d8"></span>$(+,-)$: $y = x_1+x_2$</span>
+      <span class="legend-item"><span class="sw" style="background:#f9e6c4"></span>$(-,+)$: $y = x_1-x_2$</span>
+      <span class="legend-item"><span class="sw" style="background:#f4f4f5"></span>$(-,-)$: $y = 0$</span>
+    </div>
+    <div style="margin-top: 0.3rem;">
+      <span class="legend-item"><span class="sw" style="background:#fff;border-color:#2b6cb0"></span>$\varepsilon$-ball</span>
+      <span class="legend-item"><span class="sw" style="background:repeating-linear-gradient(45deg,#d92d20,#d92d20 3px,#fff 3px,#fff 6px)"></span>violation set $\{y > M\}$</span>
+      <span class="legend-item"><span class="sw" style="background:#d92d20;border-radius:50%"></span>counterexample</span>
+    </div>
+  </div>
+
+</div>
+
+<div class="footnote">
+  <p>
+    Reference: Albarghouthi, <em>Introduction to Neural Network
+    Verification</em>, Ch 5 (arXiv:<a href="https://arxiv.org/abs/2109.10317">2109.10317</a>).
+    The case-split &ldquo;one polytope per ReLU activation
+    pattern&rdquo; is the literal mental model for Reluplex (Ch 7) and
+    α,β-CROWN — the difference is that those algorithms <em>avoid</em>
+    fully enumerating $2^k$ patterns by branching lazily and pruning
+    with bounds. On the toy net we just enumerate.
+  </p>
+  <p>
+    Verification uses sample-and-check on a 121×121 grid <em>within
+    each pattern's polytope intersected with the
+    $\varepsilon$-ball</em>. With piecewise-linear post-conditions a
+    counterexample (when one exists) is always at a polytope vertex
+    so the grid is cheap and exact up to floating-point. A real LP
+    solver (Ch 6) replaces the sampling.
+  </p>
+</div>
+
+<script>
+"use strict";
+
+// --- Toy network -----------------------------------------------------------
+const relu = (x) => Math.max(0, x);
+const netY = (x1, x2) => relu(x1 + x2) + relu(x1 - x2);
+
+// --- Patterns --------------------------------------------------------------
+// Pattern key "ab" where a in {+,-} = sign(x1+x2), b similarly for x1-x2.
+const PATTERNS = [
+  { key: "++", a1: true,  a2: true,  reducedY: (x1, x2) => 2 * x1,        regColor: "#dde7f5" },
+  { key: "+-", a1: true,  a2: false, reducedY: (x1, x2) => x1 + x2,       regColor: "#cfe8d8" },
+  { key: "-+", a1: false, a2: true,  reducedY: (x1, x2) => x1 - x2,       regColor: "#f9e6c4" },
+  { key: "--", a1: false, a2: false, reducedY: (x1, x2) => 0,             regColor: "#f4f4f5" }
+];
+
+function patternHolds(pat, x1, x2) {
+  const v1 = x1 + x2;
+  const v2 = x1 - x2;
+  const ok1 = pat.a1 ? v1 >= -1e-9 : v1 <  1e-9;
+  const ok2 = pat.a2 ? v2 >= -1e-9 : v2 <  1e-9;
+  return ok1 && ok2;
+}
+
+// --- DOM refs --------------------------------------------------------------
+const cx1El = document.getElementById('cx1');
+const cx2El = document.getElementById('cx2');
+const epsEl = document.getElementById('eps');
+const MEl = document.getElementById('M');
+const epsValEl = document.getElementById('eps-val');
+const MValEl = document.getElementById('M-val');
+const verifyBtn = document.getElementById('verify-btn');
+const resetBtn = document.getElementById('reset-btn');
+const verdictEl = document.getElementById('verdict');
+const planeSvg = d3.select('#plane');
+
+// --- Encoding render -------------------------------------------------------
+function renderEncoding() {
+  document.getElementById('enc-affine').innerHTML = `<span class="lab">// affine nodes (§5.1, equality form)</span><br>
+$\\varphi_{a_1} \\;\\triangleq\\; a_1 = x_1 + x_2$<br>
+$\\varphi_{a_2} \\;\\triangleq\\; a_2 = x_1 - x_2$`;
+  document.getElementById('enc-relu').innerHTML = `<span class="lab">// ReLU nodes (§5.1, disjunctive form — the Part-II story)</span><br>
+$\\varphi_{h_1} \\;\\triangleq\\; (a_1 > 0 \\Rightarrow h_1 = a_1) \\;\\wedge\\; (a_1 \\le 0 \\Rightarrow h_1 = 0)$<br>
+$\\varphi_{h_2} \\;\\triangleq\\; (a_2 > 0 \\Rightarrow h_2 = a_2) \\;\\wedge\\; (a_2 \\le 0 \\Rightarrow h_2 = 0)$`;
+  document.getElementById('enc-output').innerHTML = `<span class="lab">// output node + edge wiring (§5.2)</span><br>
+$\\varphi_{y} \\;\\triangleq\\; y = h_1 + h_2$<br>
+$\\varphi_G \\;\\triangleq\\; \\varphi_{a_1} \\wedge \\varphi_{a_2} \\wedge \\varphi_{h_1} \\wedge \\varphi_{h_2} \\wedge \\varphi_{y}$`;
+  if (window.renderMathInElement) {
+    renderMathInElement(document.getElementById('enc-affine'));
+    renderMathInElement(document.getElementById('enc-relu'));
+    renderMathInElement(document.getElementById('enc-output'));
+  }
+}
+
+// --- Plot ------------------------------------------------------------------
+const PLOT_RANGE = 3;
+const PLOT_PX = 460;
+const PLOT_PAD = 36;
+
+function px(x) { return PLOT_PAD + (x + PLOT_RANGE) / (2 * PLOT_RANGE) * (PLOT_PX - 2 * PLOT_PAD); }
+function py(y) { return PLOT_PX - PLOT_PAD - (y + PLOT_RANGE) / (2 * PLOT_RANGE) * (PLOT_PX - 2 * PLOT_PAD); }
+
+function getSpec() {
+  return {
+    c1: parseFloat(cx1El.value),
+    c2: parseFloat(cx2El.value),
+    eps: parseFloat(epsEl.value),
+    M: parseFloat(MEl.value)
+  };
+}
+
+let lastVerifyResult = null;
+
+function drawPlane() {
+  const { c1, c2, eps, M } = getSpec();
+  planeSvg.selectAll('*').remove();
+
+  const g = planeSvg.append('g');
+
+  // Region shading: paint each cell by its pattern color.
+  const N = 120;
+  const cellSz = (PLOT_PX - 2 * PLOT_PAD) / N;
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      const X1 = -PLOT_RANGE + (2 * PLOT_RANGE * i) / (N - 1);
+      const X2 = -PLOT_RANGE + (2 * PLOT_RANGE * j) / (N - 1);
+      const pat = PATTERNS.find(p => patternHolds(p, X1, X2));
+      if (pat) {
+        g.append('rect')
+          .attr('x', px(X1) - cellSz / 2).attr('y', py(X2) - cellSz / 2)
+          .attr('width', cellSz + 0.5).attr('height', cellSz + 0.5)
+          .attr('fill', pat.regColor).attr('opacity', 0.55);
+      }
+    }
+  }
+
+  // Region boundary lines: x1+x2 = 0 and x1-x2 = 0.
+  g.append('line').attr('x1', px(-3)).attr('y1', py(3)).attr('x2', px(3)).attr('y2', py(-3))
+    .attr('stroke', '#52606d').attr('stroke-width', 1.2);  // x1+x2=0
+  g.append('line').attr('x1', px(-3)).attr('y1', py(-3)).attr('x2', px(3)).attr('y2', py(3))
+    .attr('stroke', '#52606d').attr('stroke-width', 1.2);  // x1-x2=0
+
+  // y > M violation set: hatching pattern. Sample.
+  const violationN = 90;
+  const cellV = (PLOT_PX - 2 * PLOT_PAD) / violationN;
+  // Define a clipPath and pattern for the hatching.
+  const defs = planeSvg.append('defs');
+  defs.append('pattern').attr('id', 'hatch').attr('patternUnits', 'userSpaceOnUse')
+    .attr('width', 6).attr('height', 6).attr('patternTransform', 'rotate(45)')
+    .append('rect').attr('width', 2).attr('height', 6).attr('fill', '#d92d20');
+  // Build a single-region path of cells where y > M; for simplicity just rect-by-rect.
+  const violationG = g.append('g').attr('opacity', 0.5);
+  for (let i = 0; i < violationN; i++) {
+    for (let j = 0; j < violationN; j++) {
+      const X1 = -PLOT_RANGE + (2 * PLOT_RANGE * i) / (violationN - 1);
+      const X2 = -PLOT_RANGE + (2 * PLOT_RANGE * j) / (violationN - 1);
+      if (netY(X1, X2) > M + 1e-9) {
+        violationG.append('rect')
+          .attr('x', px(X1) - cellV / 2).attr('y', py(X2) - cellV / 2)
+          .attr('width', cellV + 0.5).attr('height', cellV + 0.5)
+          .attr('fill', 'url(#hatch)');
+      }
+    }
+  }
+
+  // eps-ball as a square (l_inf).
+  const left = c1 - eps, right = c1 + eps;
+  const bot = c2 - eps, top = c2 + eps;
+  g.append('rect')
+    .attr('x', px(left)).attr('y', py(top))
+    .attr('width', px(right) - px(left)).attr('height', py(bot) - py(top))
+    .attr('fill', 'none').attr('stroke', '#2b6cb0').attr('stroke-width', 2);
+
+  // Anchor.
+  g.append('circle').attr('cx', px(c1)).attr('cy', py(c2)).attr('r', 4)
+    .attr('fill', '#fff').attr('stroke', '#1f2933').attr('stroke-width', 1.5);
+
+  // Counterexample (if any).
+  if (lastVerifyResult && lastVerifyResult.counter) {
+    const ce = lastVerifyResult.counter;
+    g.append('circle').attr('cx', px(ce.x1)).attr('cy', py(ce.x2)).attr('r', 7)
+      .attr('fill', '#d92d20').attr('stroke', '#fff').attr('stroke-width', 2);
+    g.append('text').attr('x', px(ce.x1) + 10).attr('y', py(ce.x2) - 6)
+      .attr('font-size', 11).attr('fill', '#d92d20').attr('font-weight', 'bold')
+      .text(`x = (${ce.x1.toFixed(2)}, ${ce.x2.toFixed(2)}), y = ${ce.y.toFixed(2)}`);
+  }
+
+  // Axes
+  g.append('line').attr('x1', px(-3)).attr('y1', py(0)).attr('x2', px(3)).attr('y2', py(0))
+    .attr('stroke', '#52606d').attr('stroke-width', 1);
+  g.append('line').attr('x1', px(0)).attr('y1', py(-3)).attr('x2', px(0)).attr('y2', py(3))
+    .attr('stroke', '#52606d').attr('stroke-width', 1);
+  for (let v = -3; v <= 3; v++) {
+    if (v === 0) continue;
+    g.append('text').attr('x', px(v)).attr('y', py(0) + 12).attr('text-anchor', 'middle')
+      .attr('font-size', 10).attr('fill', '#52606d').text(String(v));
+    g.append('text').attr('x', px(0) - 6).attr('y', py(v) + 3).attr('text-anchor', 'end')
+      .attr('font-size', 10).attr('fill', '#52606d').text(String(v));
+  }
+  g.append('text').attr('x', px(3) + 6).attr('y', py(0) + 4).attr('font-size', 12).attr('fill', '#52606d').attr('font-style', 'italic').text('x₁');
+  g.append('text').attr('x', px(0) + 4).attr('y', py(3) - 6).attr('font-size', 12).attr('fill', '#52606d').attr('font-style', 'italic').text('x₂');
+}
+
+// --- Verification ----------------------------------------------------------
+function verify() {
+  const { c1, c2, eps, M } = getSpec();
+
+  const N = 121;
+  const xs = [];
+  for (let i = 0; i < N; i++) xs.push(c1 - eps + (2 * eps * i) / (N - 1));
+  const ys = [];
+  for (let i = 0; i < N; i++) ys.push(c2 - eps + (2 * eps * i) / (N - 1));
+
+  // For each pattern, sample its polytope ∩ epsBall and check whether the
+  // reduced y exceeds M anywhere.
+  const patternResults = {};
+  let counter = null;
+  for (const pat of PATTERNS) {
+    let liveCorner = null;
+    let any = false;
+    let unsat = true;
+    for (let i = 0; i < N && !liveCorner; i++) {
+      for (let j = 0; j < N; j++) {
+        const x1 = xs[i], x2 = ys[j];
+        if (!patternHolds(pat, x1, x2)) continue;
+        any = true;
+        const y = pat.reducedY(x1, x2);
+        if (y > M + 1e-9) {
+          liveCorner = { x1, x2, y };
+          break;
+        }
+      }
+    }
+    if (!any) patternResults[pat.key] = { kind: "unreachable" };
+    else if (liveCorner) {
+      patternResults[pat.key] = { kind: "live", corner: liveCorner };
+      if (!counter || liveCorner.y > counter.y) counter = liveCorner;
+    } else patternResults[pat.key] = { kind: "empty" };
+  }
+
+  return { holds: counter === null, counter, patternResults };
+}
+
+function updatePatternTable(result) {
+  const tbody = document.querySelector('#pattern-table tbody');
+  for (const pat of PATTERNS) {
+    const tr = tbody.querySelector(`tr[data-pat="${pat.key}"]`);
+    const td = tr.lastElementChild;
+    td.classList.remove('empty', 'live', 'unreachable');
+    if (!result) { td.classList.add('empty'); td.textContent = 'unchecked'; continue; }
+    const r = result.patternResults[pat.key];
+    if (r.kind === "unreachable") {
+      td.classList.add('unreachable'); td.textContent = '∅ in ε-ball';
+    } else if (r.kind === "empty") {
+      td.classList.add('empty'); td.textContent = `verified (max y ≤ M)`;
+    } else if (r.kind === "live") {
+      td.classList.add('live');
+      td.textContent = `counterexample at (${r.corner.x1.toFixed(2)}, ${r.corner.x2.toFixed(2)})`;
+    }
+  }
+}
+
+verifyBtn.addEventListener('click', () => {
+  const result = verify();
+  lastVerifyResult = result;
+  if (result.holds) {
+    verdictEl.className = 'verdict ok';
+    verdictEl.innerHTML = `Spec <strong>verified</strong>. The verification condition $(P \\wedge \\varphi_G) \\Rightarrow Q$ is valid: every ReLU activation pattern's polytope, intersected with the $\\varepsilon$-ball, satisfies $y \\le M$.`;
+  } else {
+    verdictEl.className = 'verdict bad';
+    const ce = result.counter;
+    verdictEl.innerHTML = `Spec <strong>fails</strong>. Counterexample at $\\vec x = (${ce.x1.toFixed(2)}, ${ce.x2.toFixed(2)})$ — the network outputs $y = ${ce.y.toFixed(3)}$, exceeding the bound $M = ${getSpec().M}$. (The verifier finds this by enumerating activation patterns; the live pattern is highlighted in red below.)`;
+  }
+  if (window.renderMathInElement) renderMathInElement(verdictEl);
+  updatePatternTable(result);
+  drawPlane();
+});
+
+resetBtn.addEventListener('click', () => {
+  cx1El.value = '1.0'; cx2El.value = '0.5';
+  epsEl.value = '0.4'; MEl.value = '2.5';
+  epsValEl.textContent = '0.40'; MValEl.textContent = '2.50';
+  lastVerifyResult = null;
+  verdictEl.className = 'verdict idle';
+  verdictEl.textContent = 'Choose a spec and press Verify.';
+  updatePatternTable(null);
+  drawPlane();
+});
+
+function onSpecChange() {
+  epsValEl.textContent = parseFloat(epsEl.value).toFixed(2);
+  MValEl.textContent = parseFloat(MEl.value).toFixed(2);
+  lastVerifyResult = null;
+  verdictEl.className = 'verdict idle';
+  verdictEl.textContent = 'Spec changed — press Verify.';
+  updatePatternTable(null);
+  drawPlane();
+}
+[cx1El, cx2El, epsEl, MEl].forEach(el => el.addEventListener('input', onSpecChange));
+
+// Init
+renderEncoding();
+drawPlane();
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.renderMathInElement) {
+    renderMathInElement(document.body, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "$", right: "$", display: false }
+      ],
+      throwOnError: false
+    });
+  }
+});
+</script>
+
+</body>
+</html>

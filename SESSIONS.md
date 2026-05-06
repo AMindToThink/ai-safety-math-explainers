@@ -673,3 +673,50 @@ per session, newest at the bottom. See
 - **Blockers:** none.
 - **Why stopped:** Ch 4 is a clean unit. README, widget, smoke,
   grader test all green.
+
+## 2026-05-06 23:30 (session — nnv-ch5-encoding)
+
+- **Worked on:** Built the fourth nn-verification chapter,
+  `nnv-ch5-encoding`. This is the Part-II climax: the LRA
+  language built in Ch 4 is now used to encode the canonical
+  2-2-1 ReLU toy network and a robustness query becomes a SAT
+  problem.
+- **What got done:**
+  1. Read `encodings.tex` in full (591 lines). Pulled out the
+     three load-bearing translations: affine = equality, ReLU =
+     disjunction, edge = wiring equality; and the verification
+     condition $(P \wedge \varphi_G) \Rightarrow Q$.
+  2. Flipped the row + Status block (Ch 4 now drafted; Ch 5 in
+     progress).
+  3. Wrote chapter `README.md` with the four-pattern table for
+     the toy net (one row per ReLU activation pattern, each
+     with its reduced linear $y(x_1, x_2)$).
+  4. Built `01-encode-and-verify.html`. Three sections in one
+     widget: (a) the LRA encoding of every node printed
+     verbatim; (b) a robustness-query control panel with
+     anchor / $\varepsilon$ / $M$ sliders; (c) a 2-D input-plane
+     plot showing the four activation regions in distinct
+     colours, the $\ell_\infty$ ball, the violation set
+     $\{y > M\}$ as a red hatch, and the boundary lines
+     $x_1 \pm x_2 = 0$. Verify button enumerates the four
+     patterns, checks each pattern's polytope $\cap$
+     $\varepsilon$-ball $\cap$ $\{y > M\}$ for emptiness, and
+     reports SAT (with counterexample) or UNSAT (verified) plus
+     a per-pattern table showing which patterns were
+     unreachable, vacuously verified, or live.
+  5. Smoke tested: green. Interactive Playwright check covers
+     three cases: the default $M = 2.5$ (FAILS), $M = 4.5$
+     (HOLDS), $\varepsilon = 1.5, M = 2.0$ (FAILS in a different
+     pattern — extends across the negative-input region).
+     PASS for all three.
+- **What's next:** `nnv-ch6-dpll-t` — DPLL(T), the actual
+  decision procedure that consumes Ch 5's encodings. Active
+  check is a step-through DPLL(T) trace where the reader picks
+  the next decision / propagation / backjump.
+- **Blockers:** none.
+- **Why stopped:** Ch 5 is a clean unit — README, widget, smoke,
+  grader test all green. Continuing into Ch 6 would start a new
+  algorithm chapter on a different source section.
+
+## 2026-05-07 00:15 (continuing — picking next module)
+
