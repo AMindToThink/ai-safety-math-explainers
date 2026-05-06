@@ -1,0 +1,281 @@
+<!--
+  Widget: li-ch3-pi-statistical (module 4 of the Logical Induction
+          Ch 3 batch, "Properties of Logical Inductors").
+  Source: Garrabrant et al. (2016) §4.3 Theorem 4.3.1 "Learning
+          Pseudorandom Frequencies" (arXiv:1609.03543v3, p. 36).
+          The Ackermann-digit example: phi_n := "pi[Ack(n,n)] = 7".
+          Each phi_n is decidable in principle, but Ack grows so
+          fast that no polynomial-time predictor can guess the
+          digits. Provability induction does NOT apply (the limit
+          probabilities are 0 or 1 case-by-case, not a single
+          rational), but the *frequency* is 1/10, and the LI learns
+          to assign P_n(phi_n) ~ 0.1 in a timely manner.
+  Toy system: a simulated price trajectory for the Ackermann-digit
+              sequence over n = 1..50, plus a "fair-coin" sanity
+              sequence with truth probability p, slider for p.
+  Active check: predict the limit of P_n(phi_n) given that each
+                individual phi_n has a determinate truth value.
+
+  Standalone: open this .html directly in a browser. Uses D3 v7 and
+              KaTeX from CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Logical Induction · Ch 3 · Statistical-pattern learning (π-digits)</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 920px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .panel-note { color: var(--muted); font-size: 0.92rem; margin-top: 0.4rem; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  blockquote.quote { border-left: 3px solid var(--accent); margin: 0.8rem 0; padding: 0.4rem 0.9rem; background: #fafbfc; font-size: 0.94rem; }
+  svg.plot { background: #fff; border: 1px solid #d9e0e7; border-radius: 4px; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  .controls { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin: 0.5rem 0; }
+  .layout { display: grid; grid-template-columns: 540px 1fr; gap: 1.2rem; align-items: start; }
+  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+  input[type=range] { width: 240px; }
+  .reveal { padding: 0.7rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; background: #f4f6f8; border-left: 4px solid var(--accent); display: none; }
+  .reveal.correct { border-left-color: var(--good); background: #ecfdf3; }
+  .reveal.incorrect { border-left-color: var(--bad); background: #fdecec; }
+  .choice { display: block; width: 100%; text-align: left; margin: 0.3rem 0; padding: 0.55rem 0.8rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover { background: #eef3f8; }
+  .choice.active { border-color: var(--accent); background: #eef3f8; }
+  .stat-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.4rem 0; }
+  .stat-pill { padding: 0.18rem 0.55rem; border-radius: 12px; background: #eef3f8; color: var(--accent); font-size: 0.85rem; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>Statistical-pattern learning: 10% on the Ackermann digits of π</h1>
+<p class="subtitle">Logical Induction companion · widget 4 of the Ch 3 batch on <a href="https://arxiv.org/abs/1609.03543">Garrabrant et&nbsp;al. (2016) §4.3</a></p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=36">Garrabrant et&nbsp;al. (2016) §4.3 Theorem 4.3.1 "Learning Pseudorandom Frequencies"</a> — for an EC sequence pseudorandom with frequency $p$, $\mathbb{P}_n(\varphi_n) \to p$ in a timely manner.</li>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=36">Ackermann-digit example</a> (paper p. 36): $\varphi_n := \quot{\pi[\mathrm{Ack}(n, n)] = 7}$.</li>
+    <li>Companion: <a href="../../ch1-introduction/widgets/01-pi-digit-paradox.html">li-ch1-pi-digit-paradox</a> sets up why a Bayesian is forced to 0 or 1 on $\pi$-digit sentences.</li>
+    <li><a href="https://github.com/monasticacademy/logical-induction/blob/main/examples/uniform_digits_of_pi.py">Flint's <code>uniform_digits_of_pi.py</code></a> — runnable LIA-toy convergence demo for a related setting.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;"><strong>Theorem 4.3.1 (Learning Pseudorandom Frequencies).</strong> If $(\varphi_n)$ is an EC sequence of decidable sentences pseudorandom with frequency $p$ (no polynomial-time predictor can do better than $p$), then $\mathbb{P}_n(\varphi_n) \to p$ in a timely manner.</p>
+  <p style="margin: 0;">The Ackermann-digit example: $\varphi_n := \quot{\pi[\mathrm{Ack}(n, n)] = 7}$. Each individual sentence has a determinate truth value (it's decidable in principle), but $\mathrm{Ack}(n, n)$ grows non-elementarily and no polynomial-time predictor can compute $\pi[\mathrm{Ack}(n, n)]$. <strong>The LI learns to assign $\approx 0.1$ to each $\varphi_n$ — long before any one of them is resolved.</strong></p>
+</div>
+
+<h2>Pick a target frequency $p$</h2>
+<div class="controls">
+  <label for="p-slider">$p$ =</label>
+  <input id="p-slider" type="range" min="0.05" max="0.95" step="0.05" value="0.1">
+  <span id="p-display" style="font-weight:600;color:var(--accent);"></span>
+  <button id="reroll-btn" class="choice" style="display:inline-block;width:auto;margin:0;">Reroll truth values</button>
+</div>
+
+<div class="layout">
+  <div>
+    <svg class="plot" id="plot" viewBox="0 0 540 320"></svg>
+    <p class="panel-note" style="text-align:center;">Three reasoners on the diagonal $\mathbb{P}_n(\varphi_n)$ for $n = 1, \ldots, 50$. <span style="color:var(--bad)">red</span> = the Bayesian forced to ground truth (0 or 1, knowable in principle); <span style="color:var(--accent)">blue</span> = the LI converging to $p$ in a timely manner; <span style="color:var(--muted)">grey</span> = a naive constant-$\frac{1}{2}$ guesser as a baseline. The dashed green line is the target frequency $p$.</p>
+  </div>
+  <div>
+    <div class="stat-row" id="stat-row"></div>
+    <h2 style="margin-top:0.4rem;">Predict, then reveal</h2>
+    <p class="panel-note" style="margin-top:0.2rem;">Each $\varphi_n$ has a determinate truth value. What is the limit $\lim_{n \to \infty} \mathbb{P}_n(\varphi_n)$ for a logical inductor over $\mathsf{PA}$?</p>
+    <div id="prediction-choices"></div>
+    <div class="reveal" id="reveal"></div>
+  </div>
+</div>
+
+<h2>Why this is not a contradiction with Provability Induction</h2>
+<p>Provability Induction (Theorem 4.2.1) requires the limiting probabilities to themselves be efficiently computable. For the Ackermann-digit sequence, the per-sentence limit probabilities form a sequence in $\{0, 1\}^\mathbb{N}$ that is <em>not</em> efficiently computable (it depends on $\pi$ digits at non-elementary positions). So Provability Induction has nothing to say about the diagonal $\mathbb{P}_n(\varphi_n)$.</p>
+<p>What §4.3 establishes is a <em>weaker</em> statement: even when the per-sentence pattern is uncomputable, if the <em>frequency</em> of truth is $p$ on every polynomial-time-extracted subsequence, the LI learns to predict at frequency $p$. The Ackermann-digit sequence has frequency $1/10$ (modulo the Borel-normality assumption on $\pi$), so the LI converges to $0.1$.</p>
+
+<blockquote class="quote">"Assuming there's no good way to predict the Ackermann digits of $\pi$ using a $\bar{\mathbb{P}}$-generable divergent weighting, $\mathbb{P}$ will assign probability 10% to each $\varphi^{\text{Ack}}_n$ in a timely manner, while it waits for the resources to determine whether the sentence is true or false." — <a href="https://arxiv.org/pdf/1609.03543v3#page=36">Garrabrant et&nbsp;al. (2016), §4.3</a></blockquote>
+
+<p class="footnote">
+  <strong>What this widget simulates and what it can't.</strong> Each $\varphi_n$ is given a truth value sampled iid Bernoulli($p$) at startup (or on "reroll"); this is a stand-in for the real Ackermann-digit-of-$\pi$ truth values, which the user's browser cannot compute in finite time. The "Bayesian forced to ground truth" line displays those truth values directly. The "LI" line is a stylised trajectory: Brownian-style noise around $p$ that decays as $n$ grows, modelling timely-manner convergence. The actual LIA's price for $\varphi_n$ is more nuanced — see <a href="https://github.com/monasticacademy/logical-induction/blob/main/examples/uniform_digits_of_pi.py">Flint's <code>uniform_digits_of_pi.py</code></a> for a runnable LIA-toy that produces a real (non-stylised) convergence trajectory on a related setting. The qualitative claim — $\mathbb{P}_n(\varphi_n) \to p$ even though individual truth values are 0 or 1 — is the content of Theorem 4.3.1; the widget renders that claim, not a faithful LIA simulation.
+</p>
+
+<nav class="nav">
+  <a href="03-provability-induction.html">← Module 3: provability induction</a>
+  <a href="../README.md">Ch 3 README →</a>
+</nav>
+
+<script>
+const N_SENTENCES = 50;
+
+const slider = document.getElementById('p-slider');
+const pDisplay = document.getElementById('p-display');
+const rerollBtn = document.getElementById('reroll-btn');
+const statRowEl = document.getElementById('stat-row');
+const predictionEl = document.getElementById('prediction-choices');
+const revealEl = document.getElementById('reveal');
+const svg = d3.select('#plot');
+
+let userPrediction = null;
+let truthSeed = 12345;
+
+const PREDICTIONS = [
+  { id: 'one-or-zero', label: '<strong>Either 0 or 1</strong>, depending on the truth value of the digit at $\\mathrm{Ack}(n, n)$. The limit oscillates between 0 and 1.' },
+  { id: 'half', label: '<strong>$\\tfrac{1}{2}$</strong>, since the LI has no information.' },
+  { id: 'frequency-p', label: '<strong>$p$ = the frequency of "7"s in random base-10 strings (i.e., 0.1)</strong>. The LI converges to the empirical-frequency prior.' },
+];
+const CORRECT_ID = 'frequency-p';
+
+// Tiny seedable PRNG (mulberry32)
+function mulberry32(a) {
+  return function () {
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function generateTruth(p) {
+  const rand = mulberry32(truthSeed);
+  return d3.range(N_SENTENCES).map(() => (rand() < p ? 1 : 0));
+}
+
+function generateLITrajectory(p) {
+  // Stylised LI: Brownian-style noise around p whose amplitude shrinks as 1/sqrt(n).
+  const rand = mulberry32(truthSeed * 7 + 31);
+  const series = [];
+  let warmup = 0.5;  // start at 0.5
+  for (let n = 1; n <= N_SENTENCES; n++) {
+    // Approach p with rate ~ 1 - exp(-n/3); add noise that shrinks like 1/sqrt(n).
+    const drift = p + (warmup - p) * Math.exp(-n / 3);
+    const noise = (rand() - 0.5) * 0.6 / Math.sqrt(n);
+    series.push({ n, p: Math.max(0, Math.min(1, drift + noise)) });
+  }
+  return series;
+}
+
+const PLOT_W = 540, PLOT_H = 320, PAD_L = 56, PAD_R = 18, PAD_T = 18, PAD_B = 38;
+
+function render() {
+  const p = +slider.value;
+  pDisplay.textContent = p.toFixed(2);
+
+  const truth = generateTruth(p);
+  const liSeries = generateLITrajectory(p);
+  const trueCount = truth.reduce((a, b) => a + b, 0);
+
+  svg.selectAll('*').remove();
+  const x = d3.scaleLinear().domain([1, N_SENTENCES]).range([PAD_L, PLOT_W - PAD_R]);
+  const y = d3.scaleLinear().domain([-0.05, 1.05]).range([PLOT_H - PAD_B, PAD_T]);
+
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${PLOT_H - PAD_B})`)
+     .call(d3.axisBottom(x).ticks(10));
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(${PAD_L}, 0)`)
+     .call(d3.axisLeft(y).ticks(6).tickFormat(d3.format('.1f')));
+  svg.append('text').attr('class', 'axis-label').attr('x', PLOT_W / 2).attr('y', PLOT_H - 6)
+     .attr('text-anchor', 'middle').text('sentence index n');
+  svg.append('text').attr('class', 'axis-label').attr('x', -PLOT_H / 2).attr('y', 14)
+     .attr('transform', 'rotate(-90)').attr('text-anchor', 'middle').text('P_n(φ_n)');
+
+  // Target line at p
+  svg.append('line').attr('x1', PAD_L).attr('x2', PLOT_W - PAD_R)
+     .attr('y1', y(p)).attr('y2', y(p))
+     .attr('stroke', 'var(--good)').attr('stroke-dasharray', '4 3').attr('stroke-width', 1.5);
+  svg.append('text').attr('x', PLOT_W - PAD_R - 4).attr('y', y(p) - 4)
+     .attr('text-anchor', 'end').attr('font-size', 11).attr('fill', 'var(--good)').text(`p = ${p.toFixed(2)}`);
+
+  // Naive 0.5 baseline
+  svg.append('line').attr('x1', PAD_L).attr('x2', PLOT_W - PAD_R)
+     .attr('y1', y(0.5)).attr('y2', y(0.5))
+     .attr('stroke', 'var(--muted)').attr('stroke-dasharray', '2 2').attr('stroke-width', 1).attr('opacity', 0.5);
+
+  // Bayesian truth dots
+  truth.forEach((t, i) => {
+    svg.append('circle').attr('cx', x(i + 1)).attr('cy', y(t)).attr('r', 3)
+       .attr('fill', 'var(--bad)').attr('stroke', '#fff').attr('stroke-width', 0.8);
+  });
+
+  // LI line
+  const liLine = d3.line().x(d => x(d.n)).y(d => y(d.p));
+  svg.append('path').datum(liSeries)
+     .attr('fill', 'none').attr('stroke', 'var(--accent)').attr('stroke-width', 1.8)
+     .attr('d', liLine);
+
+  // Stats
+  const meanLI = d3.mean(liSeries.slice(20), d => d.p);
+  statRowEl.innerHTML =
+    `<span class="stat-pill">truths in sample: ${trueCount} / ${N_SENTENCES}</span>` +
+    `<span class="stat-pill">empirical frequency: ${(trueCount / N_SENTENCES).toFixed(2)}</span>` +
+    `<span class="stat-pill">LI mean (last 30): ${meanLI.toFixed(2)}</span>` +
+    `<span class="stat-pill">target $p$: ${p.toFixed(2)}</span>`;
+
+  renderMath();
+}
+
+function renderPredictions() {
+  predictionEl.innerHTML = '';
+  PREDICTIONS.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'choice';
+    b.innerHTML = p.label;
+    if (userPrediction === p.id) b.classList.add('active');
+    b.onclick = () => { userPrediction = p.id; renderPredictions(); renderReveal(); };
+    predictionEl.appendChild(b);
+  });
+}
+
+function renderReveal() {
+  if (!userPrediction) { revealEl.style.display = 'none'; return; }
+  const correct = userPrediction === CORRECT_ID;
+  revealEl.className = 'reveal ' + (correct ? 'correct' : 'incorrect');
+  revealEl.style.display = 'block';
+  if (correct) {
+    revealEl.innerHTML = '<strong>✓ Right.</strong> The diagonal $\\mathbb{P}_n(\\varphi_n)$ converges to the pseudorandom frequency $p$, not to the per-sentence truth value. This is genuinely surprising the first time you see it: the LI is "wrong" on every individual sentence (it says $0.1$ on a digit that\'s either $0$ or $1$ in truth) but right in aggregate. Statistical-pattern learning is what lets the LI hover near $0.1$ without violating coherence — Provability Induction does not apply because the per-sentence pattern is not EC.';
+  } else if (userPrediction === 'one-or-zero') {
+    revealEl.innerHTML = '<strong>✗ The diagonal $\\mathbb{P}_n(\\varphi_n)$ doesn\'t track per-sentence truth.</strong> $\\lim_{m \\to \\infty} \\mathbb{P}_m(\\varphi_n)$ does go to 0 or 1 for any specific $n$ (once $\\bar{D}$ resolves $\\varphi_n$), but the diagonal $\\mathbb{P}_n(\\varphi_n)$ is checked on day $n$, before $\\bar{D}$ has had time. The diagonal converges to the frequency, not the per-sentence truth.';
+  } else {
+    revealEl.innerHTML = '<strong>✗ A naive 0.5-guesser does worse than the LI.</strong> Polynomial-time traders can detect that "7"s appear at frequency $1/10$ in random digits, and would exploit any market that priced $\\varphi_n$ at $0.5$ — they\'d sell short and earn $\\approx 0.4$ per sentence. The LI converges to $p$, not to $0.5$.';
+  }
+  renderMath();
+}
+
+function renderMath() {
+  if (!window.renderMathInElement) return;
+  renderMathInElement(document.body, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '\\[', right: '\\]', display: true },
+      { left: '$', right: '$', display: false },
+      { left: '\\(', right: '\\)', display: false },
+    ],
+    macros: { '\\quot': '\\textsf{“}#1\\textsf{”}' },
+    throwOnError: false,
+    strict: 'ignore',
+  });
+}
+
+slider.addEventListener('input', render);
+rerollBtn.addEventListener('click', () => { truthSeed = Math.floor(Math.random() * 1e9); render(); });
+renderPredictions();
+render();
+</script>
+
+</body>
+</html>
