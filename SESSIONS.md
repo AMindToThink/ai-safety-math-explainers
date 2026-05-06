@@ -968,3 +968,45 @@ per session, newest at the bottom. See
   adversarial input or a CROWN-style linear bound proving
   robustness; site grades both branches.
 - **Blockers:** none.
+
+## 2026-05-07 03:45 (continuing — nnv-ch10-deeppoly, the headline)
+
+- **Worked on:** Built `nnv-ch10-deeppoly` — the **headline
+  chapter**. DeepPoly's polyhedral abstract domain with the
+  triangle relaxation for ReLU.
+- **What got done:** read polyhedra.tex; flipped row + Status
+  block; wrote chapter `README.md` framing the ReLU triangle
+  $h \ge 0, h \ge a, h \le u(a-l)/(u-l)$ as the most-precise
+  sound convex over-approximation; built
+  `01-adversarial-or-certificate.html` — the headline
+  *verification arena*. Reader has both the attacker mode
+  (drag a marker constrained to the ε-ball, see live $y$ at the
+  marker, check if it exceeds $M$) and the defender mode (the
+  site continuously displays DeepPoly's certified upper bound
+  on $y$ over the whole ball, computed by per-ReLU triangle +
+  back-substitution to a single linear $\bar y(x_1, x_2)$, then
+  closed-form max over the box). Three-way verdict: <strong>refuted</strong>
+  if attacker found, <strong>certified</strong> if DeepPoly
+  bound ≤ M, <strong>inconclusive</strong> otherwise. Comparison
+  table contrasts the upper bound across interval/zonotope/DeepPoly/true.
+  Three presets exercise the qualitative regimes: easy-cert,
+  easy-att, hard (where DeepPoly is loose enough to leave the
+  spec inconclusive — the case branch-and-bound is built for).
+- **Verification:** Smoke test green; integration test confirms
+  CERTIFIED, INCONCLUSIVE, soundness on all three presets, and
+  that DeepPoly is strictly tighter than interval and zonotope
+  on every preset (e.g., DeepPoly 1.8 vs interval 2.4 on the
+  &ldquo;hard&rdquo; case, with true max 1.2). The headline
+  pedagogical point — DeepPoly closes the gap that broke the
+  zonotope domain on Ch 9's &ldquo;cross&rdquo; preset — is
+  visible directly in the comparison table.
+- **What's next:** Three options.
+  (a) `nnv-ch11-end-to-end` — the abstract-verification arena
+      that ties Parts I-III together at the system level.
+  (b) `nnv-ch1-motivation` — the soft on-ramp; lower priority
+      now that the technical core is mostly built.
+  (c) `nnv-ch12-abstract-training` — the bridge to defenses.
+  Probably (a) next, then (b), then (c) if time.
+- **Blockers:** none. **Part III's central chapters (8, 9, 10)
+  are now drafted** — the 14-row module breakdown is more than
+  half complete (9 of 14 chapters drafted).

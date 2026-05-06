@@ -208,7 +208,7 @@ to be refined by whichever Claude takes the chapter.
 | Ch 7 `specialized.tex` (Neural Theory Solvers — Simplex / Reluplex) | `nnv-ch7-reluplex` | Reluplex case-split tree on the 2-2-1 toy net (4 leaves) under a robustness query | Drill into each leaf to see the reduced linear network and Simplex verdict; site shows overall SAT-with-counterexample or UNSAT-after-all-leaves-closed | in progress | |
 | Ch 8 `absint.tex` (Neural Interval Abstraction) | `nnv-ch8-intervals` | 2-2-1 ReLU net; draggable ε-ball + per-node interval propagation | Drag the ε-ball, watch interval bounds propagate through every node; compare to the true output range and see the overapproximation gap appear when activation patterns straddle the boundary | in progress | |
 | Ch 9 `numerical.tex` (Neural Zonotope Abstraction) | `nnv-ch9-zonotopes` | 2-2-1 net; zonotope of generators on input ε-ball, propagated through the net, projected to (h₁, h₂) parallelogram | Drag-the-ε-ball: side-by-side interval vs. zonotope bound on $y$ + the parallelogram in $(h_1, h_2)$-space showing path-sharing preserved | in progress | |
-| Ch 10 `polyhedra.tex` (Neural Polyhedron Abstraction / DeepPoly) | `nnv-ch10-deeppoly` | Same 2-2-1 net; polyhedron viewed as a system of half-spaces | Adversarial-or-certificate verification game (the headline widget): given a 2-input net + ε-ball, the reader either constructs an adversarial input *or* a CROWN-style linear bound proving robustness; site grades both | not started | |
+| Ch 10 `polyhedra.tex` (Neural Polyhedron Abstraction / DeepPoly) | `nnv-ch10-deeppoly` | Same 2-2-1 net; DeepPoly triangle relaxation per unstable ReLU | Adversarial-or-certificate verification game (the headline widget): drag a marker to attack OR read off the DeepPoly upper bound to certify; verdict: refuted, certified, or inconclusive | in progress | |
 | Ch 11 `absver.tex` (Verifying with Abstract Interpretation) | `nnv-ch11-end-to-end` | 2-2-1 net + a tiny MNIST-3vs5 with both ℓ∞ and ℓ₂ adversaries | End-to-end verification arena: pick a domain (interval / zonotope / polyhedra), watch precision-vs-runtime trade-off on a benchmark suite; predict-then-reveal on which domain certifies which spec | not started | |
 | Ch 12 `absintnn.tex` (Abstract Training) | `nnv-ch12-abstract-training` | Same 2-2-1 net; trained vs. abstract-trained side by side on a 2D dataset | Slider over (clean loss, robust loss) Pareto frontier; reader picks training schedule and watches certified accuracy on held-out ε-balls | not started | |
 | (Bridge — book pre-dates this) α,β-CROWN + branch-and-bound | `nnv-bridge-ab-crown` | Larger 5-input ReLU net; α/β tightening parameters as sliders | Pick splitting heuristics in branch-and-bound, race α,β-CROWN's defaults on a small VNN-COMP-style benchmark leaderboard | not started | |
@@ -265,12 +265,14 @@ entry should cite the location and link the critique if one exists.
 - **Last updated:** 2026-05-07
 - **Chapters complete:** `nnv-ch2-nn-as-dag`, `nnv-ch3-specs`,
   `nnv-ch4-fol-lra`, `nnv-ch5-encoding`, `nnv-ch6-dpll-t`,
-  `nnv-ch7-reluplex`, `nnv-ch8-intervals` (all drafted;
-  awaiting human review).
-- **Currently being drafted:** `nnv-ch9-zonotopes` — relational
-  abstract domain that fixes path-sharing exactly. Active check
-  is a side-by-side interval-vs-zonotope bound on the toy net plus
-  a parallelogram visualisation in $(h_1, h_2)$-space.
+  `nnv-ch7-reluplex`, `nnv-ch8-intervals`,
+  `nnv-ch9-zonotopes` (all drafted; awaiting human review).
+- **Currently being drafted:** `nnv-ch10-deeppoly` — the headline
+  chapter. Polyhedral abstract domain (DeepPoly's triangle
+  relaxation). Active check is the *adversarial-or-certificate
+  verification game*: drag a marker to attack the spec, or read
+  off the DeepPoly upper bound to certify it; verdict refuted,
+  certified, or inconclusive.
 - **Blockers:** none.
 
 ## Cross-references

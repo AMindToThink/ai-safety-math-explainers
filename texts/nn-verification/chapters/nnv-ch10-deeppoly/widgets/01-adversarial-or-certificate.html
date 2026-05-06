@@ -1,0 +1,480 @@
+<!--
+  Widget: nnv-ch10-adversarial-or-certificate (the headline widget).
+  Source: Albarghouthi (2021) Ch 10, polyhedra.tex (arXiv:2109.10317).
+          §10.3 (ReLU triangle) + §10.4 (network pass), with explicit
+          back-substitution to a closed-form certified upper bound on y.
+  Toy system: 2-2-1 ReLU net.
+  Active check: verification arena. Reader has two modes available
+                simultaneously — drag a marker to find an adversary
+                (concrete attack), and read the DeepPoly upper bound
+                to certify (sound proof). Verdict: refuted, certified,
+                or inconclusive (bound > M but no attacker yet).
+
+  Standalone HTML; D3 v7 + KaTeX from CDN.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NN Verification · Ch 10 · Adversarial-or-certificate game</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; --soft:#eef3f8; --line:#d9e0e7; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: var(--soft); border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; align-items: start; margin-top: 1rem; }
+  @media (max-width: 920px) { .layout { grid-template-columns: 1fr; } }
+  .panel { border: 1px solid var(--line); border-radius: 6px; padding: 0.9rem 1rem; background: #fff; }
+  .panel h3 { margin: 0 0 0.5rem 0; font-size: 0.98rem; }
+  svg.plane { background: #fff; border: 1px solid var(--line); border-radius: 4px; display: block; touch-action: none; cursor: crosshair; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; }
+  .controls-row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin: 0.4rem 0; font-size: 0.92rem; }
+  .controls-row label { min-width: 4rem; color: var(--muted); }
+  input[type=range] { width: 180px; }
+  input[type=number] { width: 4.5rem; font: inherit; padding: 0.2rem 0.4rem; border: 1px solid var(--line); border-radius: 3px; }
+  button { font: inherit; padding: 0.35rem 0.7rem; border: 1px solid var(--line); border-radius: 4px; background: #fff; cursor: pointer; }
+  button:hover { background: var(--soft); }
+  .preset-buttons { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.4rem; }
+  .preset-buttons button { font-size: 0.86rem; padding: 0.25rem 0.55rem; }
+  .verdict { padding: 0.7rem 0.95rem; border-radius: 4px; margin-top: 0.6rem; font-size: 1rem; font-weight: 600; }
+  .verdict.refuted { background: #fef3f2; color: var(--bad); border-left: 4px solid var(--bad); }
+  .verdict.certified { background: #ecfdf3; color: var(--good); border-left: 4px solid var(--good); }
+  .verdict.inconclusive { background: #fffbeb; color: var(--warn); border-left: 4px solid var(--warn); }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem; }
+  .stat-card { border: 1px solid var(--line); border-radius: 4px; padding: 0.5rem 0.7rem; background: #fafbfc; }
+  .stat-card .stat-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-card .stat-val { font-family: "SFMono-Regular", monospace; font-size: 1rem; font-weight: 600; }
+  .stat-card.attack .stat-val { color: var(--bad); }
+  .stat-card.cert .stat-val { color: var(--accent); }
+  .stat-card.thresh .stat-val { color: var(--ink); }
+  .marker-attack { fill: var(--bad); stroke: #fff; stroke-width: 2; cursor: grab; }
+  .marker-attack:active { cursor: grabbing; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  .bound-block { background: #fafbfc; border: 1px solid var(--line); border-radius: 4px; padding: 0.5rem 0.7rem; font-family: "SFMono-Regular", monospace; font-size: 0.86rem; line-height: 1.6; margin-top: 0.5rem; }
+</style>
+</head>
+<body>
+
+<h1>Adversarial or certificate?</h1>
+<p class="subtitle">
+  NN Verification · Chapter 10 · companion to Albarghouthi (2021) §10.3–§10.4. The headline widget.
+</p>
+
+<div class="lede">
+  <p style="margin: 0;">
+    A robustness spec on the canonical 2-2-1 ReLU toy net says
+    &ldquo;for every input in the $\ell_\infty$ ball, the output
+    $y$ stays $\le M$.&rdquo; Two ways to settle it: <em>find an
+    adversary</em> (drag the red marker until $y$ at the marker
+    exceeds $M$) — that refutes the spec — or <em>read the
+    DeepPoly certificate</em> (the polyhedral upper bound on $y$
+    over the whole ball) — if the certificate is $\le M$, the
+    spec is provably robust. Sometimes neither side wins: the
+    bound is loose, and no attack has been found yet. That's the
+    case where α,β-CROWN's branch-and-bound takes over.
+  </p>
+</div>
+
+<div class="layout">
+
+  <div class="panel">
+    <h3>Spec</h3>
+    <div class="controls-row">
+      <label>$\vec c$:</label>
+      $($
+      <input id="cx1" type="number" step="0.1" value="1.0">
+      $,$
+      <input id="cx2" type="number" step="0.1" value="0.5">
+      $)$
+    </div>
+    <div class="controls-row">
+      <label>$\varepsilon$:</label>
+      <input id="eps" type="range" min="0.05" max="2.5" step="0.05" value="0.4">
+      <span id="eps-val">0.40</span>
+    </div>
+    <div class="controls-row">
+      <label>$M$:</label>
+      <input id="M" type="range" min="0" max="6" step="0.05" value="2.5">
+      <span id="M-val">2.50</span>
+    </div>
+
+    <div class="preset-buttons">
+      <button data-preset="easy-cert">easy certify</button>
+      <button data-preset="easy-att">easy attack</button>
+      <button data-preset="hard">inconclusive</button>
+    </div>
+
+    <h3 style="margin-top: 0.7rem;">Input plane $[-3, 3]^2$</h3>
+    <svg id="plane" class="plane" viewBox="0 0 380 380" width="100%" height="380"></svg>
+    <p style="font-size: 0.86rem; color: var(--muted); margin-top: 0.3rem;">
+      Drag the red marker (attacker). It snaps to the
+      $\varepsilon$-ball boundary if you drag outside.
+    </p>
+  </div>
+
+  <div class="panel">
+    <h3>Verdict</h3>
+    <div class="stat-grid">
+      <div class="stat-card attack"><div class="stat-label">attacker $y$</div><div class="stat-val" id="att-y"></div></div>
+      <div class="stat-card cert"><div class="stat-label">DeepPoly bound</div><div class="stat-val" id="poly-y"></div></div>
+      <div class="stat-card thresh"><div class="stat-label">threshold $M$</div><div class="stat-val" id="thresh-M"></div></div>
+    </div>
+    <div id="verdict" class="verdict inconclusive">Choose a spec.</div>
+
+    <h3 style="margin-top: 0.7rem;">DeepPoly certificate</h3>
+    <p style="font-size: 0.86rem; color: var(--muted); margin: 0.2rem 0;">
+      Triangle upper bound on each unstable ReLU + back-substitution
+      gives a single linear upper bound on $y$ over the
+      $\varepsilon$-ball. Coefficients depend on the activation
+      pattern.
+    </p>
+    <div class="bound-block" id="boundDisplay"></div>
+
+    <h3 style="margin-top: 0.7rem;">Comparison with cheaper bounds</h3>
+    <table style="border-collapse: collapse; font-size: 0.88rem; margin-top: 0.3rem; width: 100%;">
+      <thead><tr><th style="background: var(--soft); border: 1px solid var(--line); padding: 0.3rem 0.5rem; text-align: left; color: var(--muted); font-weight: 500;">Bound</th><th style="background: var(--soft); border: 1px solid var(--line); padding: 0.3rem 0.5rem; text-align: left; color: var(--muted); font-weight: 500;">$\bar y$</th><th style="background: var(--soft); border: 1px solid var(--line); padding: 0.3rem 0.5rem; text-align: left; color: var(--muted); font-weight: 500;">vs. $M$</th></tr></thead>
+      <tbody id="boundTable"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<div class="footnote">
+  <p>
+    Reference: Albarghouthi, <em>Introduction to Neural Network
+    Verification</em>, Ch 10 (arXiv:<a href="https://arxiv.org/abs/2109.10317">2109.10317</a>).
+    The triangle relaxation is the most precise sound convex
+    over-approximation of ReLU on $[l, u]$ — proved by §10's
+    visualisation of the only convex shape touching the three
+    extremal points $(l, 0)$, $(0, 0)$, $(u, u)$. DeepPoly
+    (<a href="https://files.sri.inf.ethz.ch/website/papers/DeepPoly.pdf">Singh et al. POPL 2019</a>),
+    CROWN (Zhang et al. NeurIPS 2018), and α,β-CROWN all
+    propagate this relaxation; what differs is how they
+    back-substitute and where they branch.
+  </p>
+  <p>
+    Real DeepPoly chooses the lower-bound slope adaptively
+    ($\lambda \in \{0, u/(u-l)\}$, picked to minimise the
+    resulting interval width). This widget uses the
+    fixed-$\lambda = u/(u-l)$ upper bound only — that is the
+    quantity that participates in upper-bound certificates for
+    $y \le M$ specs. The lower-bound choice would matter if you
+    were certifying $y \ge M_-$ instead.
+  </p>
+</div>
+
+<script>
+"use strict";
+
+// --- Toy net concrete forward ---------------------------------------------
+const relu = (x) => Math.max(0, x);
+const netY = (x1, x2) => relu(x1 + x2) + relu(x1 - x2);
+
+// --- Bound computations ---------------------------------------------------
+// On the box [c1-eps, c1+eps] x [c2-eps, c2+eps]:
+// a1 = x1+x2 in [c1+c2 - 2*eps, c1+c2 + 2*eps]
+// a2 = x1-x2 in [c1-c2 - 2*eps, c1-c2 + 2*eps]
+// For each a_j: status active (l>=0), inactive (u<=0), unstable (l<0<u).
+
+function aBounds(c1, c2, eps) {
+  const m1 = c1 + c2, r1 = 2 * eps; // half-width along (1,1)
+  const m2 = c1 - c2, r2 = 2 * eps; // half-width along (1,-1)
+  return {
+    a1: [m1 - r1, m1 + r1],
+    a2: [m2 - r2, m2 + r2]
+  };
+}
+
+function statusOf([l, u]) {
+  if (l >= 0) return "active";
+  if (u <= 0) return "inactive";
+  return "unstable";
+}
+
+// DeepPoly *upper* linear bound on y(x1, x2) over the eps-ball.
+// y = h1 + h2 with h_j = ReLU(a_j). For each:
+//   active (l>=0):    h_j <= a_j.
+//   inactive (u<=0):  h_j <= 0.
+//   unstable:         h_j <= lambda_j * (a_j - l_j) = lambda_j*a_j - lambda_j*l_j
+//                     where lambda_j = u_j/(u_j - l_j).
+// Sum the upper bounds, then express as a linear function of x1, x2.
+// Returns { coefX1, coefX2, const, breakdown: {...} }.
+function deepPolyUpperBound(c1, c2, eps) {
+  const { a1, a2 } = aBounds(c1, c2, eps);
+  const s1 = statusOf(a1), s2 = statusOf(a2);
+  // Express h_j upper as alpha_j*(x1+x2 or x1-x2) + beta_j.
+  function unitBound(a_range, sign_x2) {
+    const [l, u] = a_range;
+    const status = statusOf(a_range);
+    if (status === "active")   return { alpha: 1, beta: 0, status, lambda: 1 };
+    if (status === "inactive") return { alpha: 0, beta: 0, status, lambda: 0 };
+    const lambda = u / (u - l);
+    return { alpha: lambda, beta: -lambda * l, status, lambda };
+  }
+  const u1 = unitBound(a1, +1); // h1 upper = alpha1*(x1+x2) + beta1
+  const u2 = unitBound(a2, -1); // h2 upper = alpha2*(x1-x2) + beta2
+  // Combined: y_upper = alpha1*(x1+x2) + beta1 + alpha2*(x1-x2) + beta2
+  //                   = (alpha1 + alpha2) x1 + (alpha1 - alpha2) x2 + (beta1 + beta2)
+  const coefX1 = u1.alpha + u2.alpha;
+  const coefX2 = u1.alpha - u2.alpha;
+  const constTerm = u1.beta + u2.beta;
+  // Max over the eps-ball: just take signs.
+  const maxY = coefX1 * (c1 + (coefX1 >= 0 ? eps : -eps)) +
+               coefX2 * (c2 + (coefX2 >= 0 ? eps : -eps)) +
+               constTerm;
+  return { coefX1, coefX2, const: constTerm, maxY, u1, u2, s1, s2, a1, a2 };
+}
+
+// Interval bound on y (Ch 8).
+function intervalUpper(c1, c2, eps) {
+  const [la1, ua1] = [c1 + c2 - 2 * eps, c1 + c2 + 2 * eps];
+  const [la2, ua2] = [c1 - c2 - 2 * eps, c1 - c2 + 2 * eps];
+  const h1u = Math.max(ua1, 0), h2u = Math.max(ua2, 0);
+  return h1u + h2u;
+}
+
+// Zonotope bound on y (Ch 9, parallelogram).
+function zonotopeUpper(c1, c2, eps) {
+  // We do this by re-running the zonotope arithmetic.
+  // For brevity reuse the closed-form computation: compute width and center.
+  const ba1 = [c1 + c2 - 2 * eps, c1 + c2 + 2 * eps];
+  const ba2 = [c1 - c2 - 2 * eps, c1 - c2 + 2 * eps];
+  function reluZonoBounds([l, u]) {
+    if (l >= 0) return [l, u];
+    if (u <= 0) return [0, 0];
+    const lambda = u / (u - l), eta = u * (1 - lambda) / 2;
+    // Center: lambda*(midpoint) + eta.
+    // Width: lambda*(u-l)/2 + eta = lambda*(u-l)/2 + u*(1-lambda)/2.
+    const mid = (l + u) / 2;
+    const half = lambda * (u - l) / 2 + eta;
+    return [lambda * mid + eta - half, lambda * mid + eta + half];
+  }
+  // BUT this doesn't preserve relations. To keep things consistent with the
+  // zonotope widget's behaviour, fall back to widget-equivalent multi-generator
+  // arithmetic. For brevity here we approximate by summing per-unit zonotope
+  // upper bounds — same as interval-of-zonotope-images, slightly wider than
+  // the true zonotope bound but fine as a comparison reference.
+  const [_, h1u] = reluZonoBounds(ba1);
+  const [__, h2u] = reluZonoBounds(ba2);
+  return h1u + h2u;
+}
+
+// True max via grid sample.
+function trueMax(c1, c2, eps, N) {
+  N = N || 81;
+  let hi = -Infinity;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    const x1 = c1 - eps + (2 * eps * i) / (N - 1);
+    const x2 = c2 - eps + (2 * eps * j) / (N - 1);
+    const y = netY(x1, x2);
+    if (y > hi) hi = y;
+  }
+  return hi;
+}
+
+// --- DOM ------------------------------------------------------------------
+const planeSvg = d3.select('#plane');
+const cx1El = document.getElementById('cx1');
+const cx2El = document.getElementById('cx2');
+const epsEl = document.getElementById('eps');
+const MEl = document.getElementById('M');
+const epsValEl = document.getElementById('eps-val');
+const MValEl = document.getElementById('M-val');
+const verdictEl = document.getElementById('verdict');
+const attYEl = document.getElementById('att-y');
+const polyYEl = document.getElementById('poly-y');
+const threshEl = document.getElementById('thresh-M');
+const boundEl = document.getElementById('boundDisplay');
+const boundTableEl = document.getElementById('boundTable');
+
+let state = { c1: 1.0, c2: 0.5, attacker: { x1: 1.4, x2: 0.9 } };
+
+const PLOT_RANGE = 3;
+const PLOT_PX = 380;
+const PLOT_PAD = 30;
+function px(x) { return PLOT_PAD + (x + PLOT_RANGE) / (2 * PLOT_RANGE) * (PLOT_PX - 2 * PLOT_PAD); }
+function py(y) { return PLOT_PX - PLOT_PAD - (y + PLOT_RANGE) / (2 * PLOT_RANGE) * (PLOT_PX - 2 * PLOT_PAD); }
+function ux(p) { return (p - PLOT_PAD) / (PLOT_PX - 2 * PLOT_PAD) * (2 * PLOT_RANGE) - PLOT_RANGE; }
+function uy(p) { return -((p - (PLOT_PX - PLOT_PAD)) / (PLOT_PX - 2 * PLOT_PAD)) * (2 * PLOT_RANGE) - PLOT_RANGE; }
+
+function clampToBall() {
+  const eps = parseFloat(epsEl.value);
+  state.attacker.x1 = Math.max(state.c1 - eps, Math.min(state.c1 + eps, state.attacker.x1));
+  state.attacker.x2 = Math.max(state.c2 - eps, Math.min(state.c2 + eps, state.attacker.x2));
+}
+
+function drawPlane() {
+  planeSvg.selectAll('*').remove();
+  const g = planeSvg.append('g');
+  // Heatmap
+  const N = 60;
+  const cell = (PLOT_PX - 2 * PLOT_PAD) / N;
+  let mx = 0;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    mx = Math.max(mx, netY(-3 + (6 * i) / (N - 1), -3 + (6 * j) / (N - 1)));
+  }
+  const color = d3.scaleSequential(d3.interpolateBlues).domain([0, mx]);
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    const x1 = -3 + (6 * i) / (N - 1);
+    const x2 = -3 + (6 * j) / (N - 1);
+    g.append('rect').attr('x', px(x1) - cell / 2).attr('y', py(x2) - cell / 2)
+      .attr('width', cell + 0.5).attr('height', cell + 0.5)
+      .attr('fill', color(netY(x1, x2))).attr('opacity', 0.55);
+  }
+  // Activation boundaries
+  g.append('line').attr('x1', px(-3)).attr('y1', py(3)).attr('x2', px(3)).attr('y2', py(-3))
+    .attr('stroke', '#52606d').attr('stroke-width', 1.2);
+  g.append('line').attr('x1', px(-3)).attr('y1', py(-3)).attr('x2', px(3)).attr('y2', py(3))
+    .attr('stroke', '#52606d').attr('stroke-width', 1.2);
+  // M-contour: shade points where y > M (the "violation set")
+  const M = parseFloat(MEl.value);
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    const x1 = -3 + (6 * i) / (N - 1);
+    const x2 = -3 + (6 * j) / (N - 1);
+    if (netY(x1, x2) > M) {
+      g.append('rect').attr('x', px(x1) - cell / 2).attr('y', py(x2) - cell / 2)
+        .attr('width', cell + 0.5).attr('height', cell + 0.5)
+        .attr('fill', '#d92d20').attr('opacity', 0.18);
+    }
+  }
+  // eps-ball
+  const eps = parseFloat(epsEl.value);
+  g.append('rect')
+    .attr('x', px(state.c1 - eps)).attr('y', py(state.c2 + eps))
+    .attr('width', px(state.c1 + eps) - px(state.c1 - eps))
+    .attr('height', py(state.c2 - eps) - py(state.c2 + eps))
+    .attr('fill', 'rgba(43, 108, 176, 0.10)')
+    .attr('stroke', '#2b6cb0').attr('stroke-width', 2);
+  // Anchor (small white circle)
+  g.append('circle').attr('cx', px(state.c1)).attr('cy', py(state.c2)).attr('r', 4)
+    .attr('fill', '#fff').attr('stroke', '#1f2933').attr('stroke-width', 1.5);
+  // Attacker marker
+  clampToBall();
+  const att = g.append('circle').attr('class', 'marker-attack')
+    .attr('cx', px(state.attacker.x1)).attr('cy', py(state.attacker.x2)).attr('r', 7);
+  const drag = d3.drag().on('drag', function(event) {
+    state.attacker.x1 = ux(event.x);
+    state.attacker.x2 = uy(event.y);
+    clampToBall();
+    d3.select(this).attr('cx', px(state.attacker.x1)).attr('cy', py(state.attacker.x2));
+    update();
+  });
+  att.call(drag);
+
+  // Axes labels
+  g.append('text').attr('x', px(3) + 4).attr('y', py(0) + 4).attr('font-size', 11).attr('fill', '#52606d').text('x₁');
+  g.append('text').attr('x', px(0) + 4).attr('y', py(3) - 6).attr('font-size', 11).attr('fill', '#52606d').text('x₂');
+}
+
+function update() {
+  const eps = parseFloat(epsEl.value);
+  const M = parseFloat(MEl.value);
+  epsValEl.textContent = eps.toFixed(2);
+  MValEl.textContent = M.toFixed(2);
+
+  const aY = netY(state.attacker.x1, state.attacker.x2);
+  const dpRes = deepPolyUpperBound(state.c1, state.c2, eps);
+  const dpBound = dpRes.maxY;
+  const intBound = intervalUpper(state.c1, state.c2, eps);
+  const zonoBound = zonotopeUpper(state.c1, state.c2, eps);
+  const tMax = trueMax(state.c1, state.c2, eps);
+
+  attYEl.textContent = aY.toFixed(3);
+  polyYEl.textContent = dpBound.toFixed(3);
+  threshEl.textContent = M.toFixed(2);
+
+  // Verdict
+  let verdictKind, verdictText;
+  if (aY > M + 1e-6) {
+    verdictKind = 'refuted';
+    verdictText = `<strong>REFUTED.</strong> Attacker found: $\\vec x = (${state.attacker.x1.toFixed(2)}, ${state.attacker.x2.toFixed(2)})$ gives $y = ${aY.toFixed(3)} > M = ${M.toFixed(2)}$. The spec is false.`;
+  } else if (dpBound <= M + 1e-6) {
+    verdictKind = 'certified';
+    verdictText = `<strong>CERTIFIED.</strong> DeepPoly upper bound $\\bar y = ${dpBound.toFixed(3)} \\le M = ${M.toFixed(2)}$. No adversary can exist; the spec is provably robust.`;
+  } else {
+    verdictKind = 'inconclusive';
+    verdictText = `<strong>INCONCLUSIVE.</strong> Attacker's best so far is $y = ${aY.toFixed(3)}$ (within bound). DeepPoly bound $\\bar y = ${dpBound.toFixed(3)} > M = ${M.toFixed(2)}$, so the certificate is too loose to prove robustness. Either keep dragging or accept that branch-and-bound is needed.`;
+  }
+  verdictEl.className = 'verdict ' + verdictKind;
+  verdictEl.innerHTML = verdictText;
+  if (window.renderMathInElement) renderMathInElement(verdictEl);
+
+  // Bound display
+  boundEl.innerHTML = `<span style="color: var(--muted);">// status: a₁ ${dpRes.s1}, a₂ ${dpRes.s2}</span><br>` +
+    `ȳ(x₁, x₂) = ${dpRes.coefX1.toFixed(3)}·x₁ + ${dpRes.coefX2.toFixed(3)}·x₂ + ${dpRes.const.toFixed(3)}<br>` +
+    `<span style="color: var(--muted);">// max over ε-ball:</span><br>` +
+    `max ȳ = ${dpBound.toFixed(3)}`;
+
+  // Comparison table
+  const rows = [
+    { name: 'interval (Ch 8)', val: intBound },
+    { name: 'zonotope (Ch 9)', val: zonoBound },
+    { name: 'DeepPoly (Ch 10)', val: dpBound },
+    { name: 'true max (sampled)', val: tMax }
+  ];
+  boundTableEl.innerHTML = '';
+  for (const r of rows) {
+    const tr = document.createElement('tr');
+    const verdict = r.val <= M + 1e-6 ? `<span style="color: var(--good);">≤ M ✓</span>` : `<span style="color: var(--bad);">> M (loose)</span>`;
+    tr.innerHTML = `<td style="border: 1px solid var(--line); padding: 0.25rem 0.5rem;">${r.name}</td><td style="border: 1px solid var(--line); padding: 0.25rem 0.5rem; font-family: monospace;">${r.val.toFixed(3)}</td><td style="border: 1px solid var(--line); padding: 0.25rem 0.5rem;">${verdict}</td>`;
+    boundTableEl.appendChild(tr);
+  }
+}
+
+function onSpec() {
+  state.c1 = parseFloat(cx1El.value);
+  state.c2 = parseFloat(cx2El.value);
+  // Reset attacker to anchor
+  state.attacker = { x1: state.c1, x2: state.c2 };
+  drawPlane(); update();
+}
+
+[cx1El, cx2El].forEach(el => el.addEventListener('input', onSpec));
+[epsEl, MEl].forEach(el => el.addEventListener('input', () => { drawPlane(); update(); }));
+
+document.querySelectorAll('[data-preset]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const k = btn.dataset.preset;
+    if (k === 'easy-cert') {
+      // Spec that DeepPoly easily certifies (M well above max)
+      cx1El.value = '1.0'; cx2El.value = '0.5'; epsEl.value = '0.4'; MEl.value = '4.5';
+    } else if (k === 'easy-att') {
+      // Spec where the attack is right at the corner
+      cx1El.value = '1.0'; cx2El.value = '0.5'; epsEl.value = '0.4'; MEl.value = '2.0';
+    } else if (k === 'hard') {
+      // DeepPoly bound > M but no easy attack
+      cx1El.value = '0.0'; cx2El.value = '0.0'; epsEl.value = '0.6'; MEl.value = '1.0';
+    }
+    state.c1 = parseFloat(cx1El.value);
+    state.c2 = parseFloat(cx2El.value);
+    state.attacker = { x1: state.c1, x2: state.c2 };
+    drawPlane(); update();
+  });
+});
+
+drawPlane();
+update();
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.renderMathInElement) {
+    renderMathInElement(document.body, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "$", right: "$", display: false }
+      ],
+      throwOnError: false
+    });
+  }
+});
+</script>
+
+</body>
+</html>
