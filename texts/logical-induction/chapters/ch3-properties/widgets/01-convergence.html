@@ -1,0 +1,345 @@
+<!--
+  Widget: li-ch3-convergence (module 1 of the Logical Induction Ch 3
+          batch, "Properties of Logical Inductors").
+  Source: Garrabrant et al. (2016) §4.1 Theorem 4.1.1 "Convergence"
+          (arXiv:1609.03543v3, p. 29). Proof sketch: if P_n(phi)
+          oscillates between p-eps and p+eps infinitely often, a
+          trader can buy at the trough and sell at the peak, profiting
+          ~2 eps per cycle without bound. Therefore no LI can have a
+          non-convergent price.
+  Toy system: a hypothetical (non-LI) market with a price
+              trajectory that oscillates between p-eps and p+eps
+              with adjustable amplitude eps and period T, optionally
+              "settling" to p after some day n_settle.
+  Active check: predict the trader's net worth after N cycles, and
+                identify what makes the trader exploit the market.
+
+  Standalone: open this .html directly in a browser. Uses D3 v7 and
+              KaTeX from CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Logical Induction · Ch 3 · Convergence: oscillation is exploitable</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 920px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .panel-note { color: var(--muted); font-size: 0.92rem; margin-top: 0.4rem; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  blockquote.quote { border-left: 3px solid var(--accent); margin: 0.8rem 0; padding: 0.4rem 0.9rem; background: #fafbfc; font-size: 0.94rem; }
+  svg.plot { background: #fff; border: 1px solid #d9e0e7; border-radius: 4px; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  .controls { display: grid; grid-template-columns: max-content 1fr max-content; gap: 0.5rem 1rem; align-items: center; margin: 0.5rem 0; max-width: 540px; }
+  input[type=range] { width: 100%; }
+  .stat-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.4rem 0; }
+  .stat-pill { padding: 0.18rem 0.55rem; border-radius: 12px; background: #eef3f8; color: var(--accent); font-size: 0.85rem; font-weight: 600; }
+  .stat-pill.good { background: #ecfdf3; color: var(--good); }
+  .stat-pill.bad { background: #fdecec; color: var(--bad); }
+  .layout { display: grid; grid-template-columns: 1.1fr 1fr; gap: 1.2rem; }
+  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+  .reveal { padding: 0.7rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; background: #f4f6f8; border-left: 4px solid var(--accent); display: none; }
+  .reveal.correct { border-left-color: var(--good); background: #ecfdf3; }
+  .reveal.incorrect { border-left-color: var(--bad); background: #fdecec; }
+  .choice { display: block; width: 100%; text-align: left; margin: 0.3rem 0; padding: 0.55rem 0.8rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover { background: #eef3f8; }
+  .choice.active { border-color: var(--accent); background: #eef3f8; }
+</style>
+</head>
+<body>
+
+<h1>Convergence: any oscillating market is exploitable</h1>
+<p class="subtitle">Logical Induction companion · widget 1 of the Ch 3 batch on <a href="https://arxiv.org/abs/1609.03543">Garrabrant et&nbsp;al. (2016) §4.1</a></p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=29">Garrabrant et&nbsp;al. (2016) §4.1 Theorem 4.1.1 "Convergence"</a> — the limit $\mathbb{P}_\infty(\varphi)$ exists for every $\varphi$, with proof sketch by buy-low/sell-high arbitrage.</li>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=25">§3.5 "Exploitation"</a> — for the bounded-below / unbounded-above test we'll be applying.</li>
+    <li>Companion widget: <a href="../../ch2-the-criterion/widgets/04-exploit-or-not.html">li-ch2-exploit-or-not</a> covers the basic vocabulary.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;"><strong>Theorem 4.1.1 (Convergence).</strong> For any logical inductor $\mathbb{P}$ and any sentence $\varphi$, the limit $\mathbb{P}_\infty(\varphi) := \lim_{n \to \infty} \mathbb{P}_n(\varphi)$ exists.</p>
+  <p style="margin: 0;">Why? Because if $\mathbb{P}_n(\varphi)$ failed to converge, it would oscillate above $p + \varepsilon$ and below $p - \varepsilon$ infinitely often — and a trader who buys low at $p - \varepsilon$ and sells high at $p + \varepsilon$ would book $\approx 2\varepsilon$ per cycle, forever. <strong>The trader exploits the market</strong>, contradicting the LI criterion. So a non-convergent price cannot belong to an LI.</p>
+</div>
+
+<h2>Build a non-convergent market</h2>
+<p>Below, the (non-LI) market's price for $\varphi$ oscillates as a square wave with amplitude $\varepsilon$ around target $p$, with period $T$ days. Optionally, the price <em>settles</em> to $p$ after day $n_{\text{settle}}$ (set $n_{\text{settle}}$ to "never" to make the oscillation eternal).</p>
+
+<div class="controls">
+  <label for="eps-slider">amplitude $\varepsilon$</label>
+  <input id="eps-slider" type="range" min="0" max="0.4" step="0.02" value="0.2">
+  <span id="eps-display" style="font-weight:600;color:var(--accent);"></span>
+  <label for="period-slider">period $T$ (days)</label>
+  <input id="period-slider" type="range" min="4" max="20" step="2" value="8">
+  <span id="period-display" style="font-weight:600;color:var(--accent);"></span>
+  <label for="settle-slider">$n_{\text{settle}}$</label>
+  <input id="settle-slider" type="range" min="8" max="120" step="4" value="120">
+  <span id="settle-display" style="font-weight:600;color:var(--accent);"></span>
+</div>
+
+<div class="layout">
+  <div>
+    <svg class="plot" id="price-plot" viewBox="0 0 540 240"></svg>
+    <p class="panel-note" style="text-align:center;">Market price $\mathbb{P}_n(\varphi)$ over days $1, \ldots, 100$. Green dots = days the trader buys (price below $p - \varepsilon$). Red dots = days the trader sells (price above $p + \varepsilon$).</p>
+
+    <svg class="plot" id="worth-plot" viewBox="0 0 540 240" style="margin-top: 0.5rem;"></svg>
+    <p class="panel-note" style="text-align:center;">Trader's <em>realised</em> cumulative cash from completed buy/sell cycles. Each completed cycle adds $\approx 2\varepsilon$ — and there is no plausible world in which this cash drops below the realised running total.</p>
+  </div>
+  <div>
+    <div class="stat-row" id="stat-row"></div>
+    <h2 style="margin-top:0.4rem;">Predict, then reveal</h2>
+    <p class="panel-note" style="margin-top:0.2rem;">For the current $(\varepsilon, T, n_{\text{settle}})$, does the trader exploit the market?</p>
+    <div id="prediction-choices"></div>
+    <div class="reveal" id="reveal"></div>
+  </div>
+</div>
+
+<h2>Why this argument is the template</h2>
+<p>Every property in §4 follows this same shape:</p>
+<ol>
+  <li><strong>Suppose</strong> the property fails by some $\varepsilon$.</li>
+  <li><strong>Build</strong> an explicit trader that, exploits this failure, profiting $\approx \varepsilon$ per opportunity.</li>
+  <li><strong>Conclude</strong> by the criterion that the property must hold.</li>
+</ol>
+<p>The convergence argument is the cleanest example: the trader is just <em>buy low, sell high</em>. Limit coherence (Theorem 4.1.2) is the same trick applied to mutually exclusive sentences. Provability induction (Theorem 4.2.1) is the same trick applied to an EC sequence of theorems. The widget's worth-plot is the universal "see the contradiction" panel.</p>
+
+<blockquote class="quote">"A trader can wait until $\mathbb{P}_n(\varphi) &lt; p - \varepsilon$ and then buy a share in $\varphi$ at the low market price… and then sells back the share in $\varphi$ at the higher price. This trader makes a total profit of $2\varepsilon$ every time $\mathbb{P}_n(\varphi)$ oscillates in this way, at no risk, and therefore exploits $\mathbb{P}$." — <a href="https://arxiv.org/pdf/1609.03543v3#page=29">Garrabrant et&nbsp;al. (2016), §4.1</a></blockquote>
+
+<p class="footnote">
+  <strong>What the model is and isn't.</strong> The trader sketched here uses a discontinuous threshold rule (buy when price strictly below $p - \varepsilon$, sell when strictly above). Per the §3.4 continuity constraint, an actual LI-exploiting trader has to be continuous; the proof sketch in §4.1 explicitly notes "the trader we have sketched makes use of discontinuous trading functions, and so is not a well-formed trader. These details are treated in §4.1." The intuition of "buy at the trough, sell at the peak" is exactly the right one; the technical version uses a continuous indicator function (see <code>ctsind</code> in the paper) that gives ${\sim}1$ in the buy zone, ${\sim}{-1}$ in the sell zone, and ramps continuously between. A trader using such an indicator captures essentially the same per-cycle profit as the discontinuous one — see <a href="../../ch2-the-criterion/widgets/03-continuity-paradox.html">module 3 of Ch 2</a> for the continuity story.
+</p>
+
+<nav class="nav">
+  <a href="../README.md">Ch 3 README</a>
+  <a href="../../ch2-the-criterion/widgets/05-arbitrage-pair.html">← Ch 2 module 5</a>
+</nav>
+
+<script>
+const N_DAYS = 100;
+
+const epsSlider = document.getElementById('eps-slider');
+const periodSlider = document.getElementById('period-slider');
+const settleSlider = document.getElementById('settle-slider');
+const epsDisplay = document.getElementById('eps-display');
+const periodDisplay = document.getElementById('period-display');
+const settleDisplay = document.getElementById('settle-display');
+const statRowEl = document.getElementById('stat-row');
+const predictionEl = document.getElementById('prediction-choices');
+const revealEl = document.getElementById('reveal');
+
+const TARGET_P = 0.5;
+
+let userPrediction = null;
+
+const PREDICTIONS = [
+  { id: 'exploits-iff-eternal', label: '<strong>Exploits if and only if the oscillation is eternal</strong> ($n_{\\text{settle}} = $ never). For finite $n_{\\text{settle}}$, the trader books only finitely many cycles.' },
+  { id: 'always-exploits', label: '<strong>Always exploits</strong>, since the trader books positive cash on every completed cycle and never goes negative.' },
+  { id: 'never-exploits', label: '<strong>Never exploits</strong>, because the trader holds the position between buy and sell and is exposed to risk during that time.' },
+];
+const CORRECT_ID = 'exploits-iff-eternal';
+
+// Square-wave price function; settles to TARGET_P after n_settle.
+function priceAt(n, eps, period, nSettle) {
+  if (n >= nSettle) return TARGET_P;
+  const phase = Math.floor((n - 1) / (period / 2)) % 2;
+  return phase === 0 ? TARGET_P - eps : TARGET_P + eps;
+}
+
+// Simulate the threshold-trader's cumulative realised cash through day N.
+// Trader holds 0 or 1 share. Buys when price <= p-eps and not holding;
+// sells when price >= p+eps and holding. Cycle profit recorded only on sell.
+function simulate(eps, period, nSettle) {
+  let holding = 0;
+  let entryPrice = 0;
+  const prices = [];
+  const cash = [];
+  const buyDays = [];
+  const sellDays = [];
+  let cumulativeCash = 0;
+  for (let n = 1; n <= N_DAYS; n++) {
+    const p = priceAt(n, eps, period, nSettle);
+    prices.push({ n, p });
+    if (holding === 0 && p <= TARGET_P - eps + 1e-9 && eps > 1e-6) {
+      holding = 1;
+      entryPrice = p;
+      buyDays.push({ n, p });
+    } else if (holding === 1 && p >= TARGET_P + eps - 1e-9 && eps > 1e-6) {
+      holding = 0;
+      cumulativeCash += (p - entryPrice);
+      sellDays.push({ n, p });
+    }
+    cash.push({ n, c: cumulativeCash });
+  }
+  return { prices, cash, buyDays, sellDays, finalCash: cumulativeCash, completedCycles: sellDays.length };
+}
+
+const PLOT_W = 540, PRICE_H = 240, WORTH_H = 240, PAD_L = 56, PAD_R = 18, PAD_T = 18, PAD_B = 38;
+const priceSvg = d3.select('#price-plot');
+const worthSvg = d3.select('#worth-plot');
+
+function renderPricePlot(sim, eps) {
+  priceSvg.selectAll('*').remove();
+  const x = d3.scaleLinear().domain([1, N_DAYS]).range([PAD_L, PLOT_W - PAD_R]);
+  const y = d3.scaleLinear().domain([0, 1]).range([PRICE_H - PAD_B, PAD_T]);
+
+  priceSvg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${PRICE_H - PAD_B})`)
+     .call(d3.axisBottom(x).ticks(10));
+  priceSvg.append('g').attr('class', 'axis').attr('transform', `translate(${PAD_L}, 0)`)
+     .call(d3.axisLeft(y).ticks(5).tickFormat(d3.format('.1f')));
+  priceSvg.append('text').attr('class', 'axis-label').attr('x', PLOT_W / 2).attr('y', PRICE_H - 6)
+     .attr('text-anchor', 'middle').text('day n');
+  priceSvg.append('text').attr('class', 'axis-label').attr('x', -PRICE_H / 2).attr('y', 14)
+     .attr('transform', 'rotate(-90)').attr('text-anchor', 'middle').text('price P_n(φ)');
+
+  // Threshold lines
+  [TARGET_P - eps, TARGET_P, TARGET_P + eps].forEach((v, i) => {
+    priceSvg.append('line')
+       .attr('x1', PAD_L).attr('x2', PLOT_W - PAD_R)
+       .attr('y1', y(v)).attr('y2', y(v))
+       .attr('stroke', i === 1 ? '#bcd0e6' : '#bcd0e6')
+       .attr('stroke-dasharray', i === 1 ? null : '4 3').attr('opacity', i === 1 ? 1 : 0.7);
+  });
+  priceSvg.append('text').attr('x', PLOT_W - PAD_R - 4).attr('y', y(TARGET_P) - 4)
+     .attr('text-anchor', 'end').attr('font-size', 11).attr('fill', 'var(--muted)').text('p = 0.5');
+
+  // Price line
+  const line = d3.line().x(d => x(d.n)).y(d => y(d.p));
+  priceSvg.append('path').datum(sim.prices)
+     .attr('fill', 'none').attr('stroke', 'var(--accent)').attr('stroke-width', 1.5)
+     .attr('d', line);
+  // Buy/sell markers
+  sim.buyDays.forEach(d => {
+    priceSvg.append('circle').attr('cx', x(d.n)).attr('cy', y(d.p)).attr('r', 3.5)
+       .attr('fill', 'var(--good)').attr('stroke', '#fff').attr('stroke-width', 1);
+  });
+  sim.sellDays.forEach(d => {
+    priceSvg.append('circle').attr('cx', x(d.n)).attr('cy', y(d.p)).attr('r', 3.5)
+       .attr('fill', 'var(--bad)').attr('stroke', '#fff').attr('stroke-width', 1);
+  });
+}
+
+function renderWorthPlot(sim, eps, period, nSettle) {
+  worthSvg.selectAll('*').remove();
+  const yMax = Math.max(0.5, sim.finalCash + 0.5);
+  const x = d3.scaleLinear().domain([1, N_DAYS]).range([PAD_L, PLOT_W - PAD_R]);
+  const y = d3.scaleLinear().domain([0, yMax]).range([WORTH_H - PAD_B, PAD_T]);
+
+  worthSvg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${WORTH_H - PAD_B})`)
+     .call(d3.axisBottom(x).ticks(10));
+  worthSvg.append('g').attr('class', 'axis').attr('transform', `translate(${PAD_L}, 0)`)
+     .call(d3.axisLeft(y).ticks(6).tickFormat(d => '$' + d.toFixed(2)));
+  worthSvg.append('text').attr('class', 'axis-label').attr('x', PLOT_W / 2).attr('y', WORTH_H - 6)
+     .attr('text-anchor', 'middle').text('day n');
+  worthSvg.append('text').attr('class', 'axis-label').attr('x', -WORTH_H / 2).attr('y', 14)
+     .attr('transform', 'rotate(-90)').attr('text-anchor', 'middle').text('realised cash (USD)');
+
+  if (nSettle <= N_DAYS) {
+    worthSvg.append('line').attr('x1', x(nSettle)).attr('x2', x(nSettle))
+       .attr('y1', PAD_T).attr('y2', WORTH_H - PAD_B)
+       .attr('stroke', 'var(--warn)').attr('stroke-dasharray', '4 3');
+    worthSvg.append('text').attr('x', x(nSettle) + 4).attr('y', PAD_T + 12)
+       .attr('font-size', 11).attr('fill', 'var(--warn)').text(`n_settle = ${nSettle}: market converges`);
+  }
+
+  // Step line
+  const stepLine = d3.line().curve(d3.curveStepAfter).x(d => x(d.n)).y(d => y(d.c));
+  worthSvg.append('path').datum(sim.cash)
+     .attr('fill', 'none').attr('stroke', 'var(--good)').attr('stroke-width', 2)
+     .attr('d', stepLine);
+}
+
+function renderStats(sim, eps, period, nSettle) {
+  const cyclesPossible = nSettle >= N_DAYS ? Math.floor(N_DAYS / period) : Math.floor(Math.min(N_DAYS, nSettle - 1) / period);
+  const eternalNote = nSettle > N_DAYS ? ' (no settle within plot horizon)' : '';
+  statRowEl.innerHTML =
+    `<span class="stat-pill">cycles completed: ${sim.completedCycles}</span>` +
+    `<span class="stat-pill good">cash: $${sim.finalCash.toFixed(2)}</span>` +
+    `<span class="stat-pill ${nSettle > N_DAYS ? 'good' : 'bad'}">${nSettle > N_DAYS ? 'oscillates eternally' : 'settles at n=' + nSettle}${eternalNote}</span>`;
+}
+
+function renderPredictions() {
+  predictionEl.innerHTML = '';
+  PREDICTIONS.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'choice';
+    b.innerHTML = p.label;
+    if (userPrediction === p.id) b.classList.add('active');
+    b.onclick = () => { userPrediction = p.id; renderPredictions(); renderReveal(); };
+    predictionEl.appendChild(b);
+  });
+}
+
+function renderReveal() {
+  if (!userPrediction) { revealEl.style.display = 'none'; return; }
+  const correct = userPrediction === CORRECT_ID;
+  revealEl.className = 'reveal ' + (correct ? 'correct' : 'incorrect');
+  revealEl.style.display = 'block';
+  if (correct) {
+    revealEl.innerHTML = '<strong>✓ Right.</strong> The trader books $\\approx 2\\varepsilon$ per completed cycle. If the price settles at $p$ on day $n_{\\text{settle}}$, the trader stops earning (no more peaks above $p + \\varepsilon$); the cash plateaus at $\\approx 2\\varepsilon \\cdot \\lfloor n_{\\text{settle}} / T \\rfloor$, a finite number — bounded above. <em>Not</em> exploitation. But if oscillation is eternal, cash grows without bound, and exploitation does occur. The Convergence theorem says the LI criterion <em>forces</em> the eternal-oscillation case to be impossible.';
+  } else if (userPrediction === 'always-exploits') {
+    revealEl.innerHTML = '<strong>✗ Almost — but watch what happens when you set $n_{\\text{settle}}$ to something small.</strong> The cash plateau when oscillation stops is finite, and a finite plateau is bounded above. Exploitation requires <em>unbounded</em> above. The theorem rules out only the eternal-oscillation case; finite-oscillation markets are perfectly compatible with the LI criterion (they\'re just not interesting).';
+  } else {
+    revealEl.innerHTML = '<strong>✗ The risk during the hold is bounded — and §4.1 doesn\'t care about risk per se.</strong> While holding 1 share of $\\varphi$, the trader\'s plausible worth in some world is bounded below by $-(p + \\varepsilon)$ (the worst case where $\\varphi$ pays $0$ and they paid almost full price), but bounded — and the realised cycle profit eventually swamps it. Exploitation is about the asymptotic (un)boundedness of plausible worth, not transient risk.';
+  }
+  renderMath();
+}
+
+function update() {
+  const eps = +epsSlider.value;
+  const period = +periodSlider.value;
+  let nSettle = +settleSlider.value;
+  // Treat the maximum slider value as "never" (infinity for our purposes)
+  const isEternal = nSettle >= 120;
+  const effectiveSettle = isEternal ? 1e9 : nSettle;
+  epsDisplay.textContent = eps.toFixed(2);
+  periodDisplay.textContent = `${period}`;
+  settleDisplay.textContent = isEternal ? 'never' : `${nSettle}`;
+  const sim = simulate(eps, period, effectiveSettle);
+  renderPricePlot(sim, eps);
+  renderWorthPlot(sim, eps, period, effectiveSettle);
+  renderStats(sim, eps, period, effectiveSettle);
+  renderMath();
+}
+
+function renderMath() {
+  if (!window.renderMathInElement) return;
+  renderMathInElement(document.body, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '\\[', right: '\\]', display: true },
+      { left: '$', right: '$', display: false },
+      { left: '\\(', right: '\\)', display: false },
+    ],
+    throwOnError: false,
+    strict: 'ignore',
+  });
+}
+
+[epsSlider, periodSlider, settleSlider].forEach(s => s.addEventListener('input', update));
+renderPredictions();
+update();
+</script>
+
+</body>
+</html>
