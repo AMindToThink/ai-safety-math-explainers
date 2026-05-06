@@ -34,11 +34,11 @@ for the table of statuses.
 | 1 | [`01-market-trader-sandbox.html`](widgets/01-market-trader-sandbox.html) | §3.1, §3.4 (Table 1), §3.5 | drafted |
 | 2 | [`02-deductive-process.html`](widgets/02-deductive-process.html) | §3.2 | drafted |
 | 3 | [`03-continuity-paradox.html`](widgets/03-continuity-paradox.html) | §3.4 (continuity discussion, χ paradox) | drafted |
-| 4 | `04-exploit-or-not.html` | §3.5 | proposed |
+| 4 | [`04-exploit-or-not.html`](widgets/04-exploit-or-not.html) | §3.5 | drafted |
 | 5 | `05-arbitrage-pair.html` | §3.5 (the $\varphi$ vs $\neg\neg\varphi$ example) | proposed |
 
-(Modules 4, 5 are stubs in the breakdown; the chapter README
-lists them so future Claudes have a roadmap.)
+(Module 5 is a stub; the chapter README lists it so future
+Claudes have a roadmap.)
 
 ## Running the smoke test
 
