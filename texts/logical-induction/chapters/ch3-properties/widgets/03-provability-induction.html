@@ -1,0 +1,315 @@
+<!--
+  Widget: li-ch3-provability-induction (module 3 of the Logical
+          Induction Ch 3 batch, "Properties of Logical Inductors").
+  Source: Garrabrant et al. (2016) §4.2 Theorem 4.2.1 "Provability
+          Induction" (arXiv:1609.03543v3, p. 30) and the prg(n)
+          example at p. 31. The Ramanujan/Hardy analogy: an EC
+          sequence (phi_n) of theorems, each provable in PA but with
+          fast-growing proof length f(n). The deductive process D_n
+          only proves phi_k once n >= f(k). Provability induction
+          says P_n(phi_n) -> 1 in a timely manner — long before
+          f(n) days have passed.
+  Toy system: 20 sentences (phi_1, ..., phi_20) on a heatmap, with
+              two reasoners side-by-side: "Hardy waits for D"
+              (probability rises to 1 only at day f(n)) and "Hardy
+              with LI" (probability rises to 1 by day n at the
+              latest). Reader varies f-growth.
+
+  Standalone: open this .html directly in a browser. Uses D3 v7 and
+              KaTeX from CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Logical Induction · Ch 3 · Provability induction (Ramanujan/Hardy)</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 920px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .panel-note { color: var(--muted); font-size: 0.92rem; margin-top: 0.4rem; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  blockquote.quote { border-left: 3px solid var(--accent); margin: 0.8rem 0; padding: 0.4rem 0.9rem; background: #fafbfc; font-size: 0.94rem; }
+  .controls { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin: 0.5rem 0; }
+  .heatmaps { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+  @media (max-width: 880px) { .heatmaps { grid-template-columns: 1fr; } }
+  .heatmap-panel { background: #fff; border: 1px solid #e5eaf0; border-radius: 6px; padding: 0.6rem 0.7rem; }
+  .heatmap-panel h3 { margin: 0 0 0.4rem 0; font-size: 0.95rem; }
+  svg.heatmap { display: block; width: 100%; }
+  .legend { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--muted); margin-top: 0.4rem; }
+  .gradient-bar { width: 120px; height: 12px; background: linear-gradient(to right, #fdecec, #fef0c7, #ecfdf3, #099250); border-radius: 2px; border: 1px solid #c9d3df; }
+  .scenarios { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.5rem 0; }
+  .scenarios button { background: #fff; border: 1px solid #c9d3df; color: var(--ink); border-radius: 4px; padding: 0.4rem 0.85rem; cursor: pointer; font-size: 0.88rem; }
+  .scenarios button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .stat-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.4rem 0; }
+  .stat-pill { padding: 0.18rem 0.55rem; border-radius: 12px; background: #eef3f8; color: var(--accent); font-size: 0.85rem; font-weight: 600; }
+  .stat-pill.good { background: #ecfdf3; color: var(--good); }
+  .stat-pill.bad { background: #fdecec; color: var(--bad); }
+  .reveal { padding: 0.7rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; background: #f4f6f8; border-left: 4px solid var(--accent); display: none; }
+  .reveal.correct { border-left-color: var(--good); background: #ecfdf3; }
+  .reveal.incorrect { border-left-color: var(--bad); background: #fdecec; }
+  .choice { display: block; width: 100%; text-align: left; margin: 0.3rem 0; padding: 0.5rem 0.8rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover { background: #eef3f8; }
+  .choice.active { border-color: var(--accent); background: #eef3f8; }
+</style>
+</head>
+<body>
+
+<h1>Provability induction: Hardy outpaces deduction</h1>
+<p class="subtitle">Logical Induction companion · widget 3 of the Ch 3 batch on <a href="https://arxiv.org/abs/1609.03543">Garrabrant et&nbsp;al. (2016) §4.2</a></p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=30">Garrabrant et&nbsp;al. (2016) §4.2 Theorem 4.2.1 "Provability Induction"</a> — for any EC sequence of theorems $(\varphi_n)$, $\mathbb{P}_n(\varphi_n) \to 1$ in a timely manner.</li>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=31">Ramanujan/Hardy analogy</a> (paper p. 31, paragraph beginning "Imagine that the statements $\varphi_n$ are being output by an algorithm…") — the framing this widget runs with.</li>
+    <li>Background: <a href="https://en.wikipedia.org/wiki/Srinivasa_Ramanujan">Ramanujan</a> generated thousands of formulas without proofs; <a href="https://en.wikipedia.org/wiki/G._H._Hardy">Hardy</a> patiently verified them. Most turned out to be true.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;"><strong>Theorem 4.2.1 (Provability Induction).</strong> Let $(\varphi_n)$ be an efficiently computable sequence of theorems of $\mathcal{T}$. Then $\mathbb{P}_n(\varphi_n) \to 1$ in a timely manner.</p>
+  <p style="margin: 0;">The Ramanujan/Hardy analogy: $\varphi_n$ is the $n$-th of Ramanujan's untrustworthy-looking formulas. The deductive process $\bar{D}$ (Hardy's verification) is slow — proving $\varphi_n$ takes $f(n)$ days, where $f$ is fast-growing. Without an inductor, Hardy's belief in $\varphi_n$ jumps from "no opinion" to certainty only on day $f(n)$. <strong>With an inductor</strong>, Hardy starts trusting Ramanujan: $\mathbb{P}_n(\varphi_n) \approx 1$ for all $n \ge N^\star$, regardless of how fast $f$ grows.</p>
+</div>
+
+<h2>Pick a proof-length growth rate $f(n)$</h2>
+<div class="scenarios" id="scenarios"></div>
+<div class="controls">
+  <span class="stat-pill" id="f-display"></span>
+</div>
+
+<h2>Belief heatmaps</h2>
+<div class="heatmaps">
+  <div class="heatmap-panel">
+    <h3 style="color:var(--bad);">Hardy without inductor</h3>
+    <svg id="heatmap-naive" class="heatmap" viewBox="0 0 380 320"></svg>
+    <p class="panel-note">$\mathbb{P}_d(\varphi_n) = 0$ for $d &lt; f(n)$, then jumps to $1$. Cells stay grey until $\bar{D}$ finally proves $\varphi_n$.</p>
+  </div>
+  <div class="heatmap-panel">
+    <h3 style="color:var(--good);">Hardy with logical inductor</h3>
+    <svg id="heatmap-li" class="heatmap" viewBox="0 0 380 320"></svg>
+    <p class="panel-note">$\mathbb{P}_d(\varphi_n) \approx 1$ for $d \ge \max(n, N^\star)$ — green well before $\bar{D}$ catches up. The diagonal $d = n$ is the timely-manner guarantee.</p>
+  </div>
+</div>
+<div class="legend">
+  <span>$\mathbb{P}_d(\varphi_n)$:</span>
+  <span>0</span>
+  <div class="gradient-bar"></div>
+  <span>1</span>
+</div>
+
+<div class="stat-row" id="stat-row" style="margin-top: 0.5rem;"></div>
+
+<h2>Predict, then reveal</h2>
+<p class="panel-note" style="margin-top:0.2rem;">Across the three growth-rate scenarios, what is the relationship between the LI's "trust threshold" $N^\star$ and the proof-length function $f$?</p>
+<div id="prediction-choices"></div>
+<div class="reveal" id="reveal"></div>
+
+<h2>Why this is striking</h2>
+<p>$\bar{D}$ has a runtime budget that's polynomial in $n$ (we restrict to characters-of-proof up to $n$). $f(n)$ — the actual proof length — is allowed to grow as fast as we like, even non-elementarily. Yet the LI's belief in $\varphi_n$ is right by day $n$. The gap $f(n) - n$ between LI-recognition and deductive-confirmation grows without bound; the LI is trusting Ramanujan based on inductive pattern-matching, not on completing the underlying proofs.</p>
+
+<p>The exploitation argument behind the proof is an "if not, then a trader earns $\varepsilon$ infinitely often": if $\mathbb{P}_n(\varphi_n)$ stays below $1 - \varepsilon$ infinitely often, a trader buys $\varphi_n$ at the low price each time and waits for $\bar{D}$ to catch up. Once it does, the share is worth $1$ in every remaining p.c. world. That nets $\approx \varepsilon$ infinitely often off a finite stake — the §3.5 exploitation pattern. So the LI's belief must converge to $1$.</p>
+
+<blockquote class="quote">"$\mathbb{P}$ will learn to start believing $\varphi_n$ by day $n$ at the latest, despite the fact that $\varphi_n$ won't be deductively confirmed until day $f(n)$." — <a href="https://arxiv.org/pdf/1609.03543v3#page=31">Garrabrant et&nbsp;al. (2016), §4.2</a></blockquote>
+
+<p class="footnote">
+  <strong>What this widget is and isn't.</strong> The "Hardy with logical inductor" panel uses a stylised pattern: $\mathbb{P}_d(\varphi_n) \approx 1$ for $d \ge \max(n, N^\star)$ where $N^\star$ is a fixed "warm-up" parameter. The actual LI's behaviour is more nuanced: prices may rise gradually rather than snapping, and the warm-up $N^\star$ depends on the trader who eventually catches the pattern. The shape that's <em>guaranteed</em> by the theorem is "$\mathbb{P}_n(\varphi_n) \to 1$"; the exact trajectory is implementation-dependent. Treat the heatmap as cartoon showing the key qualitative win — the LI's diagonal $\mathbb{P}_n(\varphi_n)$ is green by some finite $n$, regardless of $f$ — rather than a faithful simulation of the §5 LIA. The "Hardy without inductor" panel is the strict-no-inductor reasoner: 0 until $\bar{D}$ proves the sentence, then 1. This is also a cartoon (a fancier non-LI reasoner could do better), but it captures the idea that without inductive pattern-matching there's no reason to be confident before the proof finishes.
+</p>
+
+<nav class="nav">
+  <a href="02-limit-coherence.html">← Module 2: limit coherence</a>
+  <a href="../README.md">Ch 3 README →</a>
+</nav>
+
+<script>
+const N_SENTENCES = 20;
+const N_DAYS = 200;
+
+const SCENARIOS = [
+  { id: 'linear',  name: 'f(n) = 2n + 5',         f: n => 2 * n + 5,           latex: 'f(n) = 2n + 5' },
+  { id: 'quad',    name: 'f(n) = n² + 5',          f: n => n * n + 5,           latex: 'f(n) = n^2 + 5' },
+  { id: 'cube',    name: 'f(n) = n³ / 4 + 5',     f: n => Math.floor(n * n * n / 4) + 5, latex: 'f(n) = n^3 / 4 + 5' },
+];
+
+// Stylised inductor warm-up: by day max(n, N_STAR), the inductor's belief in
+// phi_n is ~1.
+const N_STAR = 4;
+
+const scenariosEl = document.getElementById('scenarios');
+const fDisplayEl = document.getElementById('f-display');
+const statRowEl = document.getElementById('stat-row');
+const naiveSvg = d3.select('#heatmap-naive');
+const liSvg = d3.select('#heatmap-li');
+const predictionEl = document.getElementById('prediction-choices');
+const revealEl = document.getElementById('reveal');
+
+let activeScenarioId = SCENARIOS[1].id;
+let userPrediction = null;
+
+const PREDICTIONS = [
+  { id: 'independent', label: '<strong>$N^\\star$ does not depend on $f$.</strong> The inductor\'s warm-up time depends only on the rate at which the EC sequence is computed, not on how fast the proofs grow.' },
+  { id: 'matches-f', label: '<strong>$N^\\star \\approx f(N^\\star)$.</strong> The LI needs to wait for $\\bar{D}$ to catch up at least once before forming an opinion.' },
+  { id: 'log-f', label: '<strong>$N^\\star = O(\\log f(n))$.</strong> The LI gets faster as proofs get longer.' },
+];
+const CORRECT_ID = 'independent';
+
+function activeScenario() { return SCENARIOS.find(s => s.id === activeScenarioId); }
+
+function renderScenarios() {
+  scenariosEl.innerHTML = '';
+  SCENARIOS.forEach(s => {
+    const b = document.createElement('button');
+    b.textContent = s.name;
+    if (s.id === activeScenarioId) b.classList.add('active');
+    b.onclick = () => { activeScenarioId = s.id; renderAll(); };
+    scenariosEl.appendChild(b);
+  });
+}
+
+function naiveBelief(n, d) {
+  const f = activeScenario().f;
+  return d >= f(n) ? 1 : 0;
+}
+
+function liBelief(n, d) {
+  // Stylised: ramps up linearly between (max(n, N_STAR) - 2) and max(n, N_STAR).
+  const target = Math.max(n, N_STAR);
+  if (d >= target) return 1;
+  if (d >= target - 2) return (d - (target - 2)) / 2;
+  return 0;
+}
+
+const HM_W = 380, HM_H = 320, HM_PAD_L = 36, HM_PAD_R = 8, HM_PAD_T = 8, HM_PAD_B = 32;
+
+function colorScale(p) {
+  if (p < 0.25) return d3.interpolateRgb('#fdecec', '#fef0c7')(p / 0.25);
+  if (p < 0.75) return d3.interpolateRgb('#fef0c7', '#ecfdf3')((p - 0.25) / 0.5);
+  return d3.interpolateRgb('#ecfdf3', '#099250')((p - 0.75) / 0.25);
+}
+
+function renderHeatmap(svg, beliefFn, opts) {
+  svg.selectAll('*').remove();
+  const cellW = (HM_W - HM_PAD_L - HM_PAD_R) / N_DAYS;
+  const cellH = (HM_H - HM_PAD_T - HM_PAD_B) / N_SENTENCES;
+
+  for (let n = 1; n <= N_SENTENCES; n++) {
+    for (let d = 1; d <= N_DAYS; d++) {
+      const p = beliefFn(n, d);
+      svg.append('rect')
+         .attr('x', HM_PAD_L + (d - 1) * cellW)
+         .attr('y', HM_PAD_T + (n - 1) * cellH)
+         .attr('width', cellW + 0.3)
+         .attr('height', cellH + 0.3)
+         .attr('fill', colorScale(p));
+    }
+  }
+
+  // Diagonal d = n
+  svg.append('line')
+     .attr('x1', HM_PAD_L + 0.5 * cellW).attr('y1', HM_PAD_T + 0.5 * cellH)
+     .attr('x2', HM_PAD_L + (N_SENTENCES - 0.5) * cellW).attr('y2', HM_PAD_T + (N_SENTENCES - 0.5) * cellH)
+     .attr('stroke', '#1f2933').attr('stroke-width', 1).attr('stroke-dasharray', '2 2').attr('opacity', 0.5);
+
+  // f(n) curve
+  const f = activeScenario().f;
+  const fPath = d3.line()
+    .x(n => HM_PAD_L + Math.min(N_DAYS - 0.5, f(n) - 0.5) * cellW)
+    .y(n => HM_PAD_T + (n - 0.5) * cellH);
+  const fData = d3.range(1, N_SENTENCES + 1);
+  svg.append('path').datum(fData)
+     .attr('fill', 'none').attr('stroke', 'var(--bad)').attr('stroke-width', 1.4)
+     .attr('d', fPath);
+
+  // Axes
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${HM_H - HM_PAD_B})`)
+     .call(d3.axisBottom(d3.scaleLinear().domain([1, N_DAYS]).range([HM_PAD_L, HM_W - HM_PAD_R])).ticks(5));
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(${HM_PAD_L}, 0)`)
+     .call(d3.axisLeft(d3.scaleLinear().domain([1, N_SENTENCES]).range([HM_PAD_T, HM_H - HM_PAD_B])).ticks(5));
+  svg.append('text').attr('font-size', 11).attr('fill', 'var(--muted)')
+     .attr('x', HM_W / 2).attr('y', HM_H - 6).attr('text-anchor', 'middle').text('day d');
+  svg.append('text').attr('font-size', 11).attr('fill', 'var(--muted)')
+     .attr('transform', `translate(10, ${HM_H / 2}) rotate(-90)`).attr('text-anchor', 'middle').text('sentence index n');
+}
+
+function renderStats() {
+  const f = activeScenario().f;
+  const dProveLast = f(N_SENTENCES);
+  const liByLast = Math.max(N_SENTENCES, N_STAR);
+  statRowEl.innerHTML =
+    `<span class="stat-pill bad">Hardy w/o LI: trusts φ₂₀ on day ${dProveLast}</span>` +
+    `<span class="stat-pill good">Hardy w/ LI: trusts φ₂₀ by day ${liByLast}</span>` +
+    `<span class="stat-pill">gap: ${dProveLast - liByLast} days</span>`;
+}
+
+function renderPredictions() {
+  predictionEl.innerHTML = '';
+  PREDICTIONS.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'choice';
+    b.innerHTML = p.label;
+    if (userPrediction === p.id) b.classList.add('active');
+    b.onclick = () => { userPrediction = p.id; renderPredictions(); renderReveal(); };
+    predictionEl.appendChild(b);
+  });
+}
+
+function renderReveal() {
+  if (!userPrediction) { revealEl.style.display = 'none'; return; }
+  const correct = userPrediction === CORRECT_ID;
+  revealEl.className = 'reveal ' + (correct ? 'correct' : 'incorrect');
+  revealEl.style.display = 'block';
+  if (correct) {
+    revealEl.innerHTML = '<strong>✓ Right.</strong> The theorem says $\\mathbb{P}_n(\\varphi_n) \\to 1$ regardless of how fast $f$ grows. The LI catches the pattern by reasoning over the EC sequence itself, not by waiting for individual proofs. Toggle through the three scenarios — the right-hand heatmap is qualitatively the same in all three (LI is green by day $n$ for all $n \\ge N^\\star$), while the left-hand heatmap fans out further and further as $f$ grows. The "trust gap" stat shows this: the LI is trusting Ramanujan dozens or hundreds of days ahead of when Hardy could finish a single proof.';
+  } else if (userPrediction === 'matches-f') {
+    revealEl.innerHTML = '<strong>✗ Try the cubic scenario.</strong> If $N^\\star \\approx f(N^\\star)$, then the LI would need to wait for $\\bar{D}$ to verify $\\varphi_{N^\\star}$ before forming any opinion at all. But the LI gets there well before — by day $\\max(n, N^\\star)$, regardless of $f$. Provability induction does not depend on the proof-length growth.';
+  } else {
+    revealEl.innerHTML = '<strong>✗ The bound is even stronger.</strong> The theorem makes no quantitative claim about $N^\\star$ in terms of $f$. The proof shows only that <em>some</em> finite $N^\\star$ exists; in practice, the warm-up depends on which polynomial-time trader catches the pattern first, not on $f$ at all.';
+  }
+  renderMath();
+}
+
+function renderAll() {
+  renderScenarios();
+  fDisplayEl.innerHTML = `$${activeScenario().latex}$`;
+  renderHeatmap(naiveSvg, naiveBelief, {});
+  renderHeatmap(liSvg, liBelief, {});
+  renderStats();
+  renderPredictions();
+  renderReveal();
+  renderMath();
+}
+
+function renderMath() {
+  if (!window.renderMathInElement) return;
+  renderMathInElement(document.body, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '\\[', right: '\\]', display: true },
+      { left: '$', right: '$', display: false },
+      { left: '\\(', right: '\\)', display: false },
+    ],
+    throwOnError: false,
+    strict: 'ignore',
+  });
+}
+
+renderAll();
+</script>
+
+</body>
+</html>

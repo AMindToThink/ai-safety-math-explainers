@@ -37,7 +37,7 @@ modules in source order:
 |---|--------|--------|--------|
 | 1 | [`01-convergence.html`](widgets/01-convergence.html) | §4.1 Theorem 4.1.1 (Convergence) | drafted |
 | 2 | [`02-limit-coherence.html`](widgets/02-limit-coherence.html) | §4.1 Theorem 4.1.2 (Limit Coherence) | drafted |
-| 3 | `03-provability-induction.html` | §4.2 Theorem 4.2.1 (Provability Induction) | proposed |
+| 3 | [`03-provability-induction.html`](widgets/03-provability-induction.html) | §4.2 Theorem 4.2.1 (Provability Induction) | drafted |
 | 4 | `04-pi-statistical.html` | §4.3 Statistical-pattern learning | proposed |
 | 5 | `05-calibration-cluster.html` | §4.4 Calibration + correlated clusters | proposed |
 | 6 | `06-self-trust.html` | §4.12 Self-Trust (stretch) | proposed |
