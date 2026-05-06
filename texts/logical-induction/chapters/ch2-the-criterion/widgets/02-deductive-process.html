@@ -1,0 +1,365 @@
+<!--
+  Widget: li-ch2-deductive-process (module 2 of the Logical Induction
+          Ch 2 batch, "The Logical Induction Criterion").
+  Source: Garrabrant et al. (2016) §3.2 "Deductive Processes"
+          (arXiv:1609.03543v3, p. 19). Definition 3.2.1 (deductive
+          process) and the subsequent definitions of worlds,
+          propositional consistency, and pcworlds(D). The canonical
+          example: dt_n = "PA-theorems provable in <= n characters",
+          which is PA-complete (Def 3.2.4).
+  Toy system: three prime sentences (1+1=2 ; 1+1=3 ; Goldbach), and
+              a hand-crafted deductive-process schedule that adds
+              theorems day by day. Worlds are truth assignments in
+              {0, 1}^3 = 8 worlds; pcworlds(D_n) is the subset where
+              every sentence in D_n evaluates to true.
+  Active check: predict which sentence at which day first rules out
+                a particular world.
+
+  Standalone: open this .html directly in a browser. Uses D3 v7 and
+              KaTeX from CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Logical Induction · Ch 2 · Deductive process</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 920px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .controls { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin: 0.6rem 0; }
+  input[type=range] { width: 260px; }
+  .layout { display: grid; grid-template-columns: 1.1fr 1fr; gap: 1.6rem; align-items: start; margin-top: 0.5rem; }
+  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+  .panel-note { color: var(--muted); font-size: 0.92rem; margin-top: 0.4rem; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  .panel { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.8rem 1rem; }
+  blockquote.quote { border-left: 3px solid var(--accent); margin: 0.8rem 0; padding: 0.4rem 0.9rem; background: #fafbfc; font-size: 0.94rem; }
+
+  .worlds-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin: 0.5rem 0; }
+  .world {
+    border: 1.5px solid #c9d3df; border-radius: 6px; padding: 0.5rem 0.55rem; background: #fff;
+    transition: opacity 0.25s, background 0.25s, border-color 0.25s;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.84rem;
+  }
+  .world.alive { border-color: var(--good); background: #ecfdf3; }
+  .world.dead  { border-color: #c9d3df; background: #f4f6f8; opacity: 0.45; }
+  .world.just-killed { border-color: var(--bad); background: #fdecec; opacity: 1; box-shadow: 0 0 0 2px rgba(217,45,32,0.18); }
+  .world-id { font-weight: 700; color: var(--ink); margin-bottom: 0.25rem; }
+  .world-row { display: flex; justify-content: space-between; gap: 0.3rem; }
+  .truth-1 { color: var(--good); }
+  .truth-0 { color: var(--bad); }
+
+  .theorem-list { background: #fff; border: 1px solid #e5eaf0; border-radius: 6px; padding: 0.55rem 0.85rem; max-height: 280px; overflow-y: auto; font-size: 0.92rem; }
+  .theorem-list li { margin: 0.25rem 0; }
+  .theorem-list li.new { background: #fff7ec; border-left: 3px solid var(--warn); padding: 0.2rem 0.5rem; border-radius: 3px; animation: flash 1s ease-in; }
+  @keyframes flash { 0% { background: #ffd9a8; } 100% { background: #fff7ec; } }
+
+  .stat-pill { display: inline-block; padding: 0.18rem 0.55rem; border-radius: 12px; background: #eef3f8; color: var(--accent); font-size: 0.85rem; font-weight: 600; margin-right: 0.4rem; }
+  .stat-pill.bad { background: #fdecec; color: var(--bad); }
+  .stat-pill.good { background: #ecfdf3; color: var(--good); }
+
+  .reveal { padding: 0.7rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; background: #f4f6f8; border-left: 4px solid var(--accent); display: none; }
+  .choice { display: block; width: 100%; text-align: left; margin: 0.3rem 0; padding: 0.55rem 0.8rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover { background: #eef3f8; }
+  .choice.active { border-color: var(--accent); background: #eef3f8; }
+</style>
+</head>
+<body>
+
+<h1>The deductive process: a slow oracle that prunes worlds over time</h1>
+<p class="subtitle">Logical Induction companion · widget 2 of the Ch 2 batch on <a href="https://arxiv.org/abs/1609.03543">Garrabrant et&nbsp;al. (2016) §3.2</a></p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=19">Garrabrant et&nbsp;al. (2016) §3.2 "Deductive Processes"</a> — Definitions 3.2.1 (deductive process), 3.2.2 (world), 3.2.3 (propositional consistency), 3.2.4 ($\mathcal{T}$-completeness). The canonical example: $\bar{D}_n$ = theorems of $\mathsf{PA}$ provable in $\le n$ characters.</li>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=18">§3.1 "Markets"</a> — sets up the price-sequence side of the equation.</li>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=22">§3.4 "Traders" Table 1</a> — picks a similar three-sentence toy ($\quot{1+1=2}$, $\quot{1+1\ne 2}$, Goldbach) for worked examples.</li>
+    <li>Background on propositional consistency &amp; truth assignments: <a href="https://plato.stanford.edu/entries/logic-classical/">SEP, "Classical Logic"</a> §3.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;">A <strong>deductive process</strong> $\bar{D}: \mathbb{N}^+ \to \mathrm{Fin}(\mathcal{S})$ is a computable nested sequence $\bar{D}_1 \subseteq \bar{D}_2 \subseteq \cdots$ of finite sets of sentences — think of it as a slow oracle that emits theorems one day at a time.</p>
+  <p style="margin: 0;">A <strong>world</strong> is any truth assignment $W : \mathcal{S} \to \{0, 1\}$. The set $\mathrm{PC}(\bar{D}_n)$ — worlds <em>propositionally consistent</em> with $\bar{D}_n$ — is the set of truth assignments that satisfy every sentence emitted so far. As $n$ grows, $\bar{D}_n$ grows, and $\mathrm{PC}(\bar{D}_n)$ shrinks. Drag the slider to watch.</p>
+</div>
+
+<h2>The toy theory</h2>
+<p>Three prime sentences with their intended ground-truth interpretation:</p>
+<ul>
+  <li>$p_1 := \quot{1+1=2}$ — provable from $\mathsf{PA}$, true in the standard model.</li>
+  <li>$p_2 := \quot{1+1=3}$ — its negation is provable from $\mathsf{PA}$.</li>
+  <li>$p_3 := \quot{\text{Goldbach's conjecture}}$ — open: neither $\mathsf{PA} \vdash p_3$ nor $\mathsf{PA} \vdash \lnot p_3$ is currently known.</li>
+</ul>
+<p>That gives $2^3 = 8$ worlds — one per truth assignment $(p_1, p_2, p_3) \in \{0, 1\}^3$. Below is a hand-crafted deductive-process schedule that emits theorems through day 6.</p>
+
+<h2>Drag $n$</h2>
+<div class="controls">
+  <label for="n-slider">$n$ =</label>
+  <input id="n-slider" type="range" min="1" max="6" step="1" value="1">
+  <span id="n-display" style="font-weight:600;color:var(--accent);font-size:1.1rem;"></span>
+  <span id="stat-pills"></span>
+</div>
+
+<div class="layout">
+  <div>
+    <h2 style="margin-top:0;">$\mathrm{PC}(\bar{D}_n)$ — the 8 worlds</h2>
+    <div class="worlds-grid" id="worlds-grid"></div>
+    <p class="panel-note">Green = consistent with $\bar{D}_n$. Greyed-out = ruled out by some sentence in $\bar{D}_n$. Red flash = ruled out by a sentence added <em>this</em> day.</p>
+  </div>
+  <div>
+    <h2 style="margin-top:0;">$\bar{D}_n$ — theorems through day $n$</h2>
+    <ul class="theorem-list" id="theorem-list"></ul>
+
+    <h2>Predict, then reveal</h2>
+    <p class="panel-note" style="margin-top:0.2rem;">Which world is the last one ruled out as $n$ runs from 1 to 6?</p>
+    <div id="prediction-choices"></div>
+    <div class="reveal" id="reveal"></div>
+  </div>
+</div>
+
+<h2>Why this matters for the criterion</h2>
+<p>Two things to take away:</p>
+<ol>
+  <li>The Logical Induction Criterion (§3.5–§3.6) grades a market $\mathbb{P}$ against the worlds in $\mathrm{PC}(\bar{D}_n)$ on day $n$ — not against ground truth. A trader's plausible net worth is bounded only insofar as <em>some</em> world in $\mathrm{PC}(\bar{D}_n)$ assigns it a small value. As more theorems arrive, fewer worlds get to be plausible, and the bound tightens.</li>
+  <li>For sentences $\bar{D}_\infty$ never resolves (e.g., Goldbach above, if it really were independent of $\mathsf{PA}$), <em>some</em> world in $\mathrm{PC}(\bar{D}_\infty)$ assigns $p_3 = 1$ and another assigns $p_3 = 0$. The market is free to set any price for $p_3$ between the two extremes; the criterion does not pin it down. This is exactly why a logical inductor can hover around $0.5$ on Goldbach and still satisfy the criterion.</li>
+</ol>
+
+<blockquote class="quote">"Roughly speaking, we will mainly concern ourselves with the case where $\bar{D}$ eventually rules out all and only the worlds that are inconsistent with $\mathcal{T}$." — <a href="https://arxiv.org/pdf/1609.03543v3#page=19">Garrabrant et&nbsp;al. (2016), §3.2</a></blockquote>
+
+<p class="footnote">
+  <strong>What this widget is and isn't.</strong> The deductive-process schedule below is hand-crafted to stage one ruling-out per step for pedagogical clarity. The paper's canonical example is $\bar{D}_n =$ theorems of $\mathsf{PA}$ provable in at most $n$ characters — a deductive process whose growth rate is roughly exponential and whose first interesting theorems take many "days" to appear. The toy here is propositional only (no quantifiers, no axiom schemes), so $\mathrm{PC}$-checking reduces to truth-table evaluation; in the real LI setting, $\mathcal{S}$ is the language of $\mathsf{PA}$ and a "p.c. world" is any truth assignment that respects Boolean structure on Boolean combinations of sentences but can otherwise be wildly inconsistent (e.g., assign 1 to a sentence and 0 to one of its provable equivalents — Definition 3.2.3 only constrains Boolean combinations, not full first-order semantics). The scope-honest summary: this widget shows you how $\mathrm{PC}(\bar{D}_n)$ shrinks under propositional pressure; the real thing has more sentences and slower growth, but the same monotone-prune-on-finite-Boolean-evaluation logic.
+</p>
+
+<nav class="nav">
+  <a href="01-market-trader-sandbox.html">← Module 1: market-trader sandbox</a>
+  <a href="03-continuity-paradox.html">Module 3: continuity paradox →</a>
+</nav>
+
+<script>
+// ---------------------------------------------------------------------------
+// Toy theory: three prime sentences, eight worlds.
+// Encoding: world index w = 4*v1 + 2*v2 + v3, with v_i in {0, 1}.
+// ---------------------------------------------------------------------------
+const PRIMES = [
+  { id: 'p1', latex: 'p_1', gloss: '"1+1=2"' },
+  { id: 'p2', latex: 'p_2', gloss: '"1+1=3"' },
+  { id: 'p3', latex: 'p_3', gloss: '"Goldbach"' },
+];
+
+function worldValuation(w) {
+  // returns { p1, p2, p3 } in {0,1}
+  return {
+    p1: (w >> 2) & 1,
+    p2: (w >> 1) & 1,
+    p3: w & 1,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// A sentence is encoded as a function (worldVal) -> 0|1, plus a LaTeX label.
+// (Boolean evaluation is just the propositional truth-table.)
+// ---------------------------------------------------------------------------
+function S(label, fn) { return { label, eval: fn }; }
+
+const SENTENCES = {
+  p1:        S('p_1',                       v => v.p1),
+  notP2:     S('\\lnot p_2',                v => 1 - v.p2),
+  p1OrP3:    S('p_1 \\lor p_3',             v => v.p1 | v.p3),
+  p1ImpNotP2:S('p_1 \\Rightarrow \\lnot p_2', v => (1 - v.p1) | (1 - v.p2)),
+  p3OrNotP3: S('p_3 \\lor \\lnot p_3',      v => 1),                    // tautology — rules out nothing
+  p1AndNotP2:S('p_1 \\land \\lnot p_2',     v => v.p1 & (1 - v.p2)),
+};
+
+// Hand-crafted schedule. SCHEDULE[n] = list of sentence keys *added* on day n.
+// (Cumulatively, D_n = union of SCHEDULE[1..n].)
+const SCHEDULE = {
+  1: [],                                          // No theorems yet.
+  2: ['p1'],                                      // 1+1=2 proven.
+  3: ['notP2'],                                   // 1+1=3 disproven.
+  4: ['p1OrP3'],                                  // tautology given p1; rules out nothing new.
+  5: ['p1ImpNotP2'],                              // tautology given {p1, ¬p2}; rules out nothing new.
+  6: ['p1AndNotP2'],                              // also entailed; rules out nothing new past D_3.
+};
+// Note: by design, the only ruling-out happens at days 2 and 3. Days 4-6 add
+// theorems that are entailed by the existing D_n and so don't shrink PC(D_n).
+// This is exactly the §3.2 phenomenon: a deductive process can emit
+// non-trivial-looking theorems that don't constrain worlds further, because
+// they are propositionally entailed by what's already known. The "last world
+// ruled out" question therefore has an unambiguous answer (it happens by day 3
+// for every world that ever gets ruled out), and any world that survives day 3
+// survives forever in this schedule — including the Goldbach branches.
+
+function dnSentences(n) {
+  const keys = [];
+  for (let i = 1; i <= n; i++) keys.push(...SCHEDULE[i]);
+  return keys;
+}
+
+function isAlive(worldIdx, n) {
+  const v = worldValuation(worldIdx);
+  for (const key of dnSentences(n)) {
+    if (SENTENCES[key].eval(v) === 0) return false;
+  }
+  return true;
+}
+
+function killedOnDay(worldIdx) {
+  // First day on which the world becomes inconsistent. Returns null if never.
+  for (let n = 1; n <= 6; n++) {
+    if (!isAlive(worldIdx, n)) return n;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Render
+// ---------------------------------------------------------------------------
+const slider = document.getElementById('n-slider');
+const nDisplayEl = document.getElementById('n-display');
+const statPillsEl = document.getElementById('stat-pills');
+const gridEl = document.getElementById('worlds-grid');
+const listEl = document.getElementById('theorem-list');
+const predictionEl = document.getElementById('prediction-choices');
+const revealEl = document.getElementById('reveal');
+
+let currentPrediction = null;
+
+const PREDICTIONS = [
+  { id: 'p1true-p2true-any', label: 'A world where $p_1 = 1$ and $p_2 = 1$ — i.e., both $\\quot{1+1=2}$ and $\\quot{1+1=3}$ are true.' },
+  { id: 'p1false-any', label: 'A world where $p_1 = 0$ — i.e., $\\quot{1+1=2}$ is false.' },
+  { id: 'goldbach', label: 'A world where Goldbach is the wrong way around — the schedule eventually rules out one Goldbach branch.' },
+  { id: 'nothing-after-3', label: 'After day 3, no new world ever gets ruled out — even though $\\bar{D}_n$ keeps growing through day 6.' },
+];
+const CORRECT = 'nothing-after-3';
+
+function render() {
+  const n = +slider.value;
+  nDisplayEl.textContent = `${n}`;
+
+  const aliveWorlds = [];
+  const deadWorlds = [];
+  const justKilled = new Set();
+  for (let w = 0; w < 8; w++) {
+    const aliveNow = isAlive(w, n);
+    const aliveBefore = n === 1 ? true : isAlive(w, n - 1);
+    if (aliveNow) aliveWorlds.push(w);
+    else deadWorlds.push(w);
+    if (!aliveNow && aliveBefore) justKilled.add(w);
+  }
+
+  // stat pills
+  statPillsEl.innerHTML =
+    `<span class="stat-pill good">|PC(D<sub>${n}</sub>)| = ${aliveWorlds.length}</span>` +
+    `<span class="stat-pill bad">${deadWorlds.length} ruled out</span>` +
+    (justKilled.size ? `<span class="stat-pill bad">+${justKilled.size} this day</span>` : '');
+
+  // worlds grid
+  gridEl.innerHTML = '';
+  for (let w = 0; w < 8; w++) {
+    const v = worldValuation(w);
+    const div = document.createElement('div');
+    let cls = 'world ';
+    if (justKilled.has(w)) cls += 'just-killed';
+    else if (isAlive(w, n)) cls += 'alive';
+    else cls += 'dead';
+    div.className = cls;
+    div.innerHTML =
+      `<div class="world-id">W<sub>${w}</sub></div>` +
+      PRIMES.map(pr => {
+        const t = v[pr.id];
+        return `<div class="world-row"><span>${pr.id}</span><span class="${t ? 'truth-1' : 'truth-0'}">${t}</span></div>`;
+      }).join('');
+    gridEl.appendChild(div);
+  }
+
+  // theorem list
+  if (n === 1) {
+    listEl.innerHTML = '<li class="panel-note" style="font-style:italic;">D<sub>1</sub> = ∅ — no theorems yet.</li>';
+  } else {
+    const newKeys = SCHEDULE[n] || [];
+    const oldKeys = [];
+    for (let i = 2; i < n; i++) oldKeys.push(...SCHEDULE[i]);
+    const items = [
+      ...oldKeys.map(k => `<li>$${SENTENCES[k].label}$</li>`),
+      ...newKeys.map(k => `<li class="new">$${SENTENCES[k].label}$ <span class="panel-note" style="font-style:italic;">— added on day ${n}</span></li>`),
+    ];
+    if (items.length === 0) items.push('<li class="panel-note" style="font-style:italic;">no theorems through day ' + n + '</li>');
+    listEl.innerHTML = items.join('');
+  }
+
+  renderMath();
+}
+
+function renderPredictions() {
+  predictionEl.innerHTML = '';
+  PREDICTIONS.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'choice';
+    b.innerHTML = p.label;
+    if (currentPrediction === p.id) b.classList.add('active');
+    b.onclick = () => {
+      currentPrediction = p.id;
+      renderPredictions();
+      renderReveal();
+    };
+    predictionEl.appendChild(b);
+  });
+}
+
+function renderReveal() {
+  if (!currentPrediction) { revealEl.style.display = 'none'; return; }
+  const correct = currentPrediction === CORRECT;
+  revealEl.style.display = 'block';
+  if (correct) {
+    revealEl.innerHTML = '<strong>✓ Right.</strong> Days 4–6 add only theorems propositionally entailed by $\\bar{D}_3$ ($p_1 \\lor p_3$ is implied by $p_1$; $p_1 \\Rightarrow \\lnot p_2$ is implied by $\\lnot p_2$; $p_1 \\land \\lnot p_2$ is implied by both). $|\\mathrm{PC}(\\bar{D}_n)|$ is monotone non-increasing — but here it plateaus at 2 from day 3 onward. The two surviving worlds differ only in the Goldbach bit: $\\bar{D}$ never resolves $p_3$, and a logical inductor over this $\\bar{D}$ is free to set any price for $p_3$ in $[0, 1]$.';
+  } else if (currentPrediction === 'p1true-p2true-any') {
+    revealEl.innerHTML = '<strong>✗ Look at the timing.</strong> Worlds with $p_1 = 1$ and $p_2 = 1$ <em>are</em> ruled out — but they get ruled out on day 3 (when $\\lnot p_2$ enters $\\bar{D}$), not "last". The question was about which world is ruled out last. Try the option about days 4–6.';
+  } else if (currentPrediction === 'p1false-any') {
+    revealEl.innerHTML = '<strong>✗ Same timing issue.</strong> Worlds with $p_1 = 0$ are ruled out on day 2, the earliest possible. Try moving the slider through every step and watching when the red flashes appear.';
+  } else {
+    revealEl.innerHTML = '<strong>✗ Not in this schedule.</strong> The schedule we built does not resolve $p_3$ — Goldbach stays open through day 6, and both Goldbach branches survive forever. That is in fact the <em>point</em>: the deductive process is free to be silent about open conjectures, and the LI handles that silence.';
+  }
+  renderMath();
+}
+
+function renderMath() {
+  if (!window.renderMathInElement) return;
+  renderMathInElement(document.body, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '\\[', right: '\\]', display: true },
+      { left: '$', right: '$', display: false },
+      { left: '\\(', right: '\\)', display: false },
+    ],
+    macros: {
+      '\\quot': '\\textsf{“}#1\\textsf{”}',
+    },
+    throwOnError: false,
+    strict: 'ignore',
+  });
+}
+
+slider.addEventListener('input', render);
+renderPredictions();
+render();
+</script>
+
+</body>
+</html>
