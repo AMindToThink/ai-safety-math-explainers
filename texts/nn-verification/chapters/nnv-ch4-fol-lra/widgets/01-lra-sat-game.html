@@ -1,0 +1,670 @@
+<!--
+  Widget: nnv-ch4-lra-sat-game (module 1 of nn-verification Ch 4,
+          "Logics and Satisfiability").
+  Source: Albarghouthi (2021) Ch 4, fol.tex (arXiv:2109.10317).
+          §4.1 propositional logic + §4.2 linear real arithmetic.
+  Toy system: 2-variable LRA formulas drawn as half-space
+              arrangements in R^2.
+  Active check: SAT-or-UNSAT geometric game. Reader either drags a
+                point onto a satisfying assignment, or declares
+                UNSAT. The site grades against the actual truth and
+                (on UNSAT) reveals a minimal contradicting subset of
+                atoms — a Farkas-style witness.
+
+  Standalone: open this .html directly in a browser. Uses D3 v7 and
+              KaTeX from CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NN Verification · Ch 4 · LRA SAT game</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; --soft:#eef3f8; --line:#d9e0e7; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 1080px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: var(--soft); border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; align-items: start; margin-top: 1rem; }
+  @media (max-width: 920px) { .layout { grid-template-columns: 1fr; } }
+  .panel { border: 1px solid var(--line); border-radius: 6px; padding: 0.9rem 1rem; background: #fff; }
+  .panel h3 { margin: 0 0 0.5rem 0; font-size: 0.98rem; }
+  .controls { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin: 0.6rem 0; }
+  select, button { font: inherit; padding: 0.35rem 0.7rem; border: 1px solid var(--line); border-radius: 4px; background: #fff; cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:hover { background: #1f5a92; }
+  button.danger { background: #fff; color: var(--bad); border-color: var(--bad); }
+  button.danger:hover { background: #fef3f2; }
+  button:hover { background: var(--soft); }
+  button.primary:hover { background: #1f5a92; }
+  .formula { font-size: 1rem; padding: 0.6rem 0.8rem; border: 1px solid var(--line); border-radius: 4px; background: #fafbfc; margin-bottom: 0.6rem; }
+  .atoms-list { font-size: 0.9rem; margin-top: 0.4rem; }
+  .atoms-list .atom { padding: 0.25rem 0.5rem; border-radius: 3px; margin: 0.15rem 0; display: flex; gap: 0.5rem; align-items: center; border-left: 3px solid var(--line); background: #fafbfc; }
+  .atoms-list .atom.true { border-left-color: var(--good); background: #f0fdf4; }
+  .atoms-list .atom.false { border-left-color: var(--bad); background: #fef3f2; }
+  .atoms-list .atom.contradicting { border-left-color: var(--warn); background: #fffbeb; }
+  .atoms-list .atom .id { font-family: "SFMono-Regular", monospace; font-size: 0.85rem; color: var(--muted); min-width: 1.5rem; }
+  .atoms-list .atom .body { flex: 1; }
+  .atoms-list .atom .val { font-family: "SFMono-Regular", monospace; font-size: 0.85rem; color: var(--muted); }
+  .verdict { padding: 0.6rem 0.85rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.93rem; font-weight: 500; }
+  .verdict.ok { background: #ecfdf3; color: var(--good); border-left: 4px solid var(--good); }
+  .verdict.bad { background: #fef3f2; color: var(--bad); border-left: 4px solid var(--bad); }
+  .verdict.idle { background: var(--soft); color: var(--muted); border-left: 4px solid var(--line); }
+  .reveal { padding: 0.6rem 0.85rem; border-radius: 4px; margin-top: 0.5rem; font-size: 0.93rem; background: var(--soft); border-left: 4px solid var(--accent); }
+  .reveal.hidden { display: none; }
+  svg.plane { background: #fff; border: 1px solid var(--line); border-radius: 4px; display: block; cursor: crosshair; touch-action: none; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  .point-marker { fill: var(--accent); stroke: #fff; stroke-width: 2; cursor: grab; }
+  .point-marker.bad { fill: var(--bad); }
+  .point-marker.good { fill: var(--good); }
+  .point-marker:active { cursor: grabbing; }
+  .coord-label { font-family: "SFMono-Regular", monospace; font-size: 0.92rem; color: var(--muted); }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+</style>
+</head>
+<body>
+
+<h1>SAT or UNSAT?</h1>
+<p class="subtitle">
+  NN Verification · Chapter 4 · companion to Albarghouthi (2021) §4.1–§4.2.
+</p>
+
+<div class="lede">
+  <p style="margin: 0;">
+    Each round below is a formula in linear real arithmetic over two
+    variables $x_1, x_2$. Each atom is a closed half-space — its
+    interior shaded on the plane below. A conjunction is the
+    intersection of half-spaces; a disjunction is their union.
+    <strong>Decide whether the formula is satisfiable.</strong> If it
+    is, drag the point onto a satisfying assignment. If it isn't,
+    press <em>Declare UNSAT</em>. This is the same yes/no the SMT
+    solver in Ch 6 will be asked about an encoded neural network — a
+    model is a counterexample, UNSAT means the property is proved.
+  </p>
+</div>
+
+<div class="controls">
+  <label for="formula">Formula:</label>
+  <select id="formula"></select>
+  <button id="prev">&larr; Prev</button>
+  <button id="next">Next &rarr;</button>
+</div>
+
+<div class="layout">
+
+  <div class="panel">
+    <h3>Formula</h3>
+    <div class="formula" id="formula-display"></div>
+    <div id="atoms-list" class="atoms-list"></div>
+    <p class="coord-label" id="point-coords"></p>
+    <div class="controls">
+      <button id="submit-sat" class="primary">Submit point as model</button>
+      <button id="declare-unsat" class="danger">Declare UNSAT</button>
+      <button id="reveal-btn">Reveal</button>
+    </div>
+    <div id="verdict" class="verdict idle">Drag the point or declare UNSAT.</div>
+    <div id="reveal" class="reveal hidden"></div>
+  </div>
+
+  <div class="panel">
+    <h3>Half-space arrangement on $\mathbb{R}^2$</h3>
+    <svg id="plane" class="plane" viewBox="0 0 360 360" width="100%" height="360" aria-label="Half-space arrangement"></svg>
+    <p style="font-size: 0.86rem; color: var(--muted); margin-top: 0.3rem;">
+      Shaded regions are <em>where each atom is true</em>. Atom labels
+      $A_1, A_2, \ldots$ match the list on the left. Drag the dot to
+      pick a model. The plane shown is $[-3, 3]^2$.
+    </p>
+  </div>
+
+</div>
+
+<div class="footnote">
+  <p>
+    Reference: Albarghouthi, <em>Introduction to Neural Network
+    Verification</em>, Ch 4 (arXiv:<a href="https://arxiv.org/abs/2109.10317">2109.10317</a>).
+    Atoms are written in the standard LRA form $\sum_i c_i x_i + b
+    \mathrel{\bowtie} 0$ for $\bowtie \in \{\le, <, \ge, >, =\}$, with
+    $\ge$ and $>$ rewritten via negation as the book recommends.
+  </p>
+  <p>
+    The UNSAT certificates shown on reveal are tiny non-negative
+    combinations of the contradicting atoms whose sum yields a
+    constant $\le 0$ inequality with positive constant — i.e.,
+    Farkas' lemma in miniature. Real LP/SMT solvers produce
+    exactly these certificates as &ldquo;proof traces.&rdquo;
+  </p>
+</div>
+
+<script>
+"use strict";
+
+// --- Formula library -------------------------------------------------------
+// Each atom is { coefs: [c1, c2], b: number, op: "le" | "lt" | "ge" | "gt" | "eq" }
+//   meaning  c1*x1 + c2*x2 + b  <op>  0.
+// Each formula is an AST over atoms. Internal node: { kind: "and"|"or"|"not", args: [...] }
+// Leaf: { kind: "atom", id: int (1-indexed) } — atom contents are stored in `atoms`.
+
+function atomValue(atom, x1, x2) {
+  const v = atom.coefs[0] * x1 + atom.coefs[1] * x2 + atom.b;
+  switch (atom.op) {
+    case "le": return v <= 1e-9;
+    case "lt": return v < -1e-9;
+    case "ge": return v >= -1e-9;
+    case "gt": return v > 1e-9;
+    case "eq": return Math.abs(v) < 1e-9;
+  }
+}
+
+function evalNode(node, atoms, x1, x2) {
+  if (node.kind === "atom") return atomValue(atoms[node.id - 1], x1, x2);
+  if (node.kind === "and") return node.args.every(a => evalNode(a, atoms, x1, x2));
+  if (node.kind === "or")  return node.args.some(a => evalNode(a, atoms, x1, x2));
+  if (node.kind === "not") return !evalNode(node.args[0], atoms, x1, x2);
+}
+
+function atomLatex(atom, idx) {
+  const [c1, c2] = atom.coefs;
+  const b = atom.b;
+  const opLatex = { le: "\\le", lt: "<", ge: "\\ge", gt: ">", eq: "=" }[atom.op];
+  // Build LHS
+  const parts = [];
+  const fmtCoef = (c, name, first) => {
+    if (Math.abs(c) < 1e-9) return null;
+    if (first) {
+      if (c === 1) return name;
+      if (c === -1) return `-${name}`;
+      return `${c}${name}`;
+    } else {
+      const sign = c > 0 ? " + " : " - ";
+      const mag = Math.abs(c);
+      if (mag === 1) return `${sign}${name}`;
+      return `${sign}${mag}${name}`;
+    }
+  };
+  let lhs = "";
+  let first = true;
+  const c1part = fmtCoef(c1, "x_1", true);
+  if (c1part) { lhs += c1part; first = false; }
+  const c2part = fmtCoef(c2, "x_2", first);
+  if (c2part) { lhs += c2part; first = false; }
+  if (Math.abs(b) >= 1e-9) {
+    if (first) { lhs += `${b}`; first = false; }
+    else lhs += b > 0 ? ` + ${b}` : ` - ${Math.abs(b)}`;
+  }
+  if (first) lhs = "0";
+  return `${lhs} ${opLatex} 0`;
+}
+
+function formulaLatex(node, atoms) {
+  if (node.kind === "atom") return `A_{${node.id}}`;
+  if (node.kind === "and") return node.args.map(a => formulaLatex(a, atoms)).join(" \\;\\wedge\\; ");
+  if (node.kind === "or") {
+    const inner = node.args.map(a => {
+      const s = formulaLatex(a, atoms);
+      // Parenthesise if the child is an `and`.
+      if (a.kind === "and") return `(${s})`;
+      return s;
+    }).join(" \\;\\vee\\; ");
+    return inner;
+  }
+  if (node.kind === "not") return `\\neg ${formulaLatex(node.args[0], atoms)}`;
+}
+
+// Helper to construct an atom + its index slot
+function A(coefs, b, op) { return { coefs, b, op }; }
+
+// Helper builders for the AST
+const at = (id) => ({ kind: "atom", id });
+const and = (...args) => ({ kind: "and", args });
+const or  = (...args) => ({ kind: "or", args });
+
+const FORMULAS = [
+  {
+    name: "F1 — triangular polyhedron (SAT)",
+    atoms: [
+      A([1, 1], -1, "le"),    // x1 + x2 - 1 <= 0  (i.e., x1+x2 <= 1)
+      A([1, -1], 0, "ge"),    // x1 - x2 >= 0
+      A([0, 1], 1, "ge")      // x2 >= -1
+    ],
+    ast: and(at(1), at(2), at(3)),
+    sat: true,
+    blurb: "The intersection of three half-spaces is a triangle with vertices roughly at $(-1, -1), (1, 0), (1, -1)$. Any interior point — e.g., $(0.5, -0.5)$ — is a model. This is the geometric picture of a satisfiable conjunction of LRA atoms; it is also the picture of an &ldquo;abstract polyhedron&rdquo; in Ch 10."
+  },
+  {
+    name: "F2 — disjunction (SAT)",
+    atoms: [
+      A([1, 0], 0, "le"),     // x1 <= 0
+      A([0, 1], -2, "ge")     // x2 >= 2
+    ],
+    ast: or(at(1), at(2)),
+    sat: true,
+    blurb: "A disjunction is the <em>union</em> of half-spaces — anywhere left of the $x_2$-axis or above the line $x_2 = 2$. Either $A_1$ or $A_2$ alone gives a model; satisfying both at once also works but is not required."
+  },
+  {
+    name: "F3 — straight contradiction (UNSAT)",
+    atoms: [
+      A([1, 0], -1, "ge"),    // x1 >= 1
+      A([1, 0], 0, "le")      // x1 <= 0
+    ],
+    ast: and(at(1), at(2)),
+    sat: false,
+    farkas: [1, 1],
+    blurb: "$A_1 \\wedge A_2$ requires $x_1 \\ge 1$ and $x_1 \\le 0$ simultaneously. Adding the two atoms (with multiplier $1$ on each) gives $1 \\le 0$, false. UNSAT."
+  },
+  {
+    name: "F4 — Farkas-style contradiction (UNSAT)",
+    atoms: [
+      A([1, 1], -2, "ge"),    // x1 + x2 >= 2
+      A([1, 1], -1, "le"),    // x1 + x2 <= 1
+      A([1, 0], 0, "ge")      // x1 >= 0
+    ],
+    ast: and(at(1), at(2), at(3)),
+    sat: false,
+    farkas: [1, 1, 0],
+    blurb: "$A_1$ says $x_1 + x_2 \\ge 2$; $A_2$ says $x_1 + x_2 \\le 1$. Adding (multiplier $1$ each) yields $2 \\le 1$, false. The third atom $A_3$ is irrelevant — the contradiction lives in the first two. Real solvers find this minimal subset and return it as the UNSAT certificate."
+  },
+  {
+    name: "F5 — 2-CNF (SAT)",
+    atoms: [
+      A([1, 0], 0, "ge"),     // x1 >= 0
+      A([0, 1], 0, "le"),     // x2 <= 0
+      A([1, 0], -1, "le"),    // x1 <= 1
+      A([0, 1], -1, "ge")     // x2 >= 1
+    ],
+    ast: and(or(at(1), at(2)), or(at(3), at(4))),
+    sat: true,
+    blurb: "A CNF formula. The first clause $A_1 \\vee A_2$ rules out the open quadrant $\\{x_1 < 0 \\wedge x_2 > 0\\}$; the second clause $A_3 \\vee A_4$ rules out $\\{x_1 > 1 \\wedge x_2 < 1\\}$. Many models — e.g., $(0.5, 0.5)$ satisfies $A_1$ in clause 1 and $A_3$ in clause 2."
+  },
+  {
+    name: "F6 — wedge between two slopes (SAT, narrow)",
+    atoms: [
+      A([1, 0], 0, "ge"),         // x1 >= 0
+      A([1, 1], -1, "le"),        // x1 + x2 <= 1
+      A([-1, 1], -0.5, "ge")      // x2 - x1 >= 0.5
+    ],
+    ast: and(at(1), at(2), at(3)),
+    sat: true,
+    blurb: "All three: $x_1 \\ge 0$, $x_1 + x_2 \\le 1$, $x_2 - x_1 \\ge 0.5$. The feasible region is a small triangle with vertices $(0, 0.5), (0, 1), (0.25, 0.75)$. The wedge is small and easy to miss — verifiers in Ch 6/7 spend most of their runtime hunting wedges like this."
+  },
+  {
+    name: "F7 — disjoint half-planes (UNSAT)",
+    atoms: [
+      A([0, 1], -1, "le"),    // x2 - 1 <= 0  (x2 <= 1)
+      A([0, 1], -1, "ge"),    // x2 - 1 >= 0  (x2 >= 1)
+      A([0, 1], -1, "lt")     // x2 - 1 < 0   (x2 < 1)
+    ],
+    ast: and(at(1), at(3)),
+    sat: false,
+    farkas: [0, 0, 0],
+    blurb: "$A_1$ says $x_2 \\le 1$ and $A_3$ says $x_2 < 1$ — the second is just a strict version of the first, so no contradiction yet. Wait — re-read. $A_1 \\wedge A_3$ alone is satisfiable; the formula must contain something else. (This row is intentionally tricky; if you reached this blurb without solving it, look closely at which atoms appear in the AST vs. which are just extras.)",
+    note: "F7 isn't actually used in the AST as printed — the AST uses A_1 and A_3, both lower-bound-style, so it IS sat. Replaced.",
+    skip: true
+  },
+  {
+    name: "F7 — strict-vs-non-strict trap (UNSAT)",
+    atoms: [
+      A([1, 0], 0, "ge"),     // x1 >= 0
+      A([1, 0], 0, "lt"),     // x1 < 0
+    ],
+    ast: and(at(1), at(2)),
+    sat: false,
+    farkas: [1, 1],
+    blurb: "Strict $<$ never agrees with non-strict $\\ge$ at the boundary. Pure SAT does not see this distinction; SMT(LRA) must, because abstract domains in Part III rely on it being correct. This is exactly the trap that ill-encoded ReLU-as-SMT formulas fall into when an off-by-one $\\le$ vs. $<$ slips through."
+  }
+].filter(f => !f.skip);
+
+// --- Plot setup -----------------------------------------------------------
+const PLOT_RANGE = 3;     // [-3, 3]^2
+const PLOT_PX = 360;
+const PLOT_PAD = 30;
+
+const formulaSel = document.getElementById('formula');
+FORMULAS.forEach((f, i) => {
+  const opt = document.createElement('option');
+  opt.value = String(i); opt.textContent = f.name;
+  formulaSel.appendChild(opt);
+});
+
+let state = {
+  idx: 0,
+  point: { x1: 0.5, x2: 0.5 },
+  done: false   // disable buttons after a verdict
+};
+
+const planeSvg = d3.select('#plane');
+const formulaDisplay = document.getElementById('formula-display');
+const atomsListEl = document.getElementById('atoms-list');
+const coordLabel = document.getElementById('point-coords');
+const verdictEl = document.getElementById('verdict');
+const revealEl = document.getElementById('reveal');
+
+function currentFormula() { return FORMULAS[state.idx]; }
+
+function renderFormula() {
+  const f = currentFormula();
+  const tex = formulaLatex(f.ast, f.atoms);
+  formulaDisplay.innerHTML = `$\\varphi_{${state.idx + 1}} \\;\\triangleq\\; ${tex}$`;
+  if (window.renderMathInElement) renderMathInElement(formulaDisplay);
+
+  atomsListEl.innerHTML = '';
+  f.atoms.forEach((atom, i) => {
+    const div = document.createElement('div');
+    div.className = 'atom';
+    div.dataset.atomIdx = i;
+    div.innerHTML = `<span class="id">$A_{${i + 1}}$</span><span class="body">$${atomLatex(atom, i)}$</span><span class="val" data-val></span>`;
+    atomsListEl.appendChild(div);
+  });
+  if (window.renderMathInElement) renderMathInElement(atomsListEl);
+  updateAtomValues();
+}
+
+function updateAtomValues() {
+  const f = currentFormula();
+  const { x1, x2 } = state.point;
+  f.atoms.forEach((atom, i) => {
+    const val = atomValue(atom, x1, x2);
+    const el = atomsListEl.querySelector(`.atom[data-atom-idx="${i}"]`);
+    if (!el) return;
+    el.classList.remove('true', 'false');
+    el.classList.add(val ? 'true' : 'false');
+    const valEl = el.querySelector('[data-val]');
+    if (valEl) valEl.textContent = val ? "true" : "false";
+  });
+  coordLabel.textContent = `point: (x₁, x₂) = (${x1.toFixed(2)}, ${x2.toFixed(2)})    formula at point: ${evalNode(f.ast, f.atoms, x1, x2) ? "true" : "false"}`;
+}
+
+// Plane coordinates
+function px(x) { return PLOT_PAD + (x + PLOT_RANGE) / (2 * PLOT_RANGE) * (PLOT_PX - 2 * PLOT_PAD); }
+function py(y) { return PLOT_PX - PLOT_PAD - (y + PLOT_RANGE) / (2 * PLOT_RANGE) * (PLOT_PX - 2 * PLOT_PAD); }
+function ux(p) { return (p - PLOT_PAD) / (PLOT_PX - 2 * PLOT_PAD) * (2 * PLOT_RANGE) - PLOT_RANGE; }
+function uy(p) { return -((p - (PLOT_PX - PLOT_PAD)) / (PLOT_PX - 2 * PLOT_PAD)) * (2 * PLOT_RANGE) - PLOT_RANGE; }
+
+function drawPlane() {
+  const f = currentFormula();
+  planeSvg.selectAll('*').remove();
+
+  // White background already by CSS. Draw a faint grid.
+  const inner = planeSvg.append('g');
+  for (let v = -3; v <= 3; v++) {
+    inner.append('line').attr('x1', px(v)).attr('y1', py(-3)).attr('x2', px(v)).attr('y2', py(3))
+      .attr('stroke', '#eef3f8').attr('stroke-width', 1);
+    inner.append('line').attr('x1', px(-3)).attr('y1', py(v)).attr('x2', px(3)).attr('y2', py(v))
+      .attr('stroke', '#eef3f8').attr('stroke-width', 1);
+  }
+
+  // Sample a grid and shade each cell with the count of atoms it satisfies — but
+  // we'd rather draw each atom's half-plane shaded with its own color. We'll do
+  // both: per-atom semi-transparent shading, plus per-atom boundary line.
+  const ATOM_COLORS = ["#3182ce", "#dd6b20", "#38a169", "#805ad5", "#d53f8c", "#0987a0", "#b7791f"];
+  const NX = 80;
+  const cellSz = (PLOT_PX - 2 * PLOT_PAD) / NX;
+  // For each atom, render shading
+  f.atoms.forEach((atom, i) => {
+    const color = ATOM_COLORS[i % ATOM_COLORS.length];
+    const g = inner.append('g').attr('opacity', 0.18);
+    for (let ix = 0; ix < NX; ix++) {
+      for (let iy = 0; iy < NX; iy++) {
+        const X1 = -3 + (6 * ix) / (NX - 1);
+        const X2 = -3 + (6 * iy) / (NX - 1);
+        if (atomValue(atom, X1, X2)) {
+          g.append('rect').attr('x', px(X1) - cellSz / 2).attr('y', py(X2) - cellSz / 2)
+            .attr('width', cellSz + 0.5).attr('height', cellSz + 0.5)
+            .attr('fill', color);
+        }
+      }
+    }
+  });
+
+  // Atom boundary lines — solid for non-strict, dashed for strict
+  f.atoms.forEach((atom, i) => {
+    const color = ATOM_COLORS[i % ATOM_COLORS.length];
+    // Boundary: c1*x + c2*y + b = 0
+    const [c1, c2] = atom.coefs;
+    const b = atom.b;
+    let pts = [];
+    if (Math.abs(c2) > 1e-9) {
+      const yL = (-b - c1 * -PLOT_RANGE) / c2;
+      const yR = (-b - c1 * PLOT_RANGE) / c2;
+      pts = [[-PLOT_RANGE, yL], [PLOT_RANGE, yR]];
+    } else if (Math.abs(c1) > 1e-9) {
+      const xL = -b / c1;
+      pts = [[xL, -PLOT_RANGE], [xL, PLOT_RANGE]];
+    }
+    if (pts.length === 2) {
+      inner.append('line')
+        .attr('x1', px(pts[0][0])).attr('y1', py(pts[0][1]))
+        .attr('x2', px(pts[1][0])).attr('y2', py(pts[1][1]))
+        .attr('stroke', color).attr('stroke-width', 1.4)
+        .attr('stroke-dasharray', (atom.op === "lt" || atom.op === "gt") ? "4 3" : null);
+    }
+    // Atom label near top-right of its boundary at a heuristic offset.
+    if (pts.length === 2) {
+      const mx = (pts[0][0] + pts[1][0]) / 2;
+      const my = (pts[0][1] + pts[1][1]) / 2;
+      // Offset perpendicular into the truthy side a bit so the label is in the shaded region.
+      const perpX = -c2, perpY = c1;
+      const norm = Math.hypot(perpX, perpY) || 1;
+      // Determine sign by sampling a point a tiny step off the boundary.
+      const probe = atomValue(atom, mx + 0.2 * perpX / norm, my + 0.2 * perpY / norm) ? 1 : -1;
+      const ox = probe * 0.3 * perpX / norm;
+      const oy = probe * 0.3 * perpY / norm;
+      inner.append('text').attr('x', px(mx + ox)).attr('y', py(my + oy)).attr('font-size', 11)
+        .attr('fill', color).attr('font-weight', 'bold').attr('text-anchor', 'middle').text(`A${i + 1}`);
+    }
+  });
+
+  // Axes
+  inner.append('line').attr('x1', px(-3)).attr('y1', py(0)).attr('x2', px(3)).attr('y2', py(0))
+    .attr('stroke', '#52606d').attr('stroke-width', 1);
+  inner.append('line').attr('x1', px(0)).attr('y1', py(-3)).attr('x2', px(0)).attr('y2', py(3))
+    .attr('stroke', '#52606d').attr('stroke-width', 1);
+  // Tick labels
+  for (let v = -3; v <= 3; v++) {
+    if (v === 0) continue;
+    inner.append('text').attr('x', px(v)).attr('y', py(0) + 12).attr('text-anchor', 'middle')
+      .attr('font-size', 10).attr('fill', '#52606d').text(String(v));
+    inner.append('text').attr('x', px(0) - 6).attr('y', py(v) + 3).attr('text-anchor', 'end')
+      .attr('font-size', 10).attr('fill', '#52606d').text(String(v));
+  }
+  inner.append('text').attr('x', px(3) + 4).attr('y', py(0) + 4).attr('font-size', 12).attr('fill', '#52606d').attr('font-style', 'italic').text('x₁');
+  inner.append('text').attr('x', px(0) + 4).attr('y', py(3) - 6).attr('font-size', 12).attr('fill', '#52606d').attr('font-style', 'italic').text('x₂');
+
+  // Draggable point
+  const point = inner.append('circle').attr('class', 'point-marker')
+    .attr('r', 7).attr('cx', px(state.point.x1)).attr('cy', py(state.point.x2));
+
+  const drag = d3.drag()
+    .on('drag', function(event) {
+      const nx = Math.max(-PLOT_RANGE, Math.min(PLOT_RANGE, ux(event.x)));
+      const ny = Math.max(-PLOT_RANGE, Math.min(PLOT_RANGE, uy(event.y)));
+      state.point.x1 = nx;
+      state.point.x2 = ny;
+      d3.select(this).attr('cx', px(nx)).attr('cy', py(ny));
+      updateAtomValues();
+    });
+  point.call(drag);
+}
+
+// --- UNSAT certificate finder ---------------------------------------------
+// For an UNSAT conjunction of LRA atoms, find a minimal contradicting subset.
+// We only handle the common cases that show up in our library: pairwise
+// contradictions on the same direction, or three atoms whose linear
+// combination yields a constant infeasibility. We brute-force minimal subsets
+// by enumeration up to size 3.
+
+function leOnly(atom) {
+  // Convert atom to "<= 0" form (or "< 0"). Returns { coefs, b, strict } or null
+  // if the atom is an equality (handle separately).
+  const flip = (sign) => atom.coefs.map(c => sign * c);
+  switch (atom.op) {
+    case "le": return { coefs: atom.coefs.slice(), b: atom.b, strict: false };
+    case "lt": return { coefs: atom.coefs.slice(), b: atom.b, strict: true };
+    case "ge": return { coefs: flip(-1), b: -atom.b, strict: false };
+    case "gt": return { coefs: flip(-1), b: -atom.b, strict: true };
+    case "eq": return null; // we won't generate eq atoms in our library
+  }
+}
+
+function findUnsatCert(atoms) {
+  // Convert all atoms to <=/<. We assume the formula AST is a top-level
+  // conjunction of atoms when it is UNSAT (the library is designed that way).
+  const norm = atoms.map(leOnly);
+  if (norm.some(n => n === null)) return null;
+  const N = norm.length;
+  // Try sums with non-negative integer multipliers in {0, 1, 2} on each atom.
+  // We want SUM_i lambda_i * (c_i . x + b_i)  to be a constant K with K > 0
+  // (or K >= 0 with at least one strict atom involved).
+  for (let s1 = 0; s1 <= 2; s1++) for (let s2 = 0; s2 <= 2; s2++) for (let s3 = 0; s3 <= 2; s3++) {
+    const lam = N >= 3 ? [s1, s2, s3] : N === 2 ? [s1, s2] : [s1];
+    if (lam.length !== N) continue;
+    const used = lam.filter(l => l > 0).length;
+    if (used < 2) continue; // need at least 2 atoms for a real contradiction
+    // Compute combined coefficients and constant.
+    let c1 = 0, c2 = 0, b = 0;
+    let anyStrict = false;
+    for (let i = 0; i < N; i++) {
+      if (lam[i] === 0) continue;
+      c1 += lam[i] * norm[i].coefs[0];
+      c2 += lam[i] * norm[i].coefs[1];
+      b  += lam[i] * norm[i].b;
+      if (norm[i].strict) anyStrict = true;
+    }
+    if (Math.abs(c1) < 1e-9 && Math.abs(c2) < 1e-9) {
+      // Constant inequality: b <op> 0. We claim SAT was assuming
+      // "sum of atoms" <= 0 (or < 0). But if b > 0 (or b >= 0 with strict),
+      // contradiction.
+      if ((!anyStrict && b > 1e-9) || (anyStrict && b > -1e-9)) {
+        return { multipliers: lam, constant: b, strict: anyStrict };
+      }
+    }
+  }
+  return null;
+}
+
+// --- Verdict logic ---------------------------------------------------------
+const submitSatBtn = document.getElementById('submit-sat');
+const declareUnsatBtn = document.getElementById('declare-unsat');
+const revealBtn = document.getElementById('reveal-btn');
+const prevBtn = document.getElementById('prev');
+const nextBtn = document.getElementById('next');
+
+function clearVerdict() {
+  verdictEl.className = 'verdict idle';
+  verdictEl.textContent = 'Drag the point or declare UNSAT.';
+  revealEl.classList.add('hidden');
+  state.done = false;
+}
+
+function highlightContradicting(indices) {
+  for (const el of atomsListEl.querySelectorAll('.atom')) {
+    el.classList.remove('contradicting');
+  }
+  for (const i of indices) {
+    const el = atomsListEl.querySelector(`.atom[data-atom-idx="${i}"]`);
+    if (el) el.classList.add('contradicting');
+  }
+}
+
+submitSatBtn.addEventListener('click', () => {
+  const f = currentFormula();
+  const { x1, x2 } = state.point;
+  const sat = evalNode(f.ast, f.atoms, x1, x2);
+  if (sat) {
+    if (f.sat) {
+      verdictEl.className = 'verdict ok';
+      verdictEl.innerHTML = `Correct — $\\varphi_{${state.idx + 1}}$ is SAT, and $(${x1.toFixed(2)}, ${x2.toFixed(2)})$ is a model. Every atom evaluates to true (or, for disjunctions, the whole formula does).`;
+    } else {
+      verdictEl.className = 'verdict bad';
+      verdictEl.innerHTML = `The point genuinely satisfies the formula at $(${x1.toFixed(2)}, ${x2.toFixed(2)})$ — but the formula was advertised as UNSAT! This widget has a bug; please report.`;
+    }
+  } else {
+    verdictEl.className = 'verdict bad';
+    verdictEl.innerHTML = `Not yet — the formula evaluates to <strong>false</strong> at $(${x1.toFixed(2)}, ${x2.toFixed(2)})$. Look at the atom list: red atoms are the ones the point fails. Either move the point until the formula goes true, or — if you suspect no such point exists — declare UNSAT.`;
+  }
+  if (window.renderMathInElement) renderMathInElement(verdictEl);
+});
+
+declareUnsatBtn.addEventListener('click', () => {
+  const f = currentFormula();
+  if (f.sat) {
+    verdictEl.className = 'verdict bad';
+    verdictEl.innerHTML = `Not so fast — $\\varphi_{${state.idx + 1}}$ is actually SAT. There is at least one model. (Hint: try the boundary or interior of the shaded region intersection.)`;
+  } else {
+    verdictEl.className = 'verdict ok';
+    // Find a Farkas-style certificate
+    const cert = findUnsatCert(f.atoms);
+    let msg = `Correct — $\\varphi_{${state.idx + 1}}$ is UNSAT. `;
+    if (cert) {
+      const usedIdx = cert.multipliers.map((l, i) => l > 0 ? i : -1).filter(i => i >= 0);
+      highlightContradicting(usedIdx);
+      const sumStr = cert.multipliers
+        .map((l, i) => l > 0 ? `${l === 1 ? "" : l + "\\cdot"}A_{${i + 1}}` : null)
+        .filter(s => s !== null)
+        .join(" + ");
+      msg += `Certificate: $${sumStr}$ collapses to the impossible inequality $${cert.constant.toFixed(2)} ${cert.strict ? "<" : "\\le"} 0$. The contradicting atoms are highlighted in amber on the left.`;
+    } else {
+      msg += "The contradiction is genuine but the toy Farkas-finder didn't simplify it cleanly — see the reveal below for the manual argument.";
+    }
+    verdictEl.innerHTML = msg;
+  }
+  if (window.renderMathInElement) renderMathInElement(verdictEl);
+});
+
+revealBtn.addEventListener('click', () => {
+  const f = currentFormula();
+  revealEl.classList.remove('hidden');
+  let body = `<strong>${f.sat ? "SAT" : "UNSAT"}.</strong> ${f.blurb}`;
+  if (f.sat) {
+    // Try to suggest a model: sample-search the plane on a coarse grid.
+    let found = null;
+    for (let i = -30; i <= 30 && !found; i++) {
+      for (let j = -30; j <= 30 && !found; j++) {
+        const a = i / 10, b = j / 10;
+        if (evalNode(f.ast, f.atoms, a, b)) found = { x1: a, x2: b };
+      }
+    }
+    if (found) body += ` Example model: $(${found.x1.toFixed(2)}, ${found.x2.toFixed(2)})$.`;
+  }
+  revealEl.innerHTML = body;
+  if (window.renderMathInElement) renderMathInElement(revealEl);
+});
+
+function go(idx) {
+  state.idx = ((idx % FORMULAS.length) + FORMULAS.length) % FORMULAS.length;
+  formulaSel.value = String(state.idx);
+  state.point = { x1: 0.5, x2: 0.5 };
+  clearVerdict();
+  renderFormula();
+  drawPlane();
+}
+
+formulaSel.addEventListener('change', () => go(parseInt(formulaSel.value)));
+prevBtn.addEventListener('click', () => go(state.idx - 1));
+nextBtn.addEventListener('click', () => go(state.idx + 1));
+
+go(0);
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.renderMathInElement) {
+    renderMathInElement(document.body, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "$", right: "$", display: false }
+      ],
+      throwOnError: false
+    });
+  }
+});
+</script>
+
+</body>
+</html>

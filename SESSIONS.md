@@ -625,3 +625,51 @@ per session, newest at the bottom. See
   widget, smoke test, and grader correctness check all green.
   Ch 4 starts a new source section (the fol.tex logic primer)
   and is a natural session boundary.
+
+## 2026-05-06 22:45 (session — nnv-ch4-fol-lra)
+
+- **Worked on:** Built the third nn-verification chapter,
+  `nnv-ch4-fol-lra`, on Albarghouthi's propositional + LRA primer
+  (fol.tex, §4.1–§4.2). This is the Part-II hinge: every encoding
+  / decision-procedure / case-split chapter (Ch 5–7) inherits its
+  formula language from here.
+- **What got done:**
+  1. Read `fol.tex` in full. Pulled out the load-bearing
+     translation: spec validity ↔ encoded formula UNSAT,
+     model ↔ counterexample.
+  2. Flipped the `nnv-ch4-fol-lra` row to `in progress` and
+     refreshed the Status block (Ch 2 + Ch 3 now drafted).
+  3. Wrote chapter `README.md` framing the geometric mental model
+     (atoms = closed half-spaces, conjunction = polyhedron,
+     disjunction = union) and previewing how the reading pays off
+     in Part III's polyhedral abstract domains.
+  4. Built the `01-lra-sat-game.html` widget. Library of seven
+     2-variable LRA formulas, four SAT and three UNSAT, ranging
+     from a simple triangular polyhedron through a tight
+     intersection-wedge to Farkas-style and strict-vs-non-strict
+     contradictions. Live half-space arrangement on $[-3, 3]^2$
+     with each atom drawn in its own colour, boundary lines
+     dashed for strict inequalities. Draggable model-point with
+     live per-atom truth indicators. Reader either submits the
+     point as a SAT model (graded by formula evaluation) or
+     declares UNSAT (graded against the precomputed truth flag,
+     and on success the widget runs a tiny brute-force
+     Farkas-certificate finder over multipliers in $\{0,1,2\}$
+     and highlights the contradicting atoms).
+  5. Smoke-tested via `scripts/widget-smoke-test.py` — passed.
+  6. Wrote a Playwright integration check that cycles through
+     all seven formulas, declares the opposite verdict, and
+     verifies each case grades the way it should (UNSAT on SAT
+     formula → bad; SAT submission on UNSAT formula → bad; etc.).
+     PASS for all seven.
+- **What's next:** `nnv-ch5-encoding` — the &ldquo;cash in&rdquo;
+  chapter where the LRA language built here is used to encode
+  the canonical 2-2-1 ReLU toy network as a formula. Active
+  check is constructive: build the MILP/LRA encoding of one
+  affine node, then one ReLU node (the disjunction!), then the
+  whole net. Then pose a robustness query and watch the SMT-shape
+  formula light up. This is the natural pedagogical climax of
+  Part II's Ch 4–5 pair.
+- **Blockers:** none.
+- **Why stopped:** Ch 4 is a clean unit. README, widget, smoke,
+  grader test all green.
