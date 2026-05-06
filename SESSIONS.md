@@ -929,3 +929,42 @@ per session, newest at the bottom. See
   with the zonotope visualised as a 2-D parallelogram in the
   output space.
 - **Blockers:** none.
+
+## 2026-05-07 03:00 (continuing — nnv-ch9-zonotopes)
+
+- **Worked on:** Built `nnv-ch9-zonotopes`, the eighth nn-verification
+  chapter. Relational abstract domain that fixes path-sharing.
+- **What got done:** read numerical.tex; flipped row + Status block;
+  wrote chapter `README.md`; built
+  `01-zonotope-vs-interval.html` — same draggable-anchor UI as Ch 8
+  but with both interval AND zonotope passes running in parallel.
+  Output bounds plotted as three stacked bars (true / zonotope /
+  interval) on a number line; the (h₁, h₂)-projection shows the
+  zonotope as a parallelogram against the interval rectangle.
+  Implementation: full multi-generator zonotope arithmetic in JS
+  (1-D zonotope as coefficient array, generator-extension on
+  unstable ReLUs via §9.4 parallelogram with $\lambda = u/(u-l)$,
+  $\eta = u(1-\lambda)/2$); convex-hull computed by enumerating
+  $2^k$ vertex combinations and Andrew's monotone chain (k ≤ 4
+  here). Smoke + grader test pass on soundness for all 4 presets.
+- **Mid-build correction:** the test initially asserted zonotope
+  width $\le$ interval width on every preset. The "cross" preset
+  (large eps with both ReLUs heavily asymmetric, $|l| \gg |u|$)
+  caught a real Albarghouthi-acknowledged incomparability — the
+  parallelogram approximation admits negative ReLU outputs, which
+  in turn inflate downstream bounds. On "cross": interval width
+  4.0, zonotope width 4.375. Updated the test to only check
+  soundness (both ≥ true) and the headline single-region
+  exactness; updated the README to walk through both behaviours
+  rather than claim zonotopes always dominate. This is exactly
+  the gap that Ch 10's polyhedral domain (DeepPoly) closes by
+  computing both the parallelogram and the box and taking the
+  intersection.
+- **What's next:** `nnv-ch10-deeppoly` — the headline chapter.
+  Polyhedral abstract domain with paired upper / lower linear
+  bounds per node. Active check is the planned headline
+  &ldquo;adversarial-or-certificate verification game&rdquo;:
+  given a network + spec, the reader either constructs an
+  adversarial input or a CROWN-style linear bound proving
+  robustness; site grades both branches.
+- **Blockers:** none.
