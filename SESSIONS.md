@@ -761,3 +761,95 @@ per session, newest at the bottom. See
   theory solver (Simplex + Reluplex case-split rule). Active check
   would naturally be a Reluplex case-split tree visualiser.
 - **Blockers:** none.
+
+## 2026-05-06 (session — autonomous run: 8 widgets across LI Ch 2 + Ch 3)
+
+- **Worked on:** Eight new widgets across the Logical Induction
+  companion, drafted in source order and committed-on-main with a
+  Human Review issue per widget. Continued the
+  re-read-source / build / smoke-test / link-issue / commit
+  workflow established in earlier sessions.
+- **What got done (this run):**
+  1. **Ch 2 module 2** — `li-ch2-deductive-process` (#15).
+     8-world propositional grid; deductive schedule shrinks
+     $\mathrm{PC}(\bar{D}_n)$ from 8 → 4 → 2 then plateaus; both
+     Goldbach branches survive forever, dramatising why the LI is
+     free to price open conjectures anywhere. Schedule
+     correctness verified via offline node script. Commits
+     `e5313b4`, `ce4b23b`.
+  2. **Ch 2 module 4** — `li-ch2-exploit-or-not` (#16). Four
+     constant-strategy traders on the same toy market; reader
+     tabs through and classifies each as exploits / anti-exploits
+     / bounded / unbounded-both based on the plausible-net-worth
+     band. Trader A is the canonical §3.5 example. Bands
+     verified offline. Commits `4abe71c`, `fae59ed`.
+  3. **Ch 2 module 5** — `li-ch2-arbitrage-pair` (#17). The §3.5
+     paragraph-4 $(\varphi \lor \psi)$ arbitrage with $\varphi :=$
+     RH and $\psi :=$ ¬RH as syntactically distinct primes. Slider
+     for $t^\star$; lower bound across all $n$ is the finite
+     $-5(t^\star - 1)$, upper grows linearly: exploits regardless
+     of $t^\star$. Bands verified offline. Commits `96f5dd9`,
+     `de54be1`. **Ch 2 is now 5/5 modules drafted.**
+  4. **Ch 3 module 1** — `li-ch3-convergence` (#18). Three sliders
+     ($\varepsilon$, period $T$, $n_\text{settle}$); buy-low/sell-
+     high trader's realised cash plotted against the oscillating
+     market. Ships the new `chapters/ch3-properties/` directory
+     and chapter README. Commits `ef94832`, `cd0e724`.
+  5. **Ch 3 module 2** — `li-ch3-limit-coherence` (#19). Tabbed
+     widget for the three Gaifman conditions (provable $\Rightarrow$
+     $\mathbb{P}_\infty = 1$; refutable $\Rightarrow 0$;
+     mutually-exclusive $\Rightarrow$ additivity). Each tab runs
+     the dedicated trader and shows the per-day-$\varepsilon$
+     cash trajectory. Commits `098c8e2`, `c9bbdfb`.
+  6. **Ch 3 module 3** — `li-ch3-provability-induction` (#20).
+     Side-by-side belief heatmaps for the §4.2 Ramanujan/Hardy
+     framing. 20 EC theorems, three growth rates for $f(n)$
+     ($2n+5$, $n^2+5$, $n^3/4 + 5$). The LI's heatmap is
+     qualitatively the same across all three; the no-LI Hardy's
+     fans out further as $f$ grows. Predict-then-reveal nails the
+     "$N^\star$ does not depend on $f$" insight. Commits `c61ca07`,
+     `c0c11fe`.
+  7. **Ch 3 module 4** — `li-ch3-pi-statistical` (#21). Statistical
+     -pattern learning on the Ackermann-digit-of-$\pi$ sequence.
+     Three reasoners (Bayesian forced to truth, stylised LI,
+     naive 0.5); slider for target frequency $p$; reroll button.
+     The active check lands the central surprise: the diagonal
+     $\mathbb{P}_n(\varphi_n)$ converges to $p$, not to per-sentence
+     truth. Footnote acknowledges truth-value simulation and points
+     to Flint's `uniform_digits_of_pi.py` for the real LIA-toy.
+     Commits `8c827a9`, `8624376`.
+  8. (Earlier this same overall session, before the autonomous
+     run was authorised: `li-ch2-continuity-paradox` (#14) — see
+     prior SESSIONS.md entry.)
+- **Workflow notes:**
+  - Every widget re-read its primary source section in `paper/`
+    before the editor was opened, per the standing rule.
+  - Every widget passed `node --check` (extracted inline script)
+    plus `scripts/widget-smoke-test.py`. The KaTeX warning on the
+    ¢ glyph (Ch 2 module 3) is the only non-`ok` smoke-test
+    output across the eight; harmless.
+  - Three widgets had their numerical claims verified by offline
+    `node -e` scripts: deductive-process schedule, exploit-or-not
+    trader bands, arbitrage-pair trader bands.
+  - The standing repo policy of commit-on-main + Human Review
+    issues per drafted widget continues to work — review backlog
+    is now #11–#21 (the original was #9 + #11–#13).
+- **What's next (next session):**
+  - Ch 3 module 5 — `li-ch3-calibration-cluster` (§4.4
+    calibration + correlated `clusters_n` example). Needs a
+    deeper read of §4.4.
+  - Ch 3 module 6 — `li-ch3-self-trust` (§4.12 Löb-shaped
+    self-reference; stretch).
+  - Ch 4 module — `li-ch4-lia-walkthrough` (§5.1–§5.4 LIA
+    construction). Chunkier; the natural place to cash in the
+    Flint port candidates listed in NOTES.md.
+  - Backlog: respond to whichever of #11–#21 receive human
+    review feedback first.
+- **Blockers:** none.
+- **Why stopped:** clean unit boundary — Ch 2 is fully drafted
+  (5/5), Ch 3 has the four §4.1–§4.3 theorem-level modules
+  drafted, and the remaining Ch 3 modules + Ch 4 LIA all warrant
+  deeper source reads / coordination with eventual review
+  feedback. Eight widgets in one continuous run is also probably
+  the right cap — diminishing returns past this point without
+  the partner-side review loop closing.
