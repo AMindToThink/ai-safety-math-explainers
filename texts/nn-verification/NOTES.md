@@ -204,7 +204,7 @@ to be refined by whichever Claude takes the chapter.
 | Ch 3 `correctness.tex` (Correctness Properties) | `nnv-ch3-specs` | Same 2-2-1 ReLU net + an MNIST-3vs5 micro-classifier | Spec-writing exercise: translate an English property (robustness, monotonicity, ACAS-Xu turn-right) into a `{P}f{Q}` Hoare-style triple; site checks against a reference encoding | in progress | |
 | Ch 4 `fol.tex` (Logics and Satisfiability) | `nnv-ch4-fol-lra` | 2-variable LRA formulas drawn as half-space arrangements in the plane | SAT-or-UNSAT geometric game: drag a point onto a satisfying assignment, or declare UNSAT with the contradicting half-spaces | in progress | |
 | Ch 5 `encodings.tex` (Encodings of Neural Networks) | `nnv-ch5-encoding` | 2-2-1 ReLU net; verification arena over the 4 ReLU activation patterns | Verify-or-counterexample arena: pick a robustness query, watch the encoding split by activation pattern, site decides SAT (with counterexample) or UNSAT | in progress | |
-| Ch 6 `dp.tex` (DPLL Modulo Theories) | `nnv-ch6-dpll-t` | A 4-clause CNF + a tiny LRA theory atom set | Step-through DPLL(T) trace: pick the next decision/propagation/backjump; site validates each step | not started | |
+| Ch 6 `dp.tex` (DPLL Modulo Theories) | `nnv-ch6-dpll-t` | Three small LRA formulas (UNSAT contradiction, Albarghouthi's running example, theory-vacuous SAT) | Step-through DPLL(T) trace stepper: press Next and watch Boolean-abstract → DPLL → theory-check → learn ¬I → repeat unfold; final verdict matches the LRA truth | in progress | |
 | Ch 7 `specialized.tex` (Neural Theory Solvers — Simplex / Reluplex) | `nnv-ch7-reluplex` | Simplex tableau on 3 vars; Reluplex case-split on a 2-2-1 net | Reluplex case-splitter game: pick which ReLU to split next, watch the SAT search tree shrink/explode | not started | |
 | Ch 8 `absint.tex` (Neural Interval Abstraction) | `nnv-ch8-intervals` | 2-2-1 ReLU net under interval bounds on a 2D ε-ball input | Drag the ε-ball, watch the interval bounds propagate; predict whether the output bound certifies robustness before the site reveals | not started | |
 | Ch 9 `numerical.tex` (Neural Zonotope Abstraction) | `nnv-ch9-zonotopes` | Same 2-2-1 net; zonotope of generators visualized in 2D | Construct-the-ReLU-transformer: pick the linear lower bound for the [l,u] ReLU case-split that minimizes the upper bound's area; site grades against the optimal | not started | |
@@ -262,15 +262,15 @@ entry should cite the location and link the critique if one exists.
 
 ## Status
 
-- **Last updated:** 2026-05-06
+- **Last updated:** 2026-05-07
 - **Chapters complete:** `nnv-ch2-nn-as-dag`, `nnv-ch3-specs`,
-  `nnv-ch4-fol-lra` (all drafted; awaiting human review).
-- **Currently being drafted:** `nnv-ch5-encoding` — the &ldquo;cash
-  in&rdquo; chapter where the LRA language built in Ch 4 is used
-  to encode the canonical 2-2-1 ReLU toy network and a robustness
-  query becomes a SAT problem. Active check materialises the
-  ReLU disjunction case-split as four colored regions in the
-  input plane.
+  `nnv-ch4-fol-lra`, `nnv-ch5-encoding` (all drafted;
+  awaiting human review).
+- **Currently being drafted:** `nnv-ch6-dpll-t` — the DPLL(T)
+  decision procedure that consumes Ch 5's encodings.
+  Active check is a step-through trace stepper that animates
+  Boolean abstraction → DPLL → theory check → learn-and-repeat
+  on three small LRA formulas.
 - **Blockers:** none.
 
 ## Cross-references

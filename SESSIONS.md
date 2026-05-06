@@ -720,3 +720,44 @@ per session, newest at the bottom. See
 
 ## 2026-05-07 00:15 (continuing — picking next module)
 
+
+## 2026-05-07 00:50 (continuing — nnv-ch6-dpll-t)
+
+- **Worked on:** Built `nnv-ch6-dpll-t`, the fifth nn-verification
+  chapter. DPLL(T) is the algorithmic engine that consumes the
+  encodings of Ch 5.
+- **What got done:**
+  1. Read `dp.tex` in full (546 lines). Pulled out the
+     load-bearing trio: Boolean abstraction is sound but not
+     complete; the lazy DPLL(T) loop (DPLL → theory check → learn
+     ¬I) closes the gap; Tseitin's transformation handles
+     non-CNF input.
+  2. Flipped row + Status block in NOTES.md.
+  3. Wrote chapter `README.md` with a three-example schema
+     (UNSAT-after-learning, SAT-after-one-refinement,
+     theory-vacuous SAT) so the active check exercises all three
+     qualitative loop behaviours.
+  4. Built `01-dpll-t-trace.html` — a step-through trace stepper.
+     Each example has a hardcoded sequence of steps (rather than
+     a live SAT solver, which would have been ~5x more code with
+     no pedagogical gain). The widget renders four state slots
+     (original, abstraction, current Boolean model, theory check),
+     a narration line annotated with which §6.2/§6.3 rule fired,
+     a step list with done/current highlights, and Next / Run-to-end
+     / Reset controls. Yellow highlight on the slot that just
+     changed.
+  5. Smoke + interactive grader test PASS.
+- **Bugs found and fixed during testing:**
+  - Off-by-one in the state replay loop dereferenced
+    `ex.steps[i]` past the array end on the verdict step;
+    fixed by capping at `Math.min(state.step, ex.steps.length)`
+    in two places (apply-state and computeIter).
+  - Placeholder strings like &ldquo;(none yet)&rdquo; were being
+    parsed by KaTeX as math (rendering as italic
+    &ldquo;(noneyet)&rdquo;); fixed by wrapping placeholders in
+    `\text{}`. Caught by visual inspection of the smoke
+    screenshot, not the smoke test.
+- **What's next:** `nnv-ch7-reluplex` — the ReLU-aware specialised
+  theory solver (Simplex + Reluplex case-split rule). Active check
+  would naturally be a Reluplex case-split tree visualiser.
+- **Blockers:** none.

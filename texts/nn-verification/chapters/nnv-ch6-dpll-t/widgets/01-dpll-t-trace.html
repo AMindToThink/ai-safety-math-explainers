@@ -1,0 +1,404 @@
+<!--
+  Widget: nnv-ch6-dpll-t-trace (module 1 of nn-verification Ch 6).
+  Source: Albarghouthi (2021) Ch 6, dp.tex (arXiv:2109.10317),
+          §6.2 DPLL + §6.3 DPLL(T).
+  Toy systems: three small LRA formulas exhibiting the three
+              qualitative DPLL(T) loop behaviours (UNSAT after
+              learning; SAT after one refinement; theory-vacuous SAT).
+  Active check: step-through trace stepper. Reader presses Next and
+                watches Boolean abstraction → DPLL → theory check →
+                learn ¬I → repeat unfold, with each step annotated by
+                which §6.2/§6.3 rule fired.
+
+  Standalone: open this .html directly in a browser. Uses KaTeX from
+              CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NN Verification · Ch 6 · DPLL(T) trace</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; --soft:#eef3f8; --line:#d9e0e7; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 1040px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: var(--soft); border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .panel { border: 1px solid var(--line); border-radius: 6px; padding: 0.9rem 1rem; background: #fff; margin-top: 1rem; }
+  .panel h3 { margin: 0 0 0.5rem 0; font-size: 0.98rem; }
+  .controls { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin: 0.6rem 0; }
+  select, button { font: inherit; padding: 0.35rem 0.7rem; border: 1px solid var(--line); border-radius: 4px; background: #fff; cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:hover { background: #1f5a92; }
+  button:hover { background: var(--soft); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .state { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 880px) { .state { grid-template-columns: 1fr; } }
+  .slot { border: 1px solid var(--line); border-radius: 4px; padding: 0.5rem 0.7rem; background: #fafbfc; min-height: 3rem; }
+  .slot h4 { margin: 0 0 0.3rem 0; font-size: 0.86rem; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+  .slot.changed { background: #fff4d4; border-color: #f0c870; }
+  .step-narration { padding: 0.6rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.94rem; background: var(--soft); border-left: 4px solid var(--accent); }
+  .step-narration .rule { font-weight: 600; color: var(--accent); }
+  .verdict { padding: 0.6rem 0.85rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; font-weight: 500; }
+  .verdict.ok { background: #ecfdf3; color: var(--good); border-left: 4px solid var(--good); }
+  .verdict.bad { background: #fef3f2; color: var(--bad); border-left: 4px solid var(--bad); }
+  .iteration-counter { font-size: 0.86rem; color: var(--muted); margin-top: 0.4rem; }
+  .legend-key { display: inline-flex; align-items: center; gap: 0.25rem; margin-right: 0.6rem; font-size: 0.86rem; color: var(--muted); }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  .step-list { list-style: none; padding: 0; margin: 0.5rem 0 0 0; max-height: 12rem; overflow-y: auto; }
+  .step-list li { font-size: 0.86rem; padding: 0.2rem 0.5rem; border-left: 2px solid var(--line); margin: 0.15rem 0; color: var(--muted); }
+  .step-list li.current { border-left-color: var(--accent); background: var(--soft); color: var(--ink); font-weight: 500; }
+  .step-list li.done { border-left-color: var(--good); }
+</style>
+</head>
+<body>
+
+<h1>The DPLL(T) loop, step by step</h1>
+<p class="subtitle">
+  NN Verification · Chapter 6 · companion to Albarghouthi (2021) §6.2–§6.3.
+</p>
+
+<div class="lede">
+  <p style="margin: 0;">
+    DPLL(T) decides satisfiability of an LRA formula by iterating
+    <em>Boolean abstraction → DPLL → theory check → learn-blocking-clause</em>
+    until either a Boolean model survives the theory check (SAT)
+    or the abstraction itself becomes unsatisfiable (UNSAT). Press
+    <em>Next step</em> below to walk one iteration at a time on
+    three small examples that exercise all three qualitative
+    behaviours of the loop.
+  </p>
+</div>
+
+<div class="controls">
+  <label for="example">Example:</label>
+  <select id="example"></select>
+  <button id="next-btn" class="primary">Next step &rarr;</button>
+  <button id="reset-btn">Reset</button>
+  <button id="run-btn">Run to end</button>
+</div>
+
+<div class="panel">
+  <h3>State</h3>
+  <div class="state">
+    <div class="slot" id="slot-original">
+      <h4>Original LRA formula $\varphi$</h4>
+      <div data-content></div>
+    </div>
+    <div class="slot" id="slot-abstraction">
+      <h4>Boolean abstraction $\varphi^B$ (with learned clauses)</h4>
+      <div data-content></div>
+    </div>
+    <div class="slot" id="slot-model">
+      <h4>Current Boolean model $I$</h4>
+      <div data-content></div>
+    </div>
+    <div class="slot" id="slot-theory">
+      <h4>Theory check on $I^T$</h4>
+      <div data-content></div>
+    </div>
+  </div>
+
+  <div class="iteration-counter" id="iter-counter">Iteration 0 — not started.</div>
+  <div id="narration" class="step-narration">Press <em>Next step</em> to start the loop.</div>
+  <div id="verdict" style="display: none;"></div>
+
+  <h3 style="margin-top: 1rem;">Trace so far</h3>
+  <ol class="step-list" id="step-list"></ol>
+</div>
+
+<div class="footnote">
+  <p>
+    Reference: Albarghouthi, <em>Introduction to Neural Network
+    Verification</em>, Ch 6 (arXiv:<a href="https://arxiv.org/abs/2109.10317">2109.10317</a>).
+    The lazy DPLL(T) loop is §6.3, Algorithm 2; example 2 below
+    reproduces the textbook walkthrough verbatim with Albarghouthi's
+    own atom-naming convention.
+  </p>
+  <p>
+    For a real implementation, see Z3 or MiniSat — both of which add
+    several layers (clause learning by conflict analysis, two-watched
+    literals, restart heuristics) on top of the bare DPLL skeleton
+    drawn here. The pedagogical version is faithful to the
+    decision-procedure logic; it is silent on the data structures
+    that make it fast.
+  </p>
+</div>
+
+<script>
+"use strict";
+
+// --- Trace data ------------------------------------------------------------
+// Each example has an array of "steps". Each step updates one or more state
+// slots. The state is { original, abstraction, model, theory } — strings of
+// LaTeX. After all steps, the verdict slot is filled in.
+//
+// We hardcode the traces for pedagogical clarity (and to avoid implementing
+// a SAT solver in JS, which would be 5x more code than the trace).
+
+const EXAMPLES = [
+  {
+    name: "E1 — direct contradiction (UNSAT)",
+    initial: {
+      original: "\\varphi \\;\\triangleq\\; \\underbrace{x \\ge 10}_{p} \\;\\wedge\\; \\underbrace{x \\le 0}_{q}",
+      abstraction: "\\varphi^B \\;\\triangleq\\; p \\wedge q",
+      model: "\\text{(none yet)}",
+      theory: "\\text{(not run yet)}"
+    },
+    steps: [
+      {
+        title: "DPLL on $\\varphi^B$",
+        rule: "§6.2 BCP",
+        narration: "$\\varphi^B = p \\wedge q$ is two unit clauses. BCP forces $p \\mapsto \\top$ then $q \\mapsto \\top$. Boolean SAT.",
+        update: { model: "I = \\{p \\mapsto \\top,\\; q \\mapsto \\top\\}", changed: ["model"] }
+      },
+      {
+        title: "Theory check $I^T$",
+        rule: "§6.3 theory solver",
+        narration: "$I^T = (x \\ge 10) \\wedge (x \\le 0)$. Adding the two atoms (Farkas multipliers $1, 1$) yields $10 \\le 0$. <strong>UNSAT</strong>.",
+        update: { theory: "I^T \\text{ is UNSAT.}\\quad \\text{Cert: } 1\\cdot p + 1\\cdot q \\Rightarrow 10 \\le 0", changed: ["theory"] }
+      },
+      {
+        title: "Learn blocking clause",
+        rule: "§6.3 learn $\\neg I$",
+        narration: "Append $\\neg I = \\neg p \\vee \\neg q$ to $\\varphi^B$. (In CNF: it's already a single clause.) Re-solve.",
+        update: { abstraction: "\\varphi^B \\;\\triangleq\\; p \\wedge q \\wedge \\underbrace{(\\neg p \\vee \\neg q)}_{\\neg I_1}", changed: ["abstraction"] }
+      },
+      {
+        title: "DPLL on refined $\\varphi^B$",
+        rule: "§6.2 BCP",
+        narration: "BCP on the units $p$ and $q$ assigns both true. Then the clause $(\\neg p \\vee \\neg q)$ has both literals false — empty clause. Boolean <strong>UNSAT</strong>.",
+        update: { model: "(\\text{no Boolean model — refined } \\varphi^B \\text{ is UNSAT})", changed: ["model"] }
+      }
+    ],
+    verdict: { kind: "unsat", text: "Final verdict: $\\varphi$ is <strong>UNSAT</strong>. The original formula has no real-valued model. (DPLL(T) terminated after one theory-conflict learning round.)" }
+  },
+
+  {
+    name: "E2 — Albarghouthi's running example (SAT after one refinement)",
+    initial: {
+      original: "\\varphi \\;\\triangleq\\; \\underbrace{x \\ge 10}_p \\wedge \\bigl(\\underbrace{x < 0}_q \\;\\vee\\; \\underbrace{y \\ge 0}_r\\bigr)",
+      abstraction: "\\varphi^B \\;\\triangleq\\; p \\wedge (q \\vee r)",
+      model: "\\text{(none yet)}",
+      theory: "\\text{(not run yet)}"
+    },
+    steps: [
+      {
+        title: "DPLL on $\\varphi^B$",
+        rule: "§6.2 BCP + decide",
+        narration: "BCP forces $p \\mapsto \\top$. The clause $(q \\vee r)$ has no unit yet; decide $q \\mapsto \\top$ first (variable-selection heuristic). Boolean SAT with a partial model.",
+        update: { model: "I_1 = \\{p \\mapsto \\top,\\; q \\mapsto \\top\\}", changed: ["model"] }
+      },
+      {
+        title: "Theory check $I_1^T$",
+        rule: "§6.3 theory solver",
+        narration: "$I_1^T = (x \\ge 10) \\wedge (x < 0)$. Same Farkas-style contradiction as E1 — the theory solver rejects.",
+        update: { theory: "I_1^T \\text{ is UNSAT.}\\quad \\text{Cert: } 1\\cdot p + 1\\cdot q \\Rightarrow 10 < 0", changed: ["theory"] }
+      },
+      {
+        title: "Learn $\\neg I_1$",
+        rule: "§6.3 learn $\\neg I$",
+        narration: "Append $\\neg I_1 = \\neg p \\vee \\neg q$ to $\\varphi^B$.",
+        update: { abstraction: "\\varphi^B \\;\\triangleq\\; p \\wedge (q \\vee r) \\wedge \\underbrace{(\\neg p \\vee \\neg q)}_{\\neg I_1}", changed: ["abstraction"] }
+      },
+      {
+        title: "DPLL on refined $\\varphi^B$",
+        rule: "§6.2 BCP",
+        narration: "BCP forces $p \\mapsto \\top$ (unit), then $\\neg q$ from $(\\neg p \\vee \\neg q)$, then $r$ from $(q \\vee r)$. Boolean SAT.",
+        update: { model: "I_2 = \\{p \\mapsto \\top,\\; q \\mapsto \\bot,\\; r \\mapsto \\top\\}", changed: ["model"] }
+      },
+      {
+        title: "Theory check $I_2^T$",
+        rule: "§6.3 theory solver",
+        narration: "$I_2^T = (x \\ge 10) \\wedge \\neg(x < 0) \\wedge (y \\ge 0) = (x \\ge 10) \\wedge (x \\ge 0) \\wedge (y \\ge 0)$. SAT — e.g., $\\{x \\mapsto 10,\\; y \\mapsto 0\\}$.",
+        update: { theory: "I_2^T \\text{ is SAT. Theory model: } \\{x \\mapsto 10,\\; y \\mapsto 0\\}", changed: ["theory"] }
+      }
+    ],
+    verdict: { kind: "sat", text: "Final verdict: $\\varphi$ is <strong>SAT</strong> with model $\\{x \\mapsto 10,\\; y \\mapsto 0\\}$. (Two iterations: one theory conflict learned, one survival.)" }
+  },
+
+  {
+    name: "E3 — theory-vacuous SAT (no learning needed)",
+    initial: {
+      original: "\\varphi \\;\\triangleq\\; \\underbrace{x \\le 5}_p \\wedge \\bigl(\\underbrace{y \\ge 0}_q \\;\\vee\\; \\underbrace{y \\le -5}_r\\bigr)",
+      abstraction: "\\varphi^B \\;\\triangleq\\; p \\wedge (q \\vee r)",
+      model: "\\text{(none yet)}",
+      theory: "\\text{(not run yet)}"
+    },
+    steps: [
+      {
+        title: "DPLL on $\\varphi^B$",
+        rule: "§6.2 BCP + decide",
+        narration: "BCP forces $p \\mapsto \\top$. Decide $q \\mapsto \\top$. Partial model.",
+        update: { model: "I_1 = \\{p \\mapsto \\top,\\; q \\mapsto \\top\\}", changed: ["model"] }
+      },
+      {
+        title: "Theory check $I_1^T$",
+        rule: "§6.3 theory solver",
+        narration: "$I_1^T = (x \\le 5) \\wedge (y \\ge 0)$. The two inequalities are over disjoint variables — no possible contradiction. SAT.",
+        update: { theory: "I_1^T \\text{ is SAT. Theory model: } \\{x \\mapsto 0,\\; y \\mapsto 0\\}", changed: ["theory"] }
+      }
+    ],
+    verdict: { kind: "sat", text: "Final verdict: $\\varphi$ is <strong>SAT</strong> with model $\\{x \\mapsto 0,\\; y \\mapsto 0\\}$. (One iteration: the first abstract model survived the theory check immediately.)" }
+  }
+];
+
+// --- DOM refs -------------------------------------------------------------
+const sel = document.getElementById('example');
+EXAMPLES.forEach((ex, i) => {
+  const opt = document.createElement('option');
+  opt.value = String(i); opt.textContent = ex.name;
+  sel.appendChild(opt);
+});
+
+const slots = {
+  original: document.querySelector('#slot-original [data-content]'),
+  abstraction: document.querySelector('#slot-abstraction [data-content]'),
+  model: document.querySelector('#slot-model [data-content]'),
+  theory: document.querySelector('#slot-theory [data-content]')
+};
+const slotEls = {
+  original: document.getElementById('slot-original'),
+  abstraction: document.getElementById('slot-abstraction'),
+  model: document.getElementById('slot-model'),
+  theory: document.getElementById('slot-theory')
+};
+const narrationEl = document.getElementById('narration');
+const verdictEl = document.getElementById('verdict');
+const iterEl = document.getElementById('iter-counter');
+const stepListEl = document.getElementById('step-list');
+const nextBtn = document.getElementById('next-btn');
+const resetBtn = document.getElementById('reset-btn');
+const runBtn = document.getElementById('run-btn');
+
+// --- State ----------------------------------------------------------------
+let state = {
+  exIdx: 0,
+  step: 0,
+  current: null,
+  iter: 0
+};
+
+function currentExample() { return EXAMPLES[state.exIdx]; }
+
+function setSlot(key, latex, changed) {
+  slots[key].innerHTML = `$${latex}$`;
+  if (window.renderMathInElement) renderMathInElement(slots[key]);
+  slotEls[key].classList.toggle('changed', !!changed);
+}
+
+function clearChanged() {
+  for (const k of Object.keys(slotEls)) slotEls[k].classList.remove('changed');
+}
+
+function computeIter() {
+  // Iteration counter increments on each "DPLL on ..." step
+  let iter = 0;
+  const ex = currentExample();
+  const cap = Math.min(state.step, ex.steps.length);
+  for (let i = 0; i < cap; i++) {
+    if (ex.steps[i].title.toLowerCase().startsWith("dpll")) iter++;
+  }
+  return iter;
+}
+
+function render() {
+  const ex = currentExample();
+  const cur = { ...ex.initial };
+  let lastChanged = [];
+  // Apply all steps up to state.step (capped at ex.steps.length so we don't
+  // dereference past the end when showing the verdict).
+  const applied = Math.min(state.step, ex.steps.length);
+  for (let i = 0; i < applied; i++) {
+    const s = ex.steps[i];
+    for (const k of Object.keys(s.update)) {
+      if (k === "changed") continue;
+      cur[k] = s.update[k];
+    }
+    lastChanged = s.update.changed || [];
+  }
+  const isVerdictStep = state.step > ex.steps.length;
+  const justAdvanced = state.step > 0 && state.step <= ex.steps.length;
+
+  for (const k of Object.keys(slots)) setSlot(k, cur[k], justAdvanced && lastChanged.includes(k));
+
+  iterEl.textContent = `Iteration ${computeIter()} — step ${Math.min(state.step, ex.steps.length)} / ${ex.steps.length}.`;
+
+  if (state.step === 0) {
+    narrationEl.innerHTML = `Press <em>Next step</em> to begin DPLL(T) on $\\varphi$.`;
+    verdictEl.style.display = 'none';
+  } else if (state.step <= ex.steps.length) {
+    const s = ex.steps[state.step - 1];
+    narrationEl.innerHTML = `<span class="rule">${s.rule}.</span> ${s.narration}`;
+    verdictEl.style.display = 'none';
+  } else {
+    // verdict
+    narrationEl.innerHTML = `Loop terminated.`;
+    verdictEl.style.display = 'block';
+    verdictEl.className = 'verdict ' + (ex.verdict.kind === "sat" ? "ok" : "bad");
+    verdictEl.innerHTML = ex.verdict.text;
+  }
+  if (window.renderMathInElement) renderMathInElement(narrationEl);
+  if (window.renderMathInElement) renderMathInElement(verdictEl);
+
+  // Step list
+  stepListEl.innerHTML = '';
+  ex.steps.forEach((s, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `${i + 1}. ${s.title}`;
+    if (i + 1 < state.step) li.classList.add('done');
+    if (i + 1 === state.step) li.classList.add('current');
+    stepListEl.appendChild(li);
+  });
+  if (window.renderMathInElement) renderMathInElement(stepListEl);
+
+  // Buttons
+  nextBtn.disabled = state.step > ex.steps.length;
+  runBtn.disabled = state.step > ex.steps.length;
+}
+
+nextBtn.addEventListener('click', () => {
+  const ex = currentExample();
+  if (state.step <= ex.steps.length) state.step++;
+  render();
+});
+
+resetBtn.addEventListener('click', () => {
+  state.step = 0;
+  render();
+});
+
+runBtn.addEventListener('click', () => {
+  const ex = currentExample();
+  state.step = ex.steps.length + 1;
+  render();
+});
+
+sel.addEventListener('change', () => {
+  state.exIdx = parseInt(sel.value);
+  state.step = 0;
+  render();
+});
+
+render();
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.renderMathInElement) {
+    renderMathInElement(document.body, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "$", right: "$", display: false }
+      ],
+      throwOnError: false
+    });
+  }
+});
+</script>
+
+</body>
+</html>
