@@ -35,10 +35,10 @@ for the table of statuses.
 | 2 | [`02-deductive-process.html`](widgets/02-deductive-process.html) | §3.2 | drafted |
 | 3 | [`03-continuity-paradox.html`](widgets/03-continuity-paradox.html) | §3.4 (continuity discussion, χ paradox) | drafted |
 | 4 | [`04-exploit-or-not.html`](widgets/04-exploit-or-not.html) | §3.5 | drafted |
-| 5 | `05-arbitrage-pair.html` | §3.5 (the $\varphi$ vs $\neg\neg\varphi$ example) | proposed |
+| 5 | [`05-arbitrage-pair.html`](widgets/05-arbitrage-pair.html) | §3.5 paragraph 4 (the $\varphi \lor \psi$ arbitrage) | drafted |
 
-(Module 5 is a stub; the chapter README lists it so future
-Claudes have a roadmap.)
+All five Ch 2 modules are drafted; see
+[`NOTES.md`](../../NOTES.md#module-breakdown) for review-issue links.
 
 ## Running the smoke test
 

@@ -1,0 +1,339 @@
+<!--
+  Widget: li-ch2-arbitrage-pair (module 5 of the Logical Induction
+          Ch 2 batch, "The Logical Induction Criterion").
+  Source: Garrabrant et al. (2016) §3.5 paragraph 4
+          (arXiv:1609.03543v3, p. 25): "let phi and psi be two sentences
+          such that (phi or psi) is provable in PA, but such that
+          neither phi nor psi is provable in PA. Consider a trader that
+          bought 10 phi-shares at a price of 20¢ each, and 10 psi-shares
+          at a price of 30¢ each. Once D says (phi or psi), all
+          remaining p.c. worlds will agree that the portfolio
+          -5 + 10 phi + 10 psi has a value of at least +5..."
+  Toy system: take phi := "RH" (Riemann hypothesis), psi := "not RH".
+              Treated as atomic prime sentences in the §3.2 sense, a
+              p.c. world can set (phi, psi) to any of {0,0}, {0,1},
+              {1,0}, {1,1}. The deductive process eventually emits the
+              tautology phi ∨ psi (i.e. RH ∨ ¬RH), which rules out
+              the (0,0) world.
+  Active check: predict the day on which the plausible-net-worth band
+                jumps from straddling zero to lying entirely above zero.
+
+  Standalone: open this .html directly in a browser. Uses D3 v7 and
+              KaTeX from CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Logical Induction · Ch 2 · The arbitrage pair</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 920px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .panel-note { color: var(--muted); font-size: 0.92rem; margin-top: 0.4rem; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  .panel { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.8rem 1rem; }
+  blockquote.quote { border-left: 3px solid var(--accent); margin: 0.8rem 0; padding: 0.4rem 0.9rem; background: #fafbfc; font-size: 0.94rem; }
+  svg.plot { background: #fff; border: 1px solid #d9e0e7; border-radius: 4px; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  .layout { display: grid; grid-template-columns: 540px 1fr; gap: 1.6rem; align-items: start; margin-top: 0.5rem; }
+  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+  .controls { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin: 0.6rem 0; }
+  input[type=range] { width: 240px; }
+  .choice { display: block; width: 100%; text-align: left; margin: 0.3rem 0; padding: 0.55rem 0.8rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover { background: #eef3f8; }
+  .choice.active { border-color: var(--accent); background: #eef3f8; }
+  .reveal { padding: 0.7rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; background: #f4f6f8; border-left: 4px solid var(--accent); display: none; }
+  .reveal.correct { border-left-color: var(--good); background: #ecfdf3; }
+  .reveal.incorrect { border-left-color: var(--bad); background: #fdecec; }
+  .worlds-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem; }
+  .world {
+    border: 1.5px solid #c9d3df; border-radius: 6px; padding: 0.4rem 0.6rem; background: #fff;
+    transition: opacity 0.25s, background 0.25s, border-color 0.25s;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; min-width: 130px;
+  }
+  .world.alive { border-color: var(--good); background: #ecfdf3; }
+  .world.dead  { border-color: #c9d3df; background: #f4f6f8; opacity: 0.4; }
+  .world-id { font-weight: 700; margin-bottom: 0.2rem; color: var(--ink); }
+  .stat-pill { display: inline-block; padding: 0.18rem 0.55rem; border-radius: 12px; background: #eef3f8; color: var(--accent); font-size: 0.85rem; font-weight: 600; margin-right: 0.3rem; }
+</style>
+</head>
+<body>
+
+<h1>The arbitrage pair: profiting from a tautology no one's proven yet</h1>
+<p class="subtitle">Logical Induction companion · widget 5 of the Ch 2 batch on <a href="https://arxiv.org/abs/1609.03543">Garrabrant et&nbsp;al. (2016) §3.5</a></p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=25">Garrabrant et&nbsp;al. (2016) §3.5</a> paragraph 4 — the $(\varphi \lor \psi)$ arbitrage. The clean takeaway: a trader can exploit a market <em>without ever buying a sentence the deductive process resolves</em>, by exploiting a provable disjunction.</li>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=19">§3.2 "Deductive Processes"</a> — for the propositional-consistency framing where syntactically distinct prime sentences can be assigned independently, even when one is the negation of the other.</li>
+    <li>Companion: <a href="04-exploit-or-not.html">li-ch2-exploit-or-not</a> covers the basic exploitation vocabulary.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;">Take two sentences whose <em>disjunction</em> is provable, but neither of which individually is. The cleanest example: $\varphi := \quot{\text{RH}}$ and $\psi := \quot{\lnot\text{RH}}$ (the Riemann hypothesis and its negation). $\varphi \lor \psi$ is provable instantly (excluded middle); neither disjunct is — the Riemann hypothesis remains open.</p>
+  <p style="margin: 0;">A trader buys 10 shares of $\varphi$ at 20¢ and 10 shares of $\psi$ at 30¢. Until $\bar{D}$ proves the disjunction, this looks dicey. Afterwards, every p.c. world values the portfolio at $\ge +\$5$ — and the trader keeps doing it every day.</p>
+</div>
+
+<h2>The toy</h2>
+<p>Two prime sentences $\varphi, \psi$ — treated as atomic, even though semantically they are negations of each other. A p.c. world can assign $(\varphi, \psi) \in \{0, 1\}^2$ — four worlds in total:</p>
+<ul>
+  <li>$W_{00}$: $\varphi = 0, \psi = 0$ — neither is true. (Logically incoherent, but propositionally consistent until $\bar{D}$ rules it out.)</li>
+  <li>$W_{01}$: $\varphi = 0, \psi = 1$ — RH is false.</li>
+  <li>$W_{10}$: $\varphi = 1, \psi = 0$ — RH is true.</li>
+  <li>$W_{11}$: $\varphi = 1, \psi = 1$ — both true. (Logically incoherent, but again propositionally consistent.)</li>
+</ul>
+<p>The deductive process emits the tautology $\varphi \lor \psi$ on day $t^\star$ (you set this with the slider). That single theorem rules out $W_{00}$, leaving the three worlds where at least one of $\varphi, \psi$ is true.</p>
+
+<h2>Choose when $\bar{D}$ emits $\varphi \lor \psi$</h2>
+<div class="controls">
+  <label for="t-slider">$t^\star$ =</label>
+  <input id="t-slider" type="range" min="1" max="9" step="1" value="5">
+  <span id="t-display" style="font-weight:600;color:var(--accent);font-size:1.1rem;"></span>
+  <span id="stat-pills"></span>
+</div>
+
+<div class="layout">
+  <div>
+    <svg class="plot" id="plot" viewBox="0 0 540 360"></svg>
+    <p class="panel-note" style="text-align:center;">Plausible-net-worth band over days 1..10 for the trader $-\$5 + 10\varphi + 10\psi$ replayed each day. Vertical bars: range of net worth across $\mathrm{PC}(\bar{D}_n)$. The dashed orange line marks $t^\star$ — the day $\bar{D}$ emits $\varphi \lor \psi$ and $W_{00}$ disappears.</p>
+  </div>
+  <div>
+    <h2 style="margin-top:0;">Worlds at day 10</h2>
+    <div class="worlds-row" id="worlds-row"></div>
+
+    <h2>Predict, then reveal</h2>
+    <p class="panel-note" style="margin-top:0.2rem;">Will this trader exploit, regardless of when $\bar{D}$ resolves the disjunction?</p>
+    <div id="prediction-choices"></div>
+    <div class="reveal" id="reveal"></div>
+  </div>
+</div>
+
+<h2>Why this is striking</h2>
+<p>This trader never buys a sentence that $\bar{D}$ resolves. The Riemann hypothesis itself stays open forever — neither $\varphi$ nor $\psi$ enters $\bar{D}_\infty$. And yet the trader extracts unbounded profit, simply because the <em>disjunction</em> is provable. The §3.5 definition of exploitation has to count this as exploitation — otherwise the criterion would have nothing to say about traders who arbitrage between unresolved sentences, and the LI would be free to assign incoherent prices.</p>
+
+<p>This is also why §4.1 ("Convergence and Coherence") gets the limit-coherence theorem essentially for free: any market that fails to respect provable disjunctions is exploitable by exactly this construction.</p>
+
+<blockquote class="quote">"Once $\bar{D}$ says $(\varphi \lor \psi)$, all remaining p.c. worlds will agree that the portfolio $-5 + 10\varphi + 10\psi$ has a value of at least $+5$, despite the fact that neither $\varphi$ nor $\psi$ is ever proven." — <a href="https://arxiv.org/pdf/1609.03543v3#page=25">Garrabrant et&nbsp;al. (2016), §3.5</a></blockquote>
+
+<p class="footnote">
+  <strong>Why $W_{00}$ and $W_{11}$ are p.c.</strong> Definition 3.2.3 requires $W$ to respect Boolean structure on Boolean <em>combinations</em> of primes. If $\varphi$ and $\psi$ are syntactically distinct prime sentences (e.g., distinct first-order formulas in the language), $W$ is free to assign them independently. The semantic fact that $\psi \equiv \lnot \varphi$ is a <em>theorem</em> $\bar{D}$ has to actually emit before $W_{00}$ and $W_{11}$ get ruled out. In a more concrete setting, $\varphi$ and $\psi$ might be two formally distinct ways of expressing related facts — say, "for all $x$, $P(x)$" and "there exists $x$ such that $\lnot P(x)$" — whose disjunction is provable in PA but which don't have a one-line propositional reduction to each other.
+</p>
+
+<nav class="nav">
+  <a href="04-exploit-or-not.html">← Module 4: exploitation</a>
+  <a href="../README.md">Ch 2 README →</a>
+</nav>
+
+<script>
+// Two prime sentences phi and psi; four p.c. worlds.
+// World index w in 0..3, encoding (phi, psi) = (bit1, bit0).
+function worldVal(w) { return { phi: (w >> 1) & 1, psi: w & 1 }; }
+
+// Trader: each day buys 10 shares of phi at 20¢ and 10 shares of psi at 30¢.
+// Per-day cash flow: -2 - 3 = -5. Per-day shares: +10 phi, +10 psi.
+// After n days, holdings: -5n cash + 10n phi + 10n psi.
+// Net worth in world W: -5n + 10n*W(phi) + 10n*W(psi) = 5n*(2*(W(phi) + W(psi)) - 1)
+// Tabulated:
+//   W_00: -5n
+//   W_01: +5n
+//   W_10: +5n
+//   W_11: +15n
+
+function netWorth(n, w) {
+  const v = worldVal(w);
+  return -5 * n + 10 * n * v.phi + 10 * n * v.psi;
+}
+
+// PC(D_n) given t* (day on which D emits phi v psi).
+// For n < t*: all 4 worlds.
+// For n >= t*: W_00 ruled out (its phi v psi = 0 fails the theorem); other 3 stay.
+function pcWorlds(n, tStar) {
+  if (n < tStar) return [0, 1, 2, 3];
+  return [1, 2, 3]; // exclude w=0 (W_00)
+}
+
+function plausibleBand(n, tStar) {
+  const ws = pcWorlds(n, tStar);
+  const vals = ws.map(w => netWorth(n, w));
+  return { min: Math.min(...vals), max: Math.max(...vals), values: vals, worlds: ws };
+}
+
+// ---------------------------------------------------------------------------
+const N_DAYS = 10;
+const slider = document.getElementById('t-slider');
+const tDisplayEl = document.getElementById('t-display');
+const statPillsEl = document.getElementById('stat-pills');
+const worldsRowEl = document.getElementById('worlds-row');
+const predictionEl = document.getElementById('prediction-choices');
+const revealEl = document.getElementById('reveal');
+const svg = d3.select('#plot');
+
+let userPrediction = null;
+
+const PREDICTIONS = [
+  { id: 'always-exploits', label: '<strong>Always exploits</strong> — regardless of $t^\\star$, the trader\'s plausible net worth is bounded below and unbounded above.' },
+  { id: 'depends-tstar', label: 'It depends on $t^\\star$. For small $t^\\star$ the trader exploits; for large $t^\\star$ they don\'t.' },
+  { id: 'never-exploits', label: 'They never exploit — the $W_{00}$ world keeps the lower bound running to $-\\infty$.' },
+];
+const CORRECT = 'always-exploits';
+
+const PLOT_W = 540, PLOT_H = 360, PAD_L = 56, PAD_R = 18, PAD_T = 24, PAD_B = 38;
+
+function renderPlot(tStar) {
+  svg.selectAll('*').remove();
+  const bands = d3.range(1, N_DAYS + 1).map(n => ({ n, ...plausibleBand(n, tStar) }));
+
+  const yMin = Math.min(0, d3.min(bands, b => b.min) - 5);
+  const yMax = Math.max(0, d3.max(bands, b => b.max) + 5);
+
+  const x = d3.scaleLinear().domain([0.5, N_DAYS + 0.5]).range([PAD_L, PLOT_W - PAD_R]);
+  const y = d3.scaleLinear().domain([yMin, yMax]).range([PLOT_H - PAD_B, PAD_T]);
+
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${y(0)})`)
+     .call(d3.axisBottom(x).ticks(N_DAYS).tickFormat(d3.format('d')));
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(${PAD_L}, 0)`)
+     .call(d3.axisLeft(y).ticks(8).tickFormat(d => '$' + d.toFixed(0)));
+
+  svg.append('text').attr('class', 'axis-label').attr('x', PLOT_W - PAD_R - 4).attr('y', y(0) - 6)
+     .attr('text-anchor', 'end').text('day n');
+  svg.append('text').attr('class', 'axis-label').attr('x', -PLOT_H / 2).attr('y', 14)
+     .attr('transform', 'rotate(-90)').attr('text-anchor', 'middle').text('plausible net worth (USD)');
+
+  // t* marker
+  if (tStar >= 1 && tStar <= N_DAYS) {
+    svg.append('line')
+       .attr('x1', x(tStar)).attr('x2', x(tStar))
+       .attr('y1', PAD_T).attr('y2', PLOT_H - PAD_B)
+       .attr('stroke', 'var(--warn)').attr('stroke-dasharray', '4 3').attr('stroke-width', 1.4);
+    svg.append('text').attr('x', x(tStar) + 4).attr('y', PAD_T + 12)
+       .attr('font-size', 11).attr('fill', 'var(--warn)')
+       .text(`t★ = ${tStar}: D⊢ φ∨ψ`);
+  }
+
+  // Bands
+  bands.forEach(b => {
+    const cx = x(b.n);
+    svg.append('line').attr('x1', cx).attr('x2', cx)
+       .attr('y1', y(b.min)).attr('y2', y(b.max))
+       .attr('stroke', 'var(--accent)').attr('stroke-width', 6).attr('stroke-linecap', 'round').attr('opacity', 0.35);
+    const seen = new Set();
+    b.values.forEach(v => {
+      const key = v.toFixed(2);
+      if (seen.has(key)) return;
+      seen.add(key);
+      svg.append('circle').attr('cx', cx).attr('cy', y(v)).attr('r', 3)
+         .attr('fill', 'var(--accent)').attr('stroke', '#fff').attr('stroke-width', 1);
+    });
+  });
+
+  const minLine = d3.line().x(d => x(d.n)).y(d => y(d.min));
+  const maxLine = d3.line().x(d => x(d.n)).y(d => y(d.max));
+  svg.append('path').datum(bands).attr('fill', 'none').attr('stroke', 'var(--good)').attr('stroke-width', 1.5).attr('stroke-dasharray', '3 2').attr('d', maxLine);
+  svg.append('path').datum(bands).attr('fill', 'none').attr('stroke', 'var(--bad)').attr('stroke-width', 1.5).attr('stroke-dasharray', '3 2').attr('d', minLine);
+
+  // Zero baseline
+  svg.append('line').attr('x1', PAD_L).attr('x2', PLOT_W - PAD_R).attr('y1', y(0)).attr('y2', y(0))
+     .attr('stroke', '#bcd0e6').attr('stroke-width', 0.5);
+}
+
+function renderWorlds(tStar) {
+  worldsRowEl.innerHTML = '';
+  const aliveAtN10 = new Set(pcWorlds(N_DAYS, tStar));
+  for (let w = 0; w < 4; w++) {
+    const v = worldVal(w);
+    const div = document.createElement('div');
+    div.className = 'world ' + (aliveAtN10.has(w) ? 'alive' : 'dead');
+    const wid = `${v.phi}${v.psi}`;
+    div.innerHTML =
+      `<div class="world-id">W<sub>${wid}</sub></div>` +
+      `<div>φ=${v.phi}  ψ=${v.psi}</div>` +
+      `<div>worth at n=10: <strong>$${netWorth(10, w).toFixed(0)}</strong></div>`;
+    worldsRowEl.appendChild(div);
+  }
+}
+
+function renderStats(tStar) {
+  const finalBand = plausibleBand(N_DAYS, tStar);
+  statPillsEl.innerHTML =
+    `<span class="stat-pill">|PC(D₁₀)| = ${finalBand.worlds.length}</span>` +
+    `<span class="stat-pill">band at n=10: [$${finalBand.min.toFixed(0)}, $${finalBand.max.toFixed(0)}]</span>`;
+}
+
+function renderPredictions() {
+  predictionEl.innerHTML = '';
+  PREDICTIONS.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'choice';
+    b.innerHTML = p.label;
+    if (userPrediction === p.id) b.classList.add('active');
+    b.onclick = () => { userPrediction = p.id; renderPredictions(); renderReveal(); };
+    predictionEl.appendChild(b);
+  });
+}
+
+function renderReveal() {
+  if (!userPrediction) { revealEl.style.display = 'none'; return; }
+  const correct = userPrediction === CORRECT;
+  revealEl.className = 'reveal ' + (correct ? 'correct' : 'incorrect');
+  revealEl.style.display = 'block';
+  if (correct) {
+    revealEl.innerHTML = '<strong>✓ Right.</strong> The lower bound is fixed at $-5 t^\\star$ — the worst-case worth across days $1, \\ldots, t^\\star - 1$ in world $W_{00}$. After day $t^\\star$, $W_{00}$ is gone and the band\'s lower edge jumps to $+5n$ (which then keeps growing). The upper edge is $+15n$ throughout. So the plausible net worth across all $n$ is bounded below by $-5 t^\\star$ and unbounded above. <em>Exploitation regardless of</em> $t^\\star$. The bookie cannot prevent this exploit by being slow about emitting the disjunction; they can only delay the trader\'s profits.';
+  } else if (userPrediction === 'depends-tstar') {
+    revealEl.innerHTML = '<strong>✗ The lower bound is finite for any finite $t^\\star$.</strong> Move the slider — the lower edge of the band is $-5 t^\\star$ (worst day-$(t^\\star - 1)$ value in $W_{00}$), which is a finite number. The upper edge is $+15n$ regardless of $t^\\star$, growing without bound. Exploitation only requires bounded below, not "bounded by 0".';
+  } else {
+    revealEl.innerHTML = '<strong>✗ The $W_{00}$ branch is finite.</strong> $W_{00}$ contributes worth $-5n$, but only for days $n &lt; t^\\star$. After $t^\\star$, $W_{00} \\notin \\mathrm{PC}(\\bar{D}_n)$ and so doesn\'t contribute. The lower bound across all $n$ is therefore $-5 t^\\star$, finite. The upper bound is $+15n$, unbounded. Exploitation.';
+  }
+  renderMath();
+}
+
+function update() {
+  const tStar = +slider.value;
+  tDisplayEl.textContent = `${tStar}`;
+  renderPlot(tStar);
+  renderWorlds(tStar);
+  renderStats(tStar);
+  renderMath();
+}
+
+function renderMath() {
+  if (!window.renderMathInElement) return;
+  renderMathInElement(document.body, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '\\[', right: '\\]', display: true },
+      { left: '$', right: '$', display: false },
+      { left: '\\(', right: '\\)', display: false },
+    ],
+    macros: { '\\quot': '\\textsf{“}#1\\textsf{”}' },
+    throwOnError: false,
+    strict: 'ignore',
+  });
+}
+
+slider.addEventListener('input', update);
+renderPredictions();
+update();
+</script>
+
+</body>
+</html>
