@@ -206,7 +206,7 @@ to be refined by whichever Claude takes the chapter.
 | Ch 5 `encodings.tex` (Encodings of Neural Networks) | `nnv-ch5-encoding` | 2-2-1 ReLU net; verification arena over the 4 ReLU activation patterns | Verify-or-counterexample arena: pick a robustness query, watch the encoding split by activation pattern, site decides SAT (with counterexample) or UNSAT | in progress | |
 | Ch 6 `dp.tex` (DPLL Modulo Theories) | `nnv-ch6-dpll-t` | Three small LRA formulas (UNSAT contradiction, Albarghouthi's running example, theory-vacuous SAT) | Step-through DPLL(T) trace stepper: press Next and watch Boolean-abstract → DPLL → theory-check → learn ¬I → repeat unfold; final verdict matches the LRA truth | in progress | |
 | Ch 7 `specialized.tex` (Neural Theory Solvers — Simplex / Reluplex) | `nnv-ch7-reluplex` | Reluplex case-split tree on the 2-2-1 toy net (4 leaves) under a robustness query | Drill into each leaf to see the reduced linear network and Simplex verdict; site shows overall SAT-with-counterexample or UNSAT-after-all-leaves-closed | in progress | |
-| Ch 8 `absint.tex` (Neural Interval Abstraction) | `nnv-ch8-intervals` | 2-2-1 ReLU net under interval bounds on a 2D ε-ball input | Drag the ε-ball, watch the interval bounds propagate; predict whether the output bound certifies robustness before the site reveals | not started | |
+| Ch 8 `absint.tex` (Neural Interval Abstraction) | `nnv-ch8-intervals` | 2-2-1 ReLU net; draggable ε-ball + per-node interval propagation | Drag the ε-ball, watch interval bounds propagate through every node; compare to the true output range and see the overapproximation gap appear when activation patterns straddle the boundary | in progress | |
 | Ch 9 `numerical.tex` (Neural Zonotope Abstraction) | `nnv-ch9-zonotopes` | Same 2-2-1 net; zonotope of generators visualized in 2D | Construct-the-ReLU-transformer: pick the linear lower bound for the [l,u] ReLU case-split that minimizes the upper bound's area; site grades against the optimal | not started | |
 | Ch 10 `polyhedra.tex` (Neural Polyhedron Abstraction / DeepPoly) | `nnv-ch10-deeppoly` | Same 2-2-1 net; polyhedron viewed as a system of half-spaces | Adversarial-or-certificate verification game (the headline widget): given a 2-input net + ε-ball, the reader either constructs an adversarial input *or* a CROWN-style linear bound proving robustness; site grades both | not started | |
 | Ch 11 `absver.tex` (Verifying with Abstract Interpretation) | `nnv-ch11-end-to-end` | 2-2-1 net + a tiny MNIST-3vs5 with both ℓ∞ and ℓ₂ adversaries | End-to-end verification arena: pick a domain (interval / zonotope / polyhedra), watch precision-vs-runtime trade-off on a benchmark suite; predict-then-reveal on which domain certifies which spec | not started | |
@@ -264,11 +264,14 @@ entry should cite the location and link the critique if one exists.
 
 - **Last updated:** 2026-05-07
 - **Chapters complete:** `nnv-ch2-nn-as-dag`, `nnv-ch3-specs`,
-  `nnv-ch4-fol-lra`, `nnv-ch5-encoding`, `nnv-ch6-dpll-t`
-  (all drafted; awaiting human review).
-- **Currently being drafted:** `nnv-ch7-reluplex` — the
-  ReLU-aware specialised theory solver. Active check is a
-  case-split tree explorer on the 2-2-1 toy net.
+  `nnv-ch4-fol-lra`, `nnv-ch5-encoding`, `nnv-ch6-dpll-t`,
+  `nnv-ch7-reluplex` (all drafted; awaiting human review).
+  **Part II is fully drafted.**
+- **Currently being drafted:** `nnv-ch8-intervals` — Part III
+  opens with the interval abstract domain. Active check is a
+  draggable ε-ball with live interval propagation through the
+  2-2-1 toy net, side-by-side with the true output range so the
+  overapproximation gap is visible.
 - **Blockers:** none.
 
 ## Cross-references

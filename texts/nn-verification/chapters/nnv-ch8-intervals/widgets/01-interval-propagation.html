@@ -1,0 +1,412 @@
+<!--
+  Widget: nnv-ch8-interval-propagation (module 1 of nn-verification
+          Ch 8, "Neural Interval Abstraction").
+  Source: Albarghouthi (2021) Ch 8, absint.tex (arXiv:2109.10317),
+          §8.3–§8.6 — interval transformers for affine + ReLU,
+          composition, and the non-relational limitation.
+  Toy system: the canonical 2-2-1 ReLU net.
+  Active check: drag the eps-ball anchor; site re-runs interval
+                propagation through every node and re-samples the
+                true output range; both shown on a 1-D number line
+                so the overapproximation gap is visible at a glance.
+
+  Standalone: open this .html directly in a browser. Uses D3 v7 and
+              KaTeX from CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NN Verification · Ch 8 · Interval propagation</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; --soft:#eef3f8; --line:#d9e0e7; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: var(--soft); border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; align-items: start; margin-top: 1rem; }
+  @media (max-width: 920px) { .layout { grid-template-columns: 1fr; } }
+  .panel { border: 1px solid var(--line); border-radius: 6px; padding: 0.9rem 1rem; background: #fff; }
+  .panel h3 { margin: 0 0 0.5rem 0; font-size: 0.98rem; }
+  .controls-row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin: 0.4rem 0; font-size: 0.92rem; }
+  .controls-row label { min-width: 4rem; color: var(--muted); }
+  input[type=range] { width: 180px; }
+  button { font: inherit; padding: 0.35rem 0.7rem; border: 1px solid var(--line); border-radius: 4px; background: #fff; cursor: pointer; }
+  button:hover { background: var(--soft); }
+
+  svg.plane { background: #fff; border: 1px solid var(--line); border-radius: 4px; display: block; touch-action: none; cursor: grab; }
+  svg.plane:active { cursor: grabbing; }
+  svg.dag { background: #fff; border: 1px solid var(--line); border-radius: 4px; display: block; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  .anchor-marker { fill: #fff; stroke: #1f2933; stroke-width: 2; }
+  .eps-ball { fill: rgba(43, 108, 176, 0.12); stroke: var(--accent); stroke-width: 2; }
+  .node-table { border-collapse: collapse; font-size: 0.88rem; margin: 0.4rem 0; width: 100%; }
+  .node-table th, .node-table td { border: 1px solid var(--line); padding: 0.25rem 0.5rem; text-align: left; }
+  .node-table th { background: var(--soft); font-weight: 500; color: var(--muted); }
+  .node-table td.unstable { background: #fffbeb; color: var(--warn); font-style: italic; }
+  .gap-display { padding: 0.6rem 0.85rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.93rem; }
+  .gap-display.tight { background: #ecfdf3; color: var(--good); border-left: 4px solid var(--good); }
+  .gap-display.loose { background: #fef3f2; color: var(--bad); border-left: 4px solid var(--bad); }
+  .gap-display.idle { background: var(--soft); color: var(--muted); border-left: 4px solid var(--line); }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  .preset-buttons { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.4rem; }
+  .preset-buttons button { font-size: 0.86rem; padding: 0.25rem 0.55rem; }
+</style>
+</head>
+<body>
+
+<h1>Interval propagation through the toy network</h1>
+<p class="subtitle">
+  NN Verification · Chapter 8 · companion to Albarghouthi (2021) §8.3–§8.6.
+</p>
+
+<div class="lede">
+  <p style="margin: 0;">
+    The interval abstract domain tracks every quantity in the
+    network as a real-valued interval $[l, u]$. Affine nodes
+    propagate via $\min/\max$ over the corners; ReLU is monotone, so
+    $\mathrm{ReLU}^a([l, u]) = [\mathrm{ReLU}(l),
+    \mathrm{ReLU}(u)]$. Drag the anchor of an $\ell_\infty$ ball to
+    set the network's input interval; the site re-runs interval
+    propagation node-by-node and shows the resulting <em>certified
+    output range</em> against the <em>true output range</em>
+    (sampled). The gap between the two is the price of the
+    interval domain's non-relational simplicity.
+  </p>
+</div>
+
+<div class="layout">
+
+  <div class="panel">
+    <h3>Input plane $[-3, 3]^2$</h3>
+    <svg id="plane" class="plane" viewBox="0 0 380 380" width="100%" height="380" aria-label="Input plane with draggable epsilon-ball anchor"></svg>
+    <div class="controls-row">
+      <label>$\varepsilon$:</label>
+      <input id="eps" type="range" min="0.05" max="2.5" step="0.05" value="0.3">
+      <span id="eps-val">0.30</span>
+    </div>
+    <div class="preset-buttons">
+      <button data-preset="single">single-region (tight)</button>
+      <button data-preset="straddle1">straddle $a_1 = 0$</button>
+      <button data-preset="straddle2">straddle $a_2 = 0$</button>
+      <button data-preset="cross">cross both</button>
+    </div>
+    <p style="font-size: 0.86rem; color: var(--muted); margin-top: 0.4rem;">
+      Diagonal lines are the ReLU activation boundaries
+      $x_1 + x_2 = 0$ (for $h_1$) and $x_1 - x_2 = 0$ (for $h_2$).
+      Whenever the ε-ball straddles one of these, the corresponding
+      ReLU is &ldquo;unstable&rdquo; and the interval bound widens.
+    </p>
+  </div>
+
+  <div class="panel">
+    <h3>Per-node intervals</h3>
+    <svg id="dag" class="dag" viewBox="0 0 480 220" width="100%" height="220" aria-label="DAG with per-node intervals"></svg>
+    <table class="node-table" id="nodeTable">
+      <thead>
+        <tr><th>Node</th><th>Definition</th><th>Interval $[l, u]$</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h3>Output range comparison</h3>
+    <svg id="numline" viewBox="0 0 460 80" width="100%" height="80" aria-label="Output range comparison"></svg>
+    <div id="gapMsg" class="gap-display idle">Drag the anchor or pick a preset.</div>
+  </div>
+
+</div>
+
+<div class="footnote">
+  <p>
+    Reference: Albarghouthi, <em>Introduction to Neural Network
+    Verification</em>, Ch 8 (arXiv:<a href="https://arxiv.org/abs/2109.10317">2109.10317</a>).
+    The four presets walk you through the chapter's headline
+    observation: intervals are exact on a single ReLU activation
+    region (zero gap), and lose precision sharply once the input
+    range straddles a boundary.
+  </p>
+  <p>
+    The &ldquo;true&rdquo; output range is computed by 81×81 grid
+    sampling — exact up to floating point because the network is
+    piecewise-linear with vertices at the ε-ball corners. The
+    interval-domain pass uses the textbook formulas verbatim.
+  </p>
+</div>
+
+<script>
+"use strict";
+
+// --- Toy network forward (concrete) ---------------------------------------
+const relu = (x) => Math.max(0, x);
+const netY = (x1, x2) => relu(x1 + x2) + relu(x1 - x2);
+
+// --- Interval transformers ------------------------------------------------
+// All intervals are [l, u] with l <= u.
+function intAdd(a, b) { return [a[0] + b[0], a[1] + b[1]]; }
+function intSub(a, b) { return [a[0] - b[1], a[1] - b[0]]; }
+function intRelu(a) { return [Math.max(a[0], 0), Math.max(a[1], 0)]; }
+
+// Forward pass through the toy net at interval level.
+function intervalPass(xRange, yRange) {
+  const a1 = intAdd(xRange, yRange);
+  const a2 = intSub(xRange, yRange);
+  const h1 = intRelu(a1);
+  const h2 = intRelu(a2);
+  const y = intAdd(h1, h2);
+  return { x1: xRange, x2: yRange, a1, a2, h1, h2, y, h1Unstable: a1[0] < 0 && a1[1] > 0, h2Unstable: a2[0] < 0 && a2[1] > 0 };
+}
+
+// True output range over [c1-eps, c1+eps] x [c2-eps, c2+eps] by 81x81 grid.
+function trueRange(c1, c2, eps) {
+  const N = 81;
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    const x1 = c1 - eps + (2 * eps * i) / (N - 1);
+    const x2 = c2 - eps + (2 * eps * j) / (N - 1);
+    const y = netY(x1, x2);
+    if (y < lo) lo = y;
+    if (y > hi) hi = y;
+  }
+  return [lo, hi];
+}
+
+// --- DOM ------------------------------------------------------------------
+const planeSvg = d3.select('#plane');
+const dagSvg = d3.select('#dag');
+const numlineSvg = d3.select('#numline');
+const epsEl = document.getElementById('eps');
+const epsValEl = document.getElementById('eps-val');
+const gapMsgEl = document.getElementById('gapMsg');
+const nodeTableBody = document.querySelector('#nodeTable tbody');
+
+let state = { c1: 1.0, c2: 0.5 };
+
+// --- Plane plot ----------------------------------------------------------
+const PLOT_RANGE = 3;
+const PLOT_PX = 380;
+const PLOT_PAD = 32;
+function px(x) { return PLOT_PAD + (x + PLOT_RANGE) / (2 * PLOT_RANGE) * (PLOT_PX - 2 * PLOT_PAD); }
+function py(y) { return PLOT_PX - PLOT_PAD - (y + PLOT_RANGE) / (2 * PLOT_RANGE) * (PLOT_PX - 2 * PLOT_PAD); }
+function ux(p) { return (p - PLOT_PAD) / (PLOT_PX - 2 * PLOT_PAD) * (2 * PLOT_RANGE) - PLOT_RANGE; }
+function uy(p) { return -((p - (PLOT_PX - PLOT_PAD)) / (PLOT_PX - 2 * PLOT_PAD)) * (2 * PLOT_RANGE) - PLOT_RANGE; }
+
+function drawPlane() {
+  planeSvg.selectAll('*').remove();
+  const g = planeSvg.append('g');
+
+  // Heatmap of y for context (light)
+  const N = 70;
+  const cell = (PLOT_PX - 2 * PLOT_PAD) / N;
+  let maxY = 0;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    const x1 = -3 + (6 * i) / (N - 1);
+    const x2 = -3 + (6 * j) / (N - 1);
+    maxY = Math.max(maxY, netY(x1, x2));
+  }
+  const color = d3.scaleSequential(d3.interpolateBlues).domain([0, maxY]);
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    const x1 = -3 + (6 * i) / (N - 1);
+    const x2 = -3 + (6 * j) / (N - 1);
+    g.append('rect').attr('x', px(x1) - cell / 2).attr('y', py(x2) - cell / 2)
+      .attr('width', cell + 0.5).attr('height', cell + 0.5)
+      .attr('fill', color(netY(x1, x2))).attr('opacity', 0.6);
+  }
+
+  // Activation boundaries
+  g.append('line').attr('x1', px(-3)).attr('y1', py(3)).attr('x2', px(3)).attr('y2', py(-3))
+    .attr('stroke', '#52606d').attr('stroke-width', 1.2);
+  g.append('line').attr('x1', px(-3)).attr('y1', py(-3)).attr('x2', px(3)).attr('y2', py(3))
+    .attr('stroke', '#52606d').attr('stroke-width', 1.2);
+
+  // eps-ball
+  const eps = parseFloat(epsEl.value);
+  const left = state.c1 - eps, right = state.c1 + eps;
+  const bot = state.c2 - eps, top = state.c2 + eps;
+  g.append('rect').attr('class', 'eps-ball')
+    .attr('x', px(left)).attr('y', py(top))
+    .attr('width', px(right) - px(left)).attr('height', py(bot) - py(top));
+
+  // Anchor marker (draggable)
+  const anchor = g.append('circle').attr('class', 'anchor-marker')
+    .attr('cx', px(state.c1)).attr('cy', py(state.c2)).attr('r', 6);
+
+  const drag = d3.drag().on('drag', function(event) {
+    const nx = Math.max(-PLOT_RANGE, Math.min(PLOT_RANGE, ux(event.x)));
+    const ny = Math.max(-PLOT_RANGE, Math.min(PLOT_RANGE, uy(event.y)));
+    state.c1 = nx; state.c2 = ny;
+    drawPlane();
+    renderAll();
+  });
+  anchor.call(drag);
+
+  // Axes
+  g.append('line').attr('x1', px(-3)).attr('y1', py(0)).attr('x2', px(3)).attr('y2', py(0))
+    .attr('stroke', '#52606d').attr('stroke-width', 0.8);
+  g.append('line').attr('x1', px(0)).attr('y1', py(-3)).attr('x2', px(0)).attr('y2', py(3))
+    .attr('stroke', '#52606d').attr('stroke-width', 0.8);
+  g.append('text').attr('x', px(3) + 4).attr('y', py(0) + 4).attr('font-size', 11).attr('fill', '#52606d').text('x₁');
+  g.append('text').attr('x', px(0) + 4).attr('y', py(3) - 6).attr('font-size', 11).attr('fill', '#52606d').text('x₂');
+}
+
+// --- DAG with intervals ---------------------------------------------------
+function drawDag(p) {
+  dagSvg.selectAll('*').remove();
+  const nodes = [
+    { id: 'x1', x: 40, y: 70, label: 'x₁', val: p.x1, kind: 'input' },
+    { id: 'x2', x: 40, y: 150, label: 'x₂', val: p.x2, kind: 'input' },
+    { id: 'a1', x: 160, y: 70, label: 'a₁', val: p.a1, kind: 'affine' },
+    { id: 'a2', x: 160, y: 150, label: 'a₂', val: p.a2, kind: 'affine' },
+    { id: 'h1', x: 290, y: 70, label: 'h₁', val: p.h1, kind: 'relu', unstable: p.h1Unstable },
+    { id: 'h2', x: 290, y: 150, label: 'h₂', val: p.h2, kind: 'relu', unstable: p.h2Unstable },
+    { id: 'y',  x: 430, y: 110, label: 'y',  val: p.y,  kind: 'output' }
+  ];
+  const fillFor = { input: '#fde2e4', affine: '#dde7f5', relu: '#cfe8d8', output: '#f9e6c4' };
+  const edges = [
+    ['x1', 'a1'], ['x2', 'a1'],
+    ['x1', 'a2'], ['x2', 'a2'],
+    ['a1', 'h1'], ['a2', 'h2'],
+    ['h1', 'y'], ['h2', 'y']
+  ];
+  const m = Object.fromEntries(nodes.map(n => [n.id, n]));
+  for (const [s, t] of edges) {
+    const a = m[s], b = m[t];
+    dagSvg.append('line').attr('x1', a.x + 16).attr('y1', a.y).attr('x2', b.x - 18).attr('y2', b.y)
+      .attr('stroke', '#98a4b3').attr('stroke-width', 1.2);
+  }
+  for (const n of nodes) {
+    const ringStroke = n.unstable ? '#b54708' : '#1f2933';
+    const ringWidth = n.unstable ? 2.5 : 1.4;
+    dagSvg.append('circle').attr('cx', n.x).attr('cy', n.y).attr('r', 18)
+      .attr('fill', fillFor[n.kind]).attr('stroke', ringStroke).attr('stroke-width', ringWidth);
+    dagSvg.append('text').attr('x', n.x).attr('y', n.y + 4).attr('text-anchor', 'middle').attr('font-size', 12).text(n.label);
+    // Interval below node
+    const ivl = n.val;
+    dagSvg.append('text').attr('x', n.x).attr('y', n.y + 36).attr('text-anchor', 'middle').attr('font-size', 10)
+      .attr('fill', n.unstable ? '#b54708' : '#52606d')
+      .text(`[${ivl[0].toFixed(2)}, ${ivl[1].toFixed(2)}]`);
+  }
+}
+
+// --- Node table -----------------------------------------------------------
+function renderNodeTable(p) {
+  const rows = [
+    { name: 'x₁', def: 'input', val: p.x1 },
+    { name: 'x₂', def: 'input', val: p.x2 },
+    { name: 'a₁', def: 'x₁ + x₂', val: p.a1, unstable: p.h1Unstable && p.a1[0] < 0 && p.a1[1] > 0 ? false : (p.a1[0] < 0 && p.a1[1] > 0) },
+    { name: 'a₂', def: 'x₁ − x₂', val: p.a2 },
+    { name: 'h₁', def: 'ReLU(a₁)', val: p.h1, unstable: p.h1Unstable, note: p.h1Unstable ? 'unstable — straddles 0' : '' },
+    { name: 'h₂', def: 'ReLU(a₂)', val: p.h2, unstable: p.h2Unstable, note: p.h2Unstable ? 'unstable — straddles 0' : '' },
+    { name: 'y',  def: 'h₁ + h₂', val: p.y }
+  ];
+  nodeTableBody.innerHTML = '';
+  for (const r of rows) {
+    const tr = document.createElement('tr');
+    const ivl = `[${r.val[0].toFixed(3)}, ${r.val[1].toFixed(3)}]`;
+    tr.innerHTML = `<td><strong>${r.name}</strong></td><td>${r.def}</td><td${r.unstable ? ' class="unstable"' : ''}>${ivl}${r.note ? ' — <em>' + r.note + '</em>' : ''}</td>`;
+    nodeTableBody.appendChild(tr);
+  }
+}
+
+// --- Output number line ---------------------------------------------------
+function drawNumline(absRange, trueR) {
+  numlineSvg.selectAll('*').remove();
+  const W = 460, H = 80, PAD = 30;
+  const lo = Math.min(absRange[0], trueR[0]) - 0.2;
+  const hi = Math.max(absRange[1], trueR[1]) + 0.2;
+  const xScale = d3.scaleLinear().domain([lo, hi]).range([PAD, W - PAD]);
+  const g = numlineSvg.append('g');
+  // Axis line
+  g.append('line').attr('x1', PAD).attr('y1', 50).attr('x2', W - PAD).attr('y2', 50)
+    .attr('stroke', '#98a4b3').attr('stroke-width', 1);
+  // Ticks
+  const ticks = xScale.ticks(6);
+  for (const t of ticks) {
+    g.append('line').attr('x1', xScale(t)).attr('y1', 46).attr('x2', xScale(t)).attr('y2', 54)
+      .attr('stroke', '#98a4b3').attr('stroke-width', 1);
+    g.append('text').attr('x', xScale(t)).attr('y', 70).attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', '#52606d').text(t.toFixed(1));
+  }
+  // True range bar (on top)
+  g.append('rect').attr('x', xScale(trueR[0])).attr('y', 14).attr('width', xScale(trueR[1]) - xScale(trueR[0])).attr('height', 12)
+    .attr('fill', 'rgba(9, 146, 80, 0.6)').attr('stroke', '#099250').attr('stroke-width', 1.2);
+  g.append('text').attr('x', xScale((trueR[0] + trueR[1]) / 2)).attr('y', 11).attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', '#099250').text(`true range [${trueR[0].toFixed(2)}, ${trueR[1].toFixed(2)}]`);
+  // Interval bar (below)
+  g.append('rect').attr('x', xScale(absRange[0])).attr('y', 30).attr('width', xScale(absRange[1]) - xScale(absRange[0])).attr('height', 12)
+    .attr('fill', 'rgba(43, 108, 176, 0.5)').attr('stroke', '#2b6cb0').attr('stroke-width', 1.2);
+  g.append('text').attr('x', xScale((absRange[0] + absRange[1]) / 2)).attr('y', 50).attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', '#2b6cb0').text(`interval bound [${absRange[0].toFixed(2)}, ${absRange[1].toFixed(2)}]`);
+}
+
+// --- Main render ----------------------------------------------------------
+function renderAll() {
+  const eps = parseFloat(epsEl.value);
+  epsValEl.textContent = eps.toFixed(2);
+  const xR = [state.c1 - eps, state.c1 + eps];
+  const yR = [state.c2 - eps, state.c2 + eps];
+  const p = intervalPass(xR, yR);
+  const trueR = trueRange(state.c1, state.c2, eps);
+  drawDag(p);
+  renderNodeTable(p);
+  drawNumline(p.y, trueR);
+  // Gap message
+  const intWidth = p.y[1] - p.y[0];
+  const trueWidth = trueR[1] - trueR[0];
+  const gap = intWidth - trueWidth;
+  const unstableNotes = [];
+  if (p.h1Unstable) unstableNotes.push("$h_1$ unstable");
+  if (p.h2Unstable) unstableNotes.push("$h_2$ unstable");
+  const eitherUnstable = p.h1Unstable || p.h2Unstable;
+  let cause;
+  if (gap < 1e-6) {
+    cause = "no overapproximation — input is a single point.";
+    gapMsgEl.className = 'gap-display tight';
+  } else if (!eitherUnstable) {
+    cause = "both ReLUs stable; gap comes from <em>path-sharing</em> — interval propagation cannot tell that $h_1$ and $h_2$ both depend on $x_1$ with the same coefficient, so it adds their widths instead of cancelling.";
+    gapMsgEl.className = 'gap-display loose';
+  } else {
+    cause = "${unstableNotes.join(' and ')} — for an unstable ReLU, the interval $[\\max(l, 0), \\max(u, 0)]$ replaces the lower bound by $0$ even though most inputs in the box give a non-zero output, widening the interval by roughly $|l|$.";
+    cause = unstableNotes.join(' and ') + " — for an unstable ReLU, the interval $[\\max(l, 0), \\max(u, 0)]$ replaces the lower bound by $0$ even though most inputs in the box give a non-zero output, widening the interval by roughly $|l|$.";
+    gapMsgEl.className = 'gap-display loose';
+  }
+  gapMsgEl.innerHTML = `Interval bound width <strong>${intWidth.toFixed(3)}</strong> vs. true <strong>${trueWidth.toFixed(3)}</strong> — gap ${gap.toFixed(3)}. ${cause}`;
+  if (window.renderMathInElement) renderMathInElement(gapMsgEl);
+}
+
+epsEl.addEventListener('input', () => { drawPlane(); renderAll(); });
+
+// Presets
+document.querySelectorAll('[data-preset]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const k = btn.dataset.preset;
+    if (k === 'single')    { state.c1 = 1.5; state.c2 = 0.5; epsEl.value = '0.3'; }    // both stable; gap from path-sharing only
+    else if (k === 'straddle1') { state.c1 = 0.0; state.c2 = 0.0; epsEl.value = '0.5'; } // straddles a1 = 0 (and a2)
+    else if (k === 'straddle2') { state.c1 = 1.0; state.c2 = 1.0; epsEl.value = '0.4'; } // straddles a2 = 0
+    else if (k === 'cross')     { state.c1 = 0.0; state.c2 = 0.5; epsEl.value = '1.0'; } // straddles both
+    drawPlane(); renderAll();
+  });
+});
+
+drawPlane();
+renderAll();
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.renderMathInElement) {
+    renderMathInElement(document.body, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "$", right: "$", display: false }
+      ],
+      throwOnError: false
+    });
+  }
+});
+</script>
+
+</body>
+</html>

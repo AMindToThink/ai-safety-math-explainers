@@ -892,3 +892,40 @@ per session, newest at the bottom. See
   propagation through every node. This is the start of the
   abstraction-based half of the book.
 - **Blockers:** none.
+
+## 2026-05-07 02:15 (continuing — nnv-ch8-intervals, opens Part III)
+
+- **Worked on:** Built `nnv-ch8-intervals`, the seventh
+  nn-verification chapter. Opens Part III (abstraction-based
+  verification).
+- **What got done:** read absint.tex; flipped row + Status block;
+  wrote chapter `README.md`; built `01-interval-propagation.html`
+  with a draggable ε-ball anchor over the input plane, live
+  per-node interval bounds drawn on the toy net's DAG, a 7-row
+  per-node table, and a 1-D number line that overlays the
+  interval-domain output range against the true (sampled) output
+  range so the overapproximation gap is visible at a glance. Four
+  presets exercise the four qualitative regimes (both ReLUs
+  stable; $h_1$ straddles; $h_2$ straddles; both straddle).
+  Smoke + grader test pass.
+- **Mid-build correction:** initially claimed in both the README
+  and the widget that &ldquo;intervals are exact when the
+  $\varepsilon$-ball stays in a single ReLU activation
+  region.&rdquo; The grader test (gap = 0 expected on the
+  single-region preset) caught that the claim is wrong: even on
+  a single linear piece, intervals over-approximate because they
+  cannot track <em>path-sharing</em> — when $h_1$ and $h_2$ both
+  depend on $x_1$ with coefficient $+1$, interval propagation
+  adds their widths instead of cancelling them. This is exactly
+  Albarghouthi's $f(x) = x + (-x)$ pathology in §8.6, which
+  over-approximates to $[-2\varepsilon, 2\varepsilon]$ instead of
+  $\{0\}$. Fixed both the widget messages and the README to
+  surface path-sharing as an additional source of gap distinct
+  from unstable ReLUs.
+- **What's next:** `nnv-ch9-zonotopes` — the abstract domain that
+  fixes path-sharing exactly by tracking linear combinations of a
+  fixed set of generator variables. Active check is a side-by-side
+  comparison of interval vs. zonotope bounds on the same toy net,
+  with the zonotope visualised as a 2-D parallelogram in the
+  output space.
+- **Blockers:** none.
