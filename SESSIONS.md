@@ -347,3 +347,63 @@ per session, newest at the bottom. See
   global "don't push without asking" rule, so the session ends
   here cleanly with all work committed locally and waiting for
   Matthew to authorize the push.
+
+
+## 2026-05-06 (session — address issue #12, Flint cross-check follow-up)
+
+- **Worked on:** texts/logical-induction/ — addressing the
+  cross-check findings in [issue #12](https://github.com/AMindToThink/ai-safety-math-explainers/issues/12)
+  against `monasticacademy/logical-induction` (Kōshin Alex Flint,
+  MIT 2022).
+- **What got done:** Three focused commits on main, all pushed
+  (`936b601..b14afb5` plus the prior nn-verification commits
+  swept along to `180a3f3`).
+  1. `936b601` — Softened the pi-digit widget's "LI prior is
+     exactly 0.1" framing in three places (lede bullet, LI
+     panel note, footnote) to say the price *converges* to ≈0.1
+     via s-curve traders pinned at intercept 0.1, not pinned
+     there from day 1. Linked Flint's
+     `examples/uniform_digits_of_pi.py` as runnable evidence.
+     Also renamed `snapDay` → `resolutionDay` and added a
+     comment that `tau(n) = ceil(n/5) + 5` is cosmetic, a
+     stand-in for the deductive process `D_n`'s schedule, not
+     a real LI property (issue #12 finding 7).
+  2. `fa155b2` — Added Flint as a Secondary / distillation
+     source in NOTES.md with full attribution (MIT, © 2022),
+     a description of what's in the repo
+     (`LogicalInductor.update`, `find_credences`,
+     `combine_trading_algorithms`, `compute_budget_factor`,
+     §A.2 trading-formula ADT, four `examples/`), and the
+     cross-link to issue #12. Updated source-ingestion layout
+     to mention `flint-code/`. Added a new "Things to consider
+     porting from Flint" section naming the five port
+     candidates with the fixed attribution string and the two
+     open questions (rational-enumeration vs paper's fixed-point
+     MarketMaker; numerical-stability epsilons).
+  3. `b14afb5` — Added a `git clone` of
+     `monasticacademy/logical-induction` into `source/flint-code/`
+     in download.sh. Kept the existing `epistax-is/logical-induction`
+     clone step but flagged its expected-failure status (the
+     Scherlis-code GitHub repo currently 404s; the arXiv source
+     remains authoritative).
+  Smoke-tested widget JS via `node --check` after extraction;
+  download.sh validated with `bash -n`. Issue #12 closed with a
+  finding-by-finding summary comment.
+- **Also did:** Updated `~/.claude/CLAUDE.md` to drop the global
+  "don't push without asking" rule per Matthew's instruction —
+  pushing is now fine without asking, provided commits are clean
+  and the branch/identity is correct.
+- **What's next:** Continue the Logical Induction module slate.
+  Highest-leverage next module is probably `li-ch1-desiderata-tour`
+  (the 17-desiderata compatibility graph) or
+  `li-ch2-continuity-paradox` (the χ := "I am true iff my price <
+  50¢" paradox). The `li-ch4-lia-walkthrough` step-through
+  animator is the long-term capstone and is the natural place to
+  cash in the Flint port candidates listed in NOTES.md.
+- **Blockers:** none.
+- **Why stopped:** issue-12 follow-up was a discrete, well-scoped
+  unit and is fully delivered — three commits, one push, one
+  closed issue, NOTES.md durably annotated for the future
+  LIA-walkthrough widget. Continuing into a new module would
+  start a different unit of work; better to stop on a clean
+  boundary.
