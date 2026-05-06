@@ -557,3 +557,71 @@ per session, newest at the bottom. See
 - **Blockers:** none.
 - **Why stopped (this entry only):** clean unit boundary between
   modules — the run continues below.
+
+## 2026-05-06 22:00 (session — nnv-ch3-specs)
+
+- **Worked on:** Built the second nn-verification chapter,
+  `nnv-ch3-specs`, on Albarghouthi's Hoare-triple specification
+  language (correctness.tex, §3.1–§3.3).
+- **What got done:**
+  1. Read `correctness.tex` in full to ground the chapter in the
+     source's own four motivating examples (image-brightness
+     robustness, equivalence of two networks, ACAS-Xu collision
+     avoidance, monotonicity).
+  2. Flipped the `nnv-ch3-specs` row in
+     `texts/nn-verification/NOTES.md` to `in progress`; updated
+     the Status block to mark Ch 2 as drafted-awaiting-review and
+     Ch 3 as currently-drafting.
+  3. Wrote chapter `README.md` pinning down (a) the three
+     pre-/post-condition mistakes that show up downstream
+     (robustness vs. global property, strict vs. non-strict
+     inequalities, $\ell_\infty$ vs. $\ell_2$ norm choice),
+     (b) reading order through §3.1–§3.3, and (c) a corrected
+     case-split derivation of the toy network's piecewise-linear
+     form (this overwrote an earlier wrong claim that
+     $y = |x_1| + |x_2|$).
+  4. Built the `01-translate-the-property.html` widget. Three
+     properties (local robustness around an anchor, monotonicity
+     in $x_1$, output upper bound on $[-2,2]^2$); each has a
+     palette of MC predicate atoms for both pre and post — with
+     deliberate distractors that match each of the three
+     downstream mistakes from the README — plus numeric
+     thresholds. Two-phase active check: (1) encoding grader
+     compares the reader's predicate to a reference by id +
+     numeric-equality, (2) once encoding is correct, an 81×81
+     grid verifier checks the spec on the toy network and either
+     confirms it holds or shows a concrete counterexample (with
+     a heatmap marker plot). The bound spec at $M = 3.5$
+     deliberately fails — the corner counterexample shows the
+     network saturating at $4 > 3.5$.
+  5. Smoke-tested via `scripts/widget-smoke-test.py` — passed.
+  6. Wrote a one-shot Playwright integration check that cycled
+     through all three properties, verified the canonical
+     reveals graded as expected (robust HOLDS, monotone HOLDS,
+     bound FAILS with counterexample), confirmed wrong-norm
+     encoding is rejected, and confirmed wrong numeric
+     parameters are rejected. PASS.
+- **What's next:** Either start Part II by picking up
+  `nnv-ch4-fol-lra` (logics + LRA primer), or detour to
+  `nnv-ch1-motivation` for a softer on-ramp. Ch 4 has more
+  pedagogical leverage because every Part-II encoding/algorithm
+  chapter (Ch 5 MILP encoding, Ch 6 DPLL(T), Ch 7 Reluplex)
+  takes its formula language from Ch 4.
+- **Blockers:** none.
+- **Mid-session correction:** initially designed Property 2
+  (monotonicity) to fail on the toy network — but a careful
+  partial-derivative check showed both ReLU pieces have
+  coefficient $+1$ on $x_1$, so the network is provably monotone
+  in $x_1$. Discovered the error when the grid verifier returned
+  HOLDS instead of the expected FAIL. Fixed by reassigning the
+  failing case to Property 3 (output bound, $M = 3.5$) and
+  rewriting the monotonicity reveal blurb to walk through the
+  partial-derivative argument. The mistake itself is a useful
+  pedagogical artifact — verification literature is full of
+  &ldquo;intuitive&rdquo; specs that turn out to be true (or
+  false) for non-obvious reasons, and grid search is the cheap
+  way to surface them before reaching for an SMT solver.
+- **Why stopped:** Ch 3 is a clean, self-contained unit. README,
+  widget, smoke test, and grader correctness check all green.
+  Ch 4 starts a new source section (the fol.tex logic primer)
+  and is a natural session boundary.

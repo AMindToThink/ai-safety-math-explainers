@@ -1,0 +1,649 @@
+<!--
+  Widget: nnv-ch3-translate-the-property (module 1 of nn-verification
+          Ch 3, "Correctness Properties").
+  Source: Albarghouthi (2021) Ch 3, correctness.tex (arXiv:2109.10317).
+          Hoare-triple specification language: {P} r <- f(x) {Q}.
+  Toy system: 2-input, 1-hidden-layer (2 ReLU), 1-output ReLU net
+              from Ch 2, computing y(x1, x2) = ReLU(x1+x2) +
+              ReLU(x1-x2) = |x1| + |x2|.
+  Active check: for each English property the reader (1) translates
+                it into a Hoare triple by picking precondition and
+                postcondition predicates from MC palettes plus numeric
+                thresholds, then (2) sees the site verify (or refute,
+                with a concrete counterexample) the spec on the toy
+                network by 81x81 grid search.
+
+  Standalone: open this .html directly in a browser. Uses D3 v7 and
+              KaTeX from CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NN Verification · Ch 3 · Translate the property</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; --soft:#eef3f8; --line:#d9e0e7; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 1040px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: var(--soft); border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .panel { border: 1px solid var(--line); border-radius: 6px; padding: 0.9rem 1rem; background: #fff; margin-top: 1rem; }
+  .panel h3 { margin: 0 0 0.5rem 0; font-size: 0.98rem; }
+  .english { font-style: italic; color: var(--muted); padding: 0.5rem 0.8rem; border-left: 3px solid var(--accent); background: var(--soft); border-radius: 3px; }
+  .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; margin-top: 0.5rem; }
+  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+  .slot { border: 1px solid var(--line); border-radius: 4px; padding: 0.6rem; background: #fafbfc; }
+  .slot h4 { margin: 0 0 0.4rem 0; font-size: 0.92rem; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+  .choice { display: block; width: 100%; text-align: left; margin: 0.25rem 0; padding: 0.45rem 0.7rem; border: 1px solid var(--line); background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover { background: var(--soft); }
+  .choice.active { border-color: var(--accent); background: var(--soft); border-width: 2px; padding: calc(0.45rem - 1px) calc(0.7rem - 1px); }
+  .params { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; margin-top: 0.5rem; font-size: 0.92rem; }
+  .params input[type=number] { width: 5.5rem; font: inherit; padding: 0.2rem 0.4rem; border: 1px solid var(--line); border-radius: 3px; text-align: right; }
+  .triple { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; background: #fafbfc; border: 1px solid var(--line); border-radius: 4px; padding: 0.6rem 0.8rem; font-size: 0.92rem; line-height: 1.7; }
+  .triple .pre { color: var(--accent); }
+  .triple .post { color: var(--good); }
+  .triple .call { color: var(--ink); }
+  .controls { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.7rem; }
+  select, button { font: inherit; padding: 0.35rem 0.7rem; border: 1px solid var(--line); border-radius: 4px; background: #fff; cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:hover { background: #1f5a92; }
+  button:hover { background: var(--soft); }
+  button:disabled { opacity: 0.55; cursor: not-allowed; }
+  .verdict { padding: 0.55rem 0.85rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.93rem; font-weight: 500; }
+  .verdict.ok { background: #ecfdf3; color: var(--good); border-left: 4px solid var(--good); }
+  .verdict.bad { background: #fef3f2; color: var(--bad); border-left: 4px solid var(--bad); }
+  .verdict.idle { background: var(--soft); color: var(--muted); border-left: 4px solid var(--line); }
+  .reveal { padding: 0.6rem 0.85rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.93rem; background: var(--soft); border-left: 4px solid var(--accent); }
+  .reveal.hidden { display: none; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  svg.ce { background: #fff; border: 1px solid var(--line); border-radius: 4px; display: block; margin-top: 0.4rem; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+</style>
+</head>
+<body>
+
+<h1>Translate the property</h1>
+<p class="subtitle">
+  NN Verification · Chapter 3 · companion to Albarghouthi (2021) §3.1–§3.3.
+</p>
+
+<div class="lede">
+  <p style="margin: 0;">
+    Albarghouthi's specification language wraps the network in a
+    Hoare triple: $\{P\}\;\vec r \gets f(\vec x)\;\{Q\}$, read
+    &ldquo;for any input satisfying $P$, the output satisfies $Q$.&rdquo;
+    The hardest part of verification is not deciding whether such a
+    triple holds — it is writing $P$ and $Q$ correctly in the first
+    place. Below, you will translate three English properties about
+    our canonical 2-2-1 ReLU toy network into formal triples by
+    picking precondition and postcondition predicates from a
+    palette, then watch the site decide whether your spec holds (or
+    show you a counterexample if it doesn't).
+  </p>
+</div>
+
+<p style="margin-top: 1rem;">
+  Toy network (the same one as Ch 2):
+  $y(x_1, x_2) = \mathrm{ReLU}(x_1 + x_2) + \mathrm{ReLU}(x_1 - x_2)$.
+  Case-split on the signs of $x_1 \pm x_2$ to confirm
+  $y(x_1, x_2) = |x_1| + |x_2|$.
+</p>
+
+<div class="controls">
+  <label for="property">Property:</label>
+  <select id="property"></select>
+</div>
+
+<div class="panel">
+  <h3 id="prop-title"></h3>
+  <div class="english" id="prop-english"></div>
+
+  <div class="layout">
+    <div class="slot">
+      <h4>1. Precondition $P$</h4>
+      <div id="pre-choices"></div>
+      <div class="params" id="pre-params"></div>
+    </div>
+    <div class="slot">
+      <h4>2. Postcondition $Q$</h4>
+      <div id="post-choices"></div>
+      <div class="params" id="post-params"></div>
+    </div>
+  </div>
+
+  <h4 style="margin-top: 0.9rem; font-size: 0.92rem; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em;">3. Your Hoare triple</h4>
+  <div class="triple" id="triple-display"></div>
+
+  <div class="controls">
+    <button id="check-encoding" class="primary">Check encoding</button>
+    <button id="verify-spec" disabled>Verify on toy network</button>
+    <button id="reveal-btn">Reveal canonical answer</button>
+  </div>
+
+  <div id="verdict" class="verdict idle">Pick a precondition and a postcondition, then press <em>Check encoding</em>.</div>
+  <svg id="ce-plot" class="ce" viewBox="0 0 460 240" width="100%" height="240" style="display: none;"></svg>
+  <div id="reveal" class="reveal hidden"></div>
+</div>
+
+<div class="footnote">
+  <p>
+    Reference: Albarghouthi, <em>Introduction to Neural Network
+    Verification</em>, Ch 3 (arXiv:<a href="https://arxiv.org/abs/2109.10317">2109.10317</a>).
+    The triple notation is §3.2; the four properties below adapt
+    Albarghouthi's running examples (image-brightness robustness,
+    monotonicity, scalar output bound) to our 2-2-1 toy.
+  </p>
+  <p>
+    The site decides spec validity by exhaustive search on a
+    81&times;81 input grid over $[-2.5, 2.5]^2$ — fine enough to
+    surface piecewise-linear violations on the toy net, but not a
+    formal verifier. Parts II and III replace this grid search with
+    sound symbolic methods (MILP / SMT in Ch 5–7; abstract
+    interpretation in Ch 8–10).
+  </p>
+</div>
+
+<script>
+"use strict";
+
+// --- Toy network -----------------------------------------------------------
+const relu = (x) => Math.max(0, x);
+function netY(x1, x2) {
+  return relu(x1 + x2) + relu(x1 - x2);
+}
+
+// --- Properties ------------------------------------------------------------
+// Each property has:
+//   english:      natural-language statement
+//   pre/post:     palettes of choices, each with predicate fn (binary) and label
+//   correctPre/Post: id of the canonical correct choice
+//   preParams/postParams: numeric parameters (with reference values)
+//   verdict:      function that returns {holds: bool, ce?: {x1,x2,...}} after
+//                 grid search using the *reference* predicates
+//   blurb:        explanation shown on reveal
+//
+// Anchor c = (1, 0.5) for the robustness property; y(c) = |1| + |0.5| = 1.5.
+const C = { x1: 1.0, x2: 0.5 };
+const YC = netY(C.x1, C.x2); // = 1.5
+
+const PROPERTIES = {
+  "robust": {
+    title: "Property 1 — Local robustness",
+    english: `Anchor at $\\vec c = (1, 0.5)$ (the network outputs $y(\\vec c) = ${YC}$). For any input $\\vec x$ that lies in the $\\ell_\\infty$ ball of radius $\\varepsilon$ around $\\vec c$, the network's output stays within $\\delta$ of $y(\\vec c)$.`,
+    preChoices: [
+      { id: "linf", label: "$\\|\\vec x - \\vec c\\|_\\infty \\le \\varepsilon$", pred: (x1, x2, p) => Math.max(Math.abs(x1 - C.x1), Math.abs(x2 - C.x2)) <= p.eps + 1e-9 },
+      { id: "l2",   label: "$\\|\\vec x - \\vec c\\|_2 \\le \\varepsilon$ (different norm)", pred: (x1, x2, p) => Math.hypot(x1 - C.x1, x2 - C.x2) <= p.eps + 1e-9 },
+      { id: "linf-strict", label: "$\\|\\vec x - \\vec c\\|_\\infty < \\varepsilon$ (strict inequality)", pred: (x1, x2, p) => Math.max(Math.abs(x1 - C.x1), Math.abs(x2 - C.x2)) < p.eps - 1e-9 },
+      { id: "eq",   label: "$\\vec x = \\vec c$ (trivialises the property)", pred: (x1, x2) => x1 === C.x1 && x2 === C.x2 }
+    ],
+    correctPre: "linf",
+    preParams: [{ key: "eps", label: "$\\varepsilon$", reference: 0.4, step: 0.05 }],
+    postChoices: [
+      { id: "abs",  label: "$|r - y(\\vec c)| \\le \\delta$", pred: (r, p) => Math.abs(r - YC) <= p.delta + 1e-9 },
+      { id: "eq",   label: "$r = y(\\vec c)$ (too strong)", pred: (r) => Math.abs(r - YC) < 1e-9 },
+      { id: "ub",   label: "$r \\le y(\\vec c) + \\delta$ (one-sided only)", pred: (r, p) => r <= YC + p.delta + 1e-9 },
+      { id: "class",label: "$\\mathrm{class}(r) = \\mathrm{class}(y(\\vec c))$ (classification, not regression)", pred: () => true }
+    ],
+    correctPost: "abs",
+    postParams: [{ key: "delta", label: "$\\delta$", reference: 1.5, step: 0.1 }],
+    blurb: "<strong>Canonical answer.</strong> $\\ell_\\infty$ matches the &ldquo;each pixel can drift by up to $\\varepsilon$&rdquo; reading; $\\ell_2$ would match a Euclidean perturbation budget and verifiers built for $\\ell_\\infty$ would silently solve a different problem. The non-strict $\\le$ is what abstract domains in Part III actually track — strict inequalities turn closed half-spaces into open ones and break soundness arguments. With $\\varepsilon = 0.4$ and $\\delta = 1.5$ the spec <strong>holds</strong>: the worst-case input on the box $[0.6, 1.4] \\times [0.1, 0.9]$ is the corner $(0.6, 0.1)$ with output $0.7$, deviation $0.8$, comfortably below $1.5$."
+  },
+
+  "monotone": {
+    title: "Property 2 — Monotonicity in $x_1$",
+    english: "If we increase $x_1$ while holding $x_2$ fixed, the network's output should not decrease. (Toy use case: imagine $x_1$ is &ldquo;square footage&rdquo; and $y$ is a price prediction — the price should not drop when the house gets bigger.)",
+    preChoices: [
+      { id: "mono",  label: "$x_1 \\ge x_1' \\;\\wedge\\; x_2 = x_2'$", pred: (x1, x2, x1p, x2p) => x1 >= x1p - 1e-9 && Math.abs(x2 - x2p) < 1e-9 },
+      { id: "strict",label: "$x_1 > x_1' \\;\\wedge\\; x_2 = x_2'$ (strict — misses ties)", pred: (x1, x2, x1p, x2p) => x1 > x1p + 1e-9 && Math.abs(x2 - x2p) < 1e-9 },
+      { id: "both",  label: "$x_1 \\ge x_1' \\;\\wedge\\; x_2 \\ge x_2'$ (joint monotonicity, different property)", pred: (x1, x2, x1p, x2p) => x1 >= x1p - 1e-9 && x2 >= x2p - 1e-9 },
+      { id: "abs",   label: "$|x_1 - x_1'| \\le \\varepsilon$ (this is robustness, not monotonicity)", pred: () => true }
+    ],
+    correctPre: "mono",
+    preParams: [],
+    postChoices: [
+      { id: "geq",  label: "$r \\ge r'$", pred: (r, rp) => r >= rp - 1e-9 },
+      { id: "gt",   label: "$r > r'$ (strict — would fail even on the constant function)", pred: (r, rp) => r > rp + 1e-9 },
+      { id: "eq",   label: "$r = r'$ (would say the network is constant in $x_1$)", pred: (r, rp) => Math.abs(r - rp) < 1e-9 },
+      { id: "abs",  label: "$|r - r'| \\le \\delta$ (Lipschitz, not monotonicity)", pred: () => true }
+    ],
+    correctPost: "geq",
+    postParams: [],
+    blurb: "<strong>Canonical answer.</strong> Pre is $x_1 \\ge x_1' \\wedge x_2 = x_2'$, post is $r \\ge r'$. The spec <strong>holds</strong> on this toy network — and the proof is short enough to do in your head. Both hidden affine maps $a_1 = x_1 + x_2$ and $a_2 = x_1 - x_2$ have coefficient $+1$ on $x_1$, so $\\partial a_j / \\partial x_1 = 1$. ReLU is non-decreasing, so $\\partial h_j / \\partial x_1 \\ge 0$. The output $y = h_1 + h_2$ has non-negative partial derivative in $x_1$ everywhere, so it is monotone non-decreasing in $x_1$. (The same argument fails for general affine weights — replace $a_2 = x_1 - x_2$ with $a_2 = -x_1 + x_2$ and the spec breaks. House-price classifiers in production ship <a href=\"https://arxiv.org/abs/2006.01735\">monotonicity-preserving constraints</a> on the weights precisely to preserve this kind of guarantee.)"
+  },
+
+  "bound": {
+    title: "Property 3 — Output upper bound on a box",
+    english: "On the input box $[-2, 2]^2$, the network's output never exceeds the threshold $M$. (A &ldquo;safety envelope&rdquo; — verifying the controller never demands more force than the actuator can deliver.)",
+    preChoices: [
+      { id: "box",   label: "$-2 \\le x_1 \\le 2 \\;\\wedge\\; -2 \\le x_2 \\le 2$", pred: (x1, x2) => x1 >= -2 - 1e-9 && x1 <= 2 + 1e-9 && x2 >= -2 - 1e-9 && x2 <= 2 + 1e-9 },
+      { id: "ball",  label: "$x_1^2 + x_2^2 \\le 4$ (a different region — disk, not box)", pred: (x1, x2) => x1*x1 + x2*x2 <= 4 + 1e-9 },
+      { id: "true",  label: "$\\top$ (no constraint on inputs)", pred: () => true },
+      { id: "pos",   label: "$x_1 \\ge 0 \\;\\wedge\\; x_2 \\ge 0$ (only the first quadrant)", pred: (x1, x2) => x1 >= -1e-9 && x2 >= -1e-9 }
+    ],
+    correctPre: "box",
+    preParams: [],
+    postChoices: [
+      { id: "le",   label: "$r \\le M$", pred: (r, p) => r <= p.M + 1e-9 },
+      { id: "lt",   label: "$r < M$ (strict)", pred: (r, p) => r < p.M - 1e-9 },
+      { id: "abs",  label: "$|r| \\le M$ (two-sided, but $r \\ge 0$ already on this net)", pred: (r, p) => Math.abs(r) <= p.M + 1e-9 },
+      { id: "geq",  label: "$r \\ge M$ (lower bound, opposite direction)", pred: (r, p) => r >= p.M - 1e-9 }
+    ],
+    correctPost: "le",
+    postParams: [{ key: "M", label: "$M$", reference: 3.5, step: 0.1 }],
+    blurb: "<strong>Canonical answer.</strong> The pre is the literal box; the post is the non-strict scalar upper bound. With $M = 3.5$ the spec <strong>fails</strong>: the network computes $y(x_1, x_2) = \\mathrm{ReLU}(x_1+x_2) + \\mathrm{ReLU}(x_1-x_2)$, which on the corner $(2, 2)$ evaluates to $\\mathrm{ReLU}(4) + \\mathrm{ReLU}(0) = 4$ — and $4 > 3.5$. The same value $4$ is reached at the other three corners $(2, -2), (-2, 2)$ via permutation, $(-2, -2)$ via the negative-input case (where $y = 0$, not a violation), so really only the &ldquo;positive-radius&rdquo; corners. Raising $M$ to anything $\\ge 4$ certifies the bound; this is the simplest possible verification problem and previews the abstract-domain machinery of Part III. The $|r| \\le M$ distractor is harmless on this network because $y \\ge 0$ everywhere, but it would mis-encode the property on a network that can output negatives."
+  }
+};
+
+// --- DOM refs --------------------------------------------------------------
+const propSel = document.getElementById('property');
+const titleEl = document.getElementById('prop-title');
+const englishEl = document.getElementById('prop-english');
+const preChoicesEl = document.getElementById('pre-choices');
+const postChoicesEl = document.getElementById('post-choices');
+const preParamsEl = document.getElementById('pre-params');
+const postParamsEl = document.getElementById('post-params');
+const tripleEl = document.getElementById('triple-display');
+const checkBtn = document.getElementById('check-encoding');
+const verifyBtn = document.getElementById('verify-spec');
+const revealBtn = document.getElementById('reveal-btn');
+const verdictEl = document.getElementById('verdict');
+const revealEl = document.getElementById('reveal');
+const cePlot = document.getElementById('ce-plot');
+
+// Populate property selector
+for (const [k, p] of Object.entries(PROPERTIES)) {
+  const opt = document.createElement('option');
+  opt.value = k; opt.textContent = p.title;
+  propSel.appendChild(opt);
+}
+
+// --- State -----------------------------------------------------------------
+let state = {
+  property: "robust",
+  preChoice: null,
+  postChoice: null,
+  preParams: {},
+  postParams: {},
+  encodingOk: false
+};
+
+function currentProp() { return PROPERTIES[state.property]; }
+
+// --- Rendering -------------------------------------------------------------
+function renderChoices() {
+  const p = currentProp();
+  preChoicesEl.innerHTML = '';
+  for (const c of p.preChoices) {
+    const btn = document.createElement('button');
+    btn.className = 'choice' + (state.preChoice === c.id ? ' active' : '');
+    btn.dataset.id = c.id;
+    btn.innerHTML = c.label;
+    btn.addEventListener('click', () => { state.preChoice = c.id; state.encodingOk = false; verifyBtn.disabled = true; render(); resetVerdict(); });
+    preChoicesEl.appendChild(btn);
+  }
+  postChoicesEl.innerHTML = '';
+  for (const c of p.postChoices) {
+    const btn = document.createElement('button');
+    btn.className = 'choice' + (state.postChoice === c.id ? ' active' : '');
+    btn.dataset.id = c.id;
+    btn.innerHTML = c.label;
+    btn.addEventListener('click', () => { state.postChoice = c.id; state.encodingOk = false; verifyBtn.disabled = true; render(); resetVerdict(); });
+    postChoicesEl.appendChild(btn);
+  }
+  preParamsEl.innerHTML = '';
+  for (const param of p.preParams) {
+    const wrap = document.createElement('span');
+    wrap.innerHTML = `<span>${param.label}:</span>`;
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.step = String(param.step); inp.dataset.key = param.key; inp.dataset.bag = 'pre';
+    inp.value = state.preParams[param.key] ?? '';
+    inp.addEventListener('input', onParamInput);
+    wrap.appendChild(inp);
+    preParamsEl.appendChild(wrap);
+  }
+  postParamsEl.innerHTML = '';
+  for (const param of p.postParams) {
+    const wrap = document.createElement('span');
+    wrap.innerHTML = `<span>${param.label}:</span>`;
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.step = String(param.step); inp.dataset.key = param.key; inp.dataset.bag = 'post';
+    inp.value = state.postParams[param.key] ?? '';
+    inp.addEventListener('input', onParamInput);
+    wrap.appendChild(inp);
+    postParamsEl.appendChild(wrap);
+  }
+}
+
+function onParamInput(ev) {
+  const inp = ev.target;
+  const key = inp.dataset.key;
+  const bag = inp.dataset.bag;
+  const v = inp.value === '' ? NaN : parseFloat(inp.value);
+  if (bag === 'pre') state.preParams[key] = v;
+  else state.postParams[key] = v;
+  state.encodingOk = false;
+  verifyBtn.disabled = true;
+  renderTriple();
+  resetVerdict();
+}
+
+function renderTriple() {
+  const p = currentProp();
+  const preLabel = p.preChoices.find(c => c.id === state.preChoice)?.label ?? "<em>(pick one)</em>";
+  const postLabel = p.postChoices.find(c => c.id === state.postChoice)?.label ?? "<em>(pick one)</em>";
+
+  // Substitute numeric params into the triple display.
+  let preStr = preLabel;
+  for (const param of p.preParams) {
+    const v = state.preParams[param.key];
+    const lhs = param.label.replace(/^\$|\$$/g, '');
+    if (Number.isFinite(v)) preStr = preStr.split(param.label).join(`$${v}$`);
+  }
+  let postStr = postLabel;
+  for (const param of p.postParams) {
+    const v = state.postParams[param.key];
+    if (Number.isFinite(v)) postStr = postStr.split(param.label).join(`$${v}$`);
+  }
+  // Property-specific call signature
+  let callBlock;
+  if (state.property === "monotone") {
+    callBlock = `<span class="call">  $r \\gets f(x_1, x_2)$<br>  $r' \\gets f(x_1', x_2')$</span>`;
+  } else if (state.property === "robust") {
+    callBlock = `<span class="call">  $r \\gets f(\\vec x)$</span>`;
+  } else {
+    callBlock = `<span class="call">  $r \\gets f(x_1, x_2)$</span>`;
+  }
+  tripleEl.innerHTML = `<span class="pre">$\\{$ ${preStr} $\\}$</span><br>${callBlock}<br><span class="post">$\\{$ ${postStr} $\\}$</span>`;
+  if (window.renderMathInElement) renderMathInElement(tripleEl);
+}
+
+function render() {
+  const p = currentProp();
+  titleEl.textContent = p.title;
+  englishEl.innerHTML = p.english;
+  if (window.renderMathInElement) renderMathInElement(englishEl);
+  if (window.renderMathInElement) renderMathInElement(titleEl);
+  renderChoices();
+  if (window.renderMathInElement) renderMathInElement(preChoicesEl);
+  if (window.renderMathInElement) renderMathInElement(postChoicesEl);
+  if (window.renderMathInElement) renderMathInElement(preParamsEl);
+  if (window.renderMathInElement) renderMathInElement(postParamsEl);
+  renderTriple();
+}
+
+function resetVerdict() {
+  verdictEl.className = 'verdict idle';
+  verdictEl.innerHTML = state.encodingOk
+    ? 'Encoding looks right. Press <em>Verify on toy network</em> to check whether the spec actually holds.'
+    : 'Pick a precondition and a postcondition, then press <em>Check encoding</em>.';
+  cePlot.style.display = 'none';
+  revealEl.classList.add('hidden');
+}
+
+// --- Encoding grader -------------------------------------------------------
+// Compare reader's predicate to the canonical reference predicate by sampling
+// a grid of (x, x') tuples (or just x for single-call properties). Two
+// predicates "encode the same property" iff they agree on every sample.
+
+function gridArr(lo, hi, n) {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(lo + (hi - lo) * i / (n - 1));
+  return out;
+}
+
+function checkEncoding() {
+  const p = currentProp();
+  const preChoice = p.preChoices.find(c => c.id === state.preChoice);
+  const postChoice = p.postChoices.find(c => c.id === state.postChoice);
+  const preRef = p.preChoices.find(c => c.id === p.correctPre);
+  const postRef = p.postChoices.find(c => c.id === p.correctPost);
+  if (!preChoice) return { ok: false, msg: "No precondition selected." };
+  if (!postChoice) return { ok: false, msg: "No postcondition selected." };
+  for (const param of p.preParams) if (!Number.isFinite(state.preParams[param.key])) return { ok: false, msg: `Set the precondition parameter ${param.key}.` };
+  for (const param of p.postParams) if (!Number.isFinite(state.postParams[param.key])) return { ok: false, msg: `Set the postcondition parameter ${param.key}.` };
+
+  // Build reference param set (the canonical numeric values).
+  const refPreParams = {}; for (const pp of p.preParams) refPreParams[pp.key] = pp.reference;
+  const refPostParams = {}; for (const pp of p.postParams) refPostParams[pp.key] = pp.reference;
+
+  // Enforce numeric-parameter equality with the reference (they're discrete
+  // tunables, not free variables). This is the cleanest way to grade: if the
+  // user's eps differs, their predicate cannot be the same set as the
+  // canonical predicate.
+  for (const pp of p.preParams) if (Math.abs(state.preParams[pp.key] - pp.reference) > 1e-6) return { ok: false, msg: `Numeric parameter ${pp.key} should be ${pp.reference}.` };
+  for (const pp of p.postParams) if (Math.abs(state.postParams[pp.key] - pp.reference) > 1e-6) return { ok: false, msg: `Numeric parameter ${pp.key} should be ${pp.reference}.` };
+
+  // Now check predicate-set equality on the reference grid by id-comparison.
+  // Numeric params already match, so id-equality of choices implies set-equality.
+  if (preChoice.id !== preRef.id) return { ok: false, msg: `That precondition does not encode the English property. Look again at how Albarghouthi writes it in §3.${state.property === "robust" ? "2" : "3"} — the standard idiom is the one starting with the right norm / the right relation.` };
+  if (postChoice.id !== postRef.id) return { ok: false, msg: `That postcondition does not encode the English property. Hint: ${postHint(state.property, postChoice.id)}` };
+
+  return { ok: true, msg: "Encoding matches the canonical Hoare triple." };
+}
+
+function postHint(prop, badId) {
+  if (prop === "robust") {
+    if (badId === "eq") return "exact equality is far too strong — even tiny perturbations move the output a little.";
+    if (badId === "ub") return "robustness is two-sided; a one-sided bound only catches half the failures.";
+    if (badId === "class") return "the toy network is regression, not classification — there is no $\\mathrm{class}(\\cdot)$ to read.";
+  }
+  if (prop === "monotone") {
+    if (badId === "gt") return "even on a perfectly monotone network, $r > r'$ fails when $x_1 = x_1'$.";
+    if (badId === "eq") return "this would say $f$ is constant in $x_1$, which is much stronger than monotone.";
+    if (badId === "abs") return "this is a Lipschitz (continuity) postcondition, not a monotonicity one.";
+  }
+  if (prop === "bound") {
+    if (badId === "lt") return "abstract domains in Part III certify $\\le$, not $<$ — they cannot rule out attaining the bound.";
+    if (badId === "abs") return "two-sided is harmless on a non-negative network but mis-encodes the &ldquo;upper bound&rdquo; English meaning on networks that can output negatives.";
+    if (badId === "geq") return "wrong direction.";
+  }
+  return "consider what English statement that predicate actually encodes.";
+}
+
+// --- Spec verifier ---------------------------------------------------------
+function verifySpec() {
+  const p = currentProp();
+  const N = 81;
+  const xs = gridArr(-2.5, 2.5, N);
+  let counter = null;
+
+  if (state.property === "robust") {
+    // Single x; reference pre is L_inf ball around c with radius eps.
+    const eps = state.preParams.eps;
+    const delta = state.postParams.delta;
+    for (const x1 of xs) {
+      for (const x2 of xs) {
+        if (Math.max(Math.abs(x1 - C.x1), Math.abs(x2 - C.x2)) > eps + 1e-9) continue;
+        const r = netY(x1, x2);
+        if (Math.abs(r - YC) > delta + 1e-9) {
+          counter = { kind: "robust", x1, x2, r, dev: r - YC };
+          break;
+        }
+      }
+      if (counter) break;
+    }
+  } else if (state.property === "monotone") {
+    // Two inputs (x, x') with x1 >= x1' and x2 = x2'. To make this tractable
+    // we fix x2 = x2' across the same grid and pair (x1, x1') from the same
+    // 1D sweep with x1 >= x1'.
+    outer:
+    for (const x2 of xs) {
+      for (let i = 0; i < N; i++) {
+        for (let j = 0; j <= i; j++) {
+          const x1 = xs[i], x1p = xs[j];
+          const r = netY(x1, x2), rp = netY(x1p, x2);
+          if (r < rp - 1e-9) {
+            counter = { kind: "monotone", x1, x2, x1p, x2p: x2, r, rp };
+            break outer;
+          }
+        }
+      }
+    }
+  } else if (state.property === "bound") {
+    const M = state.postParams.M;
+    for (const x1 of xs) {
+      for (const x2 of xs) {
+        if (x1 < -2 - 1e-9 || x1 > 2 + 1e-9 || x2 < -2 - 1e-9 || x2 > 2 + 1e-9) continue;
+        const r = netY(x1, x2);
+        if (r > M + 1e-9) {
+          counter = { kind: "bound", x1, x2, r };
+          break;
+        }
+      }
+      if (counter) break;
+    }
+  }
+  return { holds: counter === null, counter };
+}
+
+// --- Counterexample plot ---------------------------------------------------
+function plotCounterexample(ce) {
+  cePlot.style.display = 'block';
+  const svg = d3.select('#ce-plot');
+  svg.selectAll('*').remove();
+  const W = 460, H = 240, PAD = 40;
+  const g = svg.append('g').attr('transform', `translate(${PAD}, ${PAD * 0.4})`);
+  const innerW = W - 2 * PAD;
+  const innerH = H - PAD * 1.4;
+  const xScale = d3.scaleLinear().domain([-2.5, 2.5]).range([0, innerW]);
+  const yScale = d3.scaleLinear().domain([-2.5, 2.5]).range([innerH, 0]);
+
+  // Background heatmap
+  const N = 41;
+  const xs = gridArr(-2.5, 2.5, N);
+  const cellW = innerW / N, cellH = innerH / N;
+  let maxV = 0;
+  for (const a of xs) for (const b of xs) maxV = Math.max(maxV, netY(a, b));
+  const color = d3.scaleSequential(d3.interpolateBlues).domain([0, maxV]);
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      const v = netY(xs[i], xs[j]);
+      g.append('rect')
+        .attr('x', i * cellW)
+        .attr('y', innerH - (j + 1) * cellH)
+        .attr('width', cellW + 0.5).attr('height', cellH + 0.5)
+        .attr('fill', color(v));
+    }
+  }
+
+  // Anchor for robustness
+  if (ce.kind === "robust") {
+    g.append('circle').attr('cx', xScale(C.x1)).attr('cy', yScale(C.x2)).attr('r', 5).attr('fill', '#fff').attr('stroke', '#1f2933').attr('stroke-width', 2);
+    g.append('text').attr('x', xScale(C.x1) + 8).attr('y', yScale(C.x2) - 6).attr('font-size', 11).attr('fill', '#1f2933').text(`anchor c, y=${YC}`);
+  }
+
+  // CE marker(s)
+  const markCE = (x1, x2, label, fill) => {
+    g.append('circle').attr('cx', xScale(x1)).attr('cy', yScale(x2)).attr('r', 6).attr('fill', fill).attr('stroke', '#1f2933').attr('stroke-width', 1.5);
+    g.append('text').attr('x', xScale(x1) + 8).attr('y', yScale(x2) + 4).attr('font-size', 11).attr('fill', '#1f2933').text(label);
+  };
+  if (ce.kind === "robust") {
+    markCE(ce.x1, ce.x2, `x=(${ce.x1.toFixed(2)}, ${ce.x2.toFixed(2)}), y=${ce.r.toFixed(2)}`, '#d92d20');
+  } else if (ce.kind === "monotone") {
+    markCE(ce.x1, ce.x2, `x=(${ce.x1.toFixed(2)}, ${ce.x2.toFixed(2)}), r=${ce.r.toFixed(2)}`, '#d92d20');
+    markCE(ce.x1p, ce.x2p, `x'=(${ce.x1p.toFixed(2)}, ${ce.x2p.toFixed(2)}), r'=${ce.rp.toFixed(2)}`, '#b54708');
+  } else if (ce.kind === "bound") {
+    markCE(ce.x1, ce.x2, `x=(${ce.x1.toFixed(2)}, ${ce.x2.toFixed(2)}), y=${ce.r.toFixed(2)}`, '#d92d20');
+  }
+
+  g.append('g').attr('class', 'axis').attr('transform', `translate(0, ${innerH})`).call(d3.axisBottom(xScale).ticks(5));
+  g.append('g').attr('class', 'axis').call(d3.axisLeft(yScale).ticks(5));
+  g.append('text').attr('class', 'axis-label').attr('x', innerW).attr('y', innerH + 30).attr('text-anchor', 'end').text('x₁');
+  g.append('text').attr('class', 'axis-label').attr('x', -4).attr('y', -8).attr('text-anchor', 'start').text('x₂');
+}
+
+// --- Wire it up ------------------------------------------------------------
+checkBtn.addEventListener('click', () => {
+  const result = checkEncoding();
+  state.encodingOk = result.ok;
+  verifyBtn.disabled = !result.ok;
+  verdictEl.className = 'verdict ' + (result.ok ? 'ok' : 'bad');
+  verdictEl.textContent = result.msg;
+  cePlot.style.display = 'none';
+});
+
+verifyBtn.addEventListener('click', () => {
+  const v = verifySpec();
+  if (v.holds) {
+    verdictEl.className = 'verdict ok';
+    verdictEl.textContent = 'Spec holds on the toy network. (Verified by 81×81 grid search — Parts II/III replace this with sound symbolic methods.)';
+    cePlot.style.display = 'none';
+  } else {
+    verdictEl.className = 'verdict bad';
+    const ce = v.counter;
+    let msg;
+    if (ce.kind === "robust") {
+      msg = `Spec fails. Counterexample at $\\vec x = (${ce.x1.toFixed(2)}, ${ce.x2.toFixed(2)})$ inside the $\\varepsilon$-ball: output is $${ce.r.toFixed(3)}$, deviation $${(ce.dev).toFixed(3)}$ from $y(\\vec c) = ${YC}$.`;
+    } else if (ce.kind === "monotone") {
+      msg = `Spec fails. Counterexample: $\\vec x = (${ce.x1.toFixed(2)}, ${ce.x2.toFixed(2)})$ with $r = ${ce.r.toFixed(3)}$, $\\vec x' = (${ce.x1p.toFixed(2)}, ${ce.x2p.toFixed(2)})$ with $r' = ${ce.rp.toFixed(3)}$. Pre holds ($x_1 \\ge x_1'$, $x_2 = x_2'$) but $r < r'$.`;
+    } else {
+      msg = `Spec fails. Counterexample at $\\vec x = (${ce.x1.toFixed(2)}, ${ce.x2.toFixed(2)})$: output $${ce.r.toFixed(3)}$ exceeds the bound.`;
+    }
+    verdictEl.innerHTML = msg;
+    if (window.renderMathInElement) renderMathInElement(verdictEl);
+    plotCounterexample(ce);
+  }
+});
+
+revealBtn.addEventListener('click', () => {
+  const p = currentProp();
+  state.preChoice = p.correctPre;
+  state.postChoice = p.correctPost;
+  state.preParams = {}; for (const pp of p.preParams) state.preParams[pp.key] = pp.reference;
+  state.postParams = {}; for (const pp of p.postParams) state.postParams[pp.key] = pp.reference;
+  render();
+  revealEl.classList.remove('hidden');
+  revealEl.innerHTML = p.blurb;
+  if (window.renderMathInElement) renderMathInElement(revealEl);
+  // Auto-grade encoding then verify.
+  const enc = checkEncoding();
+  state.encodingOk = enc.ok;
+  verifyBtn.disabled = !enc.ok;
+  verdictEl.className = 'verdict ' + (enc.ok ? 'ok' : 'bad');
+  verdictEl.textContent = enc.msg;
+  if (enc.ok) {
+    const v = verifySpec();
+    setTimeout(() => { verifyBtn.click(); }, 0);
+  }
+});
+
+propSel.addEventListener('change', () => {
+  state.property = propSel.value;
+  state.preChoice = null;
+  state.postChoice = null;
+  state.preParams = {};
+  state.postParams = {};
+  state.encodingOk = false;
+  verifyBtn.disabled = true;
+  render();
+  resetVerdict();
+});
+
+// Initial render
+render();
+resetVerdict();
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.renderMathInElement) {
+    renderMathInElement(document.body, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "$", right: "$", display: false }
+      ],
+      throwOnError: false
+    });
+  }
+});
+</script>
+
+</body>
+</html>

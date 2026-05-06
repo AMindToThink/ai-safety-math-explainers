@@ -201,7 +201,7 @@ to be refined by whichever Claude takes the chapter.
 |-----------------|-------------|------------|--------------|--------|--------------|
 | Ch 1 `beginning.tex` (A New Beginning) | `nnv-ch1-motivation` | Stop-sign-vs-cupboard adversarial photo; ACAS-Xu collision-avoidance spec | Predict-then-reveal: which Turing 1948/1949 paper seeded which thread? + drag-the-perturbation widget on a 2D toy classifier | not started | |
 | Ch 2 `semantics.tex` (Neural Networks as Graphs) | `nnv-ch2-nn-as-dag` | 2-input, 1-hidden-layer (2 ReLU) → 1-output ReLU net; reused throughout the companion | Construct-the-DAG: drag affine + ReLU nodes onto canvas, site verifies the resulting `outs(·)` matches a target piecewise-linear function | in progress | |
-| Ch 3 `correctness.tex` (Correctness Properties) | `nnv-ch3-specs` | Same 2-2-1 ReLU net + an MNIST-3vs5 micro-classifier | Spec-writing exercise: translate an English property (robustness, monotonicity, ACAS-Xu turn-right) into a `{P}f{Q}` Hoare-style triple; site checks against a reference encoding | not started | |
+| Ch 3 `correctness.tex` (Correctness Properties) | `nnv-ch3-specs` | Same 2-2-1 ReLU net + an MNIST-3vs5 micro-classifier | Spec-writing exercise: translate an English property (robustness, monotonicity, ACAS-Xu turn-right) into a `{P}f{Q}` Hoare-style triple; site checks against a reference encoding | in progress | |
 | Ch 4 `fol.tex` (Logics and Satisfiability) | `nnv-ch4-fol-lra` | 3-variable LRA formulas; the 2-2-1 net's encoding | SAT-or-counterexample: given a small LRA formula, click "SAT" with a model or "UNSAT" with a short proof outline | not started | |
 | Ch 5 `encodings.tex` (Encodings of Neural Networks) | `nnv-ch5-encoding` | 2-2-1 ReLU net; single ReLU node | Construct the MILP/LRA encoding of a node, then of a 2-layer net; site grades by SMT-equivalence on a small input grid | not started | |
 | Ch 6 `dp.tex` (DPLL Modulo Theories) | `nnv-ch6-dpll-t` | A 4-clause CNF + a tiny LRA theory atom set | Step-through DPLL(T) trace: pick the next decision/propagation/backjump; site validates each step | not started | |
@@ -263,11 +263,14 @@ entry should cite the location and link the critique if one exists.
 ## Status
 
 - **Last updated:** 2026-05-06
-- **Chapters complete:** none
-- **Currently being drafted:** `nnv-ch2-nn-as-dag` — first deliverable
-  chapter. Picked over Ch 1 because Ch 2 has more math grip
-  (formal DAG semantics, recursive `outs(·)`, piecewise-linearity)
-  and pins down the toy system carried by every later chapter.
+- **Chapters complete:** `nnv-ch2-nn-as-dag` (drafted; awaiting human
+  review).
+- **Currently being drafted:** `nnv-ch3-specs` — Hoare-style spec
+  writing on the canonical 2-2-1 ReLU toy network. Picked because
+  every Part-II encoding chapter needs a working vocabulary of
+  `{P} f {Q}` triples to encode against, and the verification
+  literature consistently flags spec-writing as the underemphasised
+  skill (Albarghouthi §3.3 Collision-avoidance discussion).
 - **Blockers:** none.
 
 ## Cross-references
