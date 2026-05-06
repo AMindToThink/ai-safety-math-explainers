@@ -516,3 +516,44 @@ per session, newest at the bottom. See
 - **Why stopped:** clean unit boundary — widget, README, NOTES,
   review issue all aligned and pushed. Continuing into Ch 2 starts
   a new source section.
+
+## 2026-05-06 (session — li-ch2-continuity-paradox + autonomous run start)
+
+- **Worked on:** Module 3 of the Logical Induction Ch 2 batch
+  (`li-ch2-continuity-paradox`), then handed an autonomous-run
+  directive: keep drafting modules across all chapters using the
+  re-read-source / build-widget / open-review-issue workflow.
+- **What got done (this entry):**
+  1. Re-read paper §3.4 in full
+     (`texts/logical-induction/source/paper/main.tex` lines 715–800)
+     to recover the χ paradox passage and the IVT-via-continuity
+     rescue verbatim.
+  2. Built `chapters/ch2-the-criterion/widgets/03-continuity-paradox.html`
+     — single D3 plot of trader net demand $d(p)$ with an
+     $\varepsilon$ slider morphing the strategy from a step
+     function (no zero $\Rightarrow$ no clearing price) to a
+     clamped piecewise-linear ramp (zero at $p^\star = 0.5$).
+     Predict-then-reveal active check; honest footnote on the
+     1D-vs-Brouwer-in-$[0,1]^k$ scope gap.
+  3. Smoke test (`scripts/widget-smoke-test.py`) passes; only a
+     benign KaTeX warning that ¢ has no Main-Regular glyph.
+  4. Updated Ch 2 README (module 3 → drafted, link added) and
+     NOTES.md row.
+  5. Opened Human Review issue
+     [#14](https://github.com/AMindToThink/ai-safety-math-explainers/issues/14)
+     and linked it from NOTES.md.
+- **Commits / push:** `be67e6f` (widget + README + NOTES) and
+  `ad52364` (link #14). Pushed to origin/main.
+- **What's next (this autonomous run):** continue down NOTES.md
+  Module breakdown drafting `proposed` modules in source order.
+  Targets, in the order I plan to take them:
+  1. `li-ch2-deductive-process` (§3.2) — drag $n$, watch
+     p.c.-worlds get ruled out as $\bar{D}_n$ grows.
+  2. `li-ch2-exploit-or-not` (§3.5) — Definition 3.5.1 played as a
+     classifier game on toy trader trajectories.
+  3. `li-ch2-arbitrage-pair` (§3.5) — the $\varphi$ vs
+     $\lnot\lnot\varphi$ arbitrage.
+  4. Ch 1 module 3 if it gets added; otherwise into Ch 4 LIA.
+- **Blockers:** none.
+- **Why stopped (this entry only):** clean unit boundary between
+  modules — the run continues below.
