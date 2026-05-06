@@ -1,0 +1,318 @@
+<!--
+  Widget: li-ch2-continuity-paradox (module 3 of the Logical Induction
+          Ch 2 batch, "The Logical Induction Criterion").
+  Source: Garrabrant et al. (2016) §3.4 "Traders" (arXiv:1609.03543v3,
+          p. 22), the paragraph beginning "This circularity is related
+          to classic paradoxes of self-trust." The paradoxical sentence
+          chi := "I am true iff my price is < 50 cents" pays $1 if its
+          price is below 50 cents and $0 otherwise. A discontinuous
+          trading strategy (buy if p < 0.5, sell if p >= 0.5) admits no
+          market-clearing price; a continuous strategy that is
+          insensitive to prices within an epsilon-window around 0.5 has
+          a clearing price by the intermediate-value theorem (Brouwer
+          fixed point in 1D).
+  Toy system: a single plot of net trader demand d(p) for chi, with an
+              epsilon-slider that morphs the strategy from a step
+              function (epsilon=0) to a smoothed ramp.
+  Active check: predict whether the discontinuous strategy admits a
+                market-clearing price; reveal explains via the IVT.
+
+  Standalone: open this .html directly in a browser. Uses D3 v7 and
+              KaTeX from CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Logical Induction · Ch 2 · The continuity paradox (χ)</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 920px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .controls { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin: 0.6rem 0; }
+  input[type=range] { width: 260px; }
+  .layout { display: grid; grid-template-columns: 540px 1fr; gap: 1.6rem; align-items: start; margin-top: 0.5rem; }
+  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+  svg.plot { background: #fff; border: 1px solid #d9e0e7; border-radius: 4px; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  .panel-note { color: var(--muted); font-size: 0.92rem; margin-top: 0.4rem; }
+  .choice { display: block; width: 100%; text-align: left; margin: 0.3rem 0; padding: 0.55rem 0.8rem; border: 1px solid #c9d3df; background: #fff; cursor: pointer; border-radius: 4px; font-size: 0.92rem; color: var(--ink); }
+  .choice:hover { background: #eef3f8; }
+  .choice.active { border-color: var(--accent); background: #eef3f8; }
+  .reveal { padding: 0.7rem 0.9rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; background: #f4f6f8; border-left: 4px solid var(--accent); display: none; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  .panel { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.8rem 1rem; }
+  .verdict-good { color: var(--good); font-weight: 600; }
+  .verdict-bad { color: var(--bad); font-weight: 600; }
+  blockquote.quote { border-left: 3px solid var(--accent); margin: 0.8rem 0; padding: 0.4rem 0.9rem; background: #fafbfc; font-size: 0.94rem; }
+  .price { font-size: 1.2rem; font-weight: 600; color: var(--accent); }
+  .reasoner-name { color: var(--muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>The continuity paradox: why traders can't be allowed to trade discontinuously</h1>
+<p class="subtitle">Logical Induction companion · widget 3 of the Ch 2 batch on <a href="https://arxiv.org/abs/1609.03543">Garrabrant et&nbsp;al. (2016) §3.4</a></p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=22">Garrabrant et&nbsp;al. (2016) §3.4 "Traders"</a> — the paragraph beginning "This circularity is related to classic paradoxes of self-trust." Defines the paradoxical sentence $\chi$ := "I am true iff my price is &lt; 50¢" and explains why traders must be continuous.</li>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=72">§4.5 "Self-Trust"</a> and the §4.7 paradox-handling theorems — where the continuity payoff is collected.</li>
+    <li>Brouwer's fixed-point theorem in 1D = the intermediate value theorem. See e.g. <a href="https://en.wikipedia.org/wiki/Brouwer_fixed-point_theorem">Brouwer's theorem</a> for the general $n$-D version used in §5 of the paper.</li>
+    <li>Background on the liar paradox: Garrabrant et&nbsp;al.'s reference list cites <a href="https://www.cambridge.org/core/books/incomplete-universe/">Grim 1991</a> on the formal-logic version.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;">Define the sentence $\chi := \quot{\text{I am true iff my price is} < 50\text{¢}}$. By Gödel's diagonal lemma, such a sentence exists. Its payoff is then a function of its own price:</p>
+  <p style="margin: 0.4rem 0;text-align:center;">$\text{payout}(\chi) = \begin{cases} \$1 & \text{if } p_\chi &lt; 0.5 \\ \$0 & \text{if } p_\chi \ge 0.5 \end{cases}$</p>
+  <p style="margin: 0;">A trader who can <em>see</em> the price wants to buy $\chi$ when it's cheap (below its $\$1$ payout) and sell when it's overpriced. The natural strategy: <strong>buy if $p &lt; 0.5$, sell if $p \ge 0.5$</strong>. The market clears at a price where the trader chooses to do nothing — but does such a price exist?</p>
+</div>
+
+<h2>Toggle the trader's continuity tolerance $\varepsilon$</h2>
+<div class="controls">
+  <label for="eps-slider">$\varepsilon$ =</label>
+  <input id="eps-slider" type="range" min="0" max="0.4" step="0.01" value="0">
+  <span id="eps-display" class="price"></span>
+</div>
+<p class="panel-note">$\varepsilon = 0$ is the discontinuous "step" trader the paper warns about. $\varepsilon &gt; 0$ is a continuous trader insensitive to price shifts of size $\varepsilon$ around the threshold — an honest physical bound on price-resolution.</p>
+
+<div class="layout">
+  <div>
+    <svg class="plot" id="plot" viewBox="0 0 540 360"></svg>
+    <p class="panel-note" style="text-align:center;">Net demand $d(p)$ — shares of $\chi$ the trader wants to buy as a function of the current price $p$. A market-clearing price is a zero-crossing of $d$. The dashed vertical line marks the threshold $p = 0.5$.</p>
+  </div>
+  <div>
+    <div class="panel" style="margin-bottom: 0.6rem;">
+      <div class="reasoner-name">Market-clearing price</div>
+      <div id="equilibrium-display" class="price"></div>
+      <div class="panel-note" id="equilibrium-note"></div>
+    </div>
+
+    <h2 style="margin-top: 0.5rem;">Predict, then reveal</h2>
+    <div id="prediction-choices"></div>
+    <div class="reveal" id="reveal"></div>
+  </div>
+</div>
+
+<h2>Why discontinuity breaks the market</h2>
+<p>A market-clearing price for $\chi$ is one where the trader has no incentive to trade — net demand $d(p) = 0$. With the discontinuous step strategy:</p>
+<ul>
+  <li>For any $p &lt; 0.5$: $\chi$ pays $\$1$ but trades for less, so the trader buys ($d &gt; 0$).</li>
+  <li>For any $p \ge 0.5$: $\chi$ pays $\$0$ but trades for at least $\$0.50$, so the trader sells ($d &lt; 0$).</li>
+</ul>
+<p>$d$ jumps from $+1$ to $-1$ at $p = 0.5$ without ever being zero. <strong>No clearing price exists.</strong> The market-maker has no way to set a price for $\chi$ that the trader will accept.</p>
+
+<p>If we restrict traders to <em>continuous</em> demand functions — equivalently: the trader is insensitive to price shifts smaller than some $\varepsilon &gt; 0$ — then $d(p)$ goes from positive at the left endpoint to negative at the right with no jumps. By the intermediate value theorem, $d$ has at least one zero on $[0, 1]$. <strong>A clearing price always exists.</strong></p>
+
+<blockquote class="quote">"Continuity breaks the circularity, by ensuring that if there's a price where a trader buys $\chi$ and a price where they sell $\chi$, then there's a price in between where they neither buy nor sell. … The continuity constraint can be interpreted as saying that the trader has only finite-precision access to the market prices." — <a href="https://arxiv.org/pdf/1609.03543v3#page=22">Garrabrant et&nbsp;al. (2016), §3.4</a></blockquote>
+
+<h2>Why this matters for the rest of the paper</h2>
+<p>Continuity is doing two jobs at once:</p>
+<ol>
+  <li><strong>Mathematical:</strong> it lets the market-maker (§5.2) <em>solve</em> for prices via Brouwer's fixed-point theorem in $n$ dimensions, rather than getting stuck on a paradox.</li>
+  <li><strong>Philosophical:</strong> it lets the LIA dodge the liar paradox and its probabilistic cousin $\chi^{1/2}_n := \quot{\enc{\mathbb{P}}_n(\enc{\chi^{1/2}_n}) &lt; 0.5}$ (§4.7). The diagonal lemma still produces such a sentence, but no continuous trader can exploit it indefinitely — its price ends up at exactly $0.5$ in the limit, which is the unique fixed point.</li>
+</ol>
+
+<p class="footnote">
+  <strong>What the model is and isn't.</strong> The widget plots a single trader's net demand for $\chi$ as a function of $\chi$'s current price $p$, holding all other prices fixed. In the full §3.4 setting, traders depend on the entire price history $\Valuation_{\le n}$ across all sentences, and the market-maker (§5.2) clears prices for many sentences simultaneously — the relevant fixed-point theorem is then Brouwer's in $[0, 1]^k$, not the IVT in 1D. The 1D picture here captures the <em>essential</em> failure mode (a step function has no zero) and the <em>essential</em> rescue (continuity + IVT $\Rightarrow$ a zero exists), which is what the paper itself appeals to in its informal exposition. The smoothed strategy used here is $d(p) = \mathrm{clamp}((0.5 - p)/\varepsilon, -1, +1)$ when $\varepsilon &gt; 0$, and the step function $d(p) = +1$ for $p &lt; 0.5$, $d(p) = -1$ for $p \ge 0.5$ when $\varepsilon = 0$. The expressible-feature definition (§3.4) builds continuous strategies from rational arithmetic, $\max$, and safe reciprocation; a piecewise-linear ramp is a specific instance.
+</p>
+
+<nav class="nav">
+  <a href="01-market-trader-sandbox.html">← Module 1: market-trader sandbox</a>
+  <a href="../README.md">Ch 2 README →</a>
+</nav>
+
+<script>
+const PLOT_W = 540, PLOT_H = 360, PAD_L = 56, PAD_R = 18, PAD_T = 18, PAD_B = 38;
+
+const slider = document.getElementById('eps-slider');
+const epsDisplay = document.getElementById('eps-display');
+const equilibriumDisplay = document.getElementById('equilibrium-display');
+const equilibriumNote = document.getElementById('equilibrium-note');
+const predictionEl = document.getElementById('prediction-choices');
+const revealEl = document.getElementById('reveal');
+const svg = d3.select('#plot');
+
+let currentPrediction = null;
+
+const PREDICTIONS = [
+  { id: 'no-clearing', label: 'For $\\varepsilon = 0$ (the discontinuous strategy) there is <strong>no</strong> market-clearing price. For any $\\varepsilon &gt; 0$, a clearing price exists at $p = 0.5$.' },
+  { id: 'always-half', label: 'There is always a clearing price at $p = 0.5$, since that is where the discontinuity is.' },
+  { id: 'never-clears', label: 'The market never clears for the paradoxical sentence $\\chi$, regardless of $\\varepsilon$ — that is the paradox.' },
+];
+const CORRECT = 'no-clearing';
+
+// Net demand d(p) as a function of price p, for a given epsilon.
+// epsilon = 0: discontinuous step function (+1 for p < 0.5, -1 for p >= 0.5).
+// epsilon > 0: piecewise-linear ramp clamped to [-1, +1], crossing 0 at p = 0.5.
+function demand(p, eps) {
+  if (eps <= 0) {
+    return p < 0.5 ? +1 : -1;
+  }
+  const raw = (0.5 - p) / eps;
+  return Math.max(-1, Math.min(1, raw));
+}
+
+// Find an approximate market-clearing price (zero of d) by scanning the grid.
+// For epsilon = 0, the step has no zero; we report null.
+function findEquilibrium(eps) {
+  if (eps <= 0) return null;
+  // The continuous demand is piecewise-linear with the unique zero at 0.5.
+  return 0.5;
+}
+
+function update() {
+  const eps = +slider.value;
+  epsDisplay.textContent = eps.toFixed(2);
+  renderPlot(eps);
+
+  const eq = findEquilibrium(eps);
+  if (eq === null) {
+    equilibriumDisplay.innerHTML = '<span class="verdict-bad">none</span>';
+    equilibriumNote.innerHTML = 'The step trader buys at any $p &lt; 0.5$ and sells at any $p \\ge 0.5$. There is no $p$ where they hold — the market cannot clear.';
+  } else {
+    equilibriumDisplay.innerHTML = `<span class="verdict-good">$p^\\star = ${eq.toFixed(3)}$</span>`;
+    equilibriumNote.innerHTML = `The continuous trader's demand $d$ goes from $+1$ at the left endpoint to $-1$ at the right. By the intermediate value theorem, $d$ has at least one zero — here, exactly at $p = 0.5$. This is the unique price the market can clear at.`;
+  }
+
+  renderMath();
+}
+
+function renderPredictions() {
+  predictionEl.innerHTML = '';
+  PREDICTIONS.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'choice';
+    b.innerHTML = p.label;
+    if (currentPrediction === p.id) b.classList.add('active');
+    b.onclick = () => {
+      currentPrediction = p.id;
+      renderPredictions();
+      renderReveal();
+    };
+    predictionEl.appendChild(b);
+  });
+}
+
+function renderReveal() {
+  if (!currentPrediction) { revealEl.style.display = 'none'; return; }
+  const correct = currentPrediction === CORRECT;
+  revealEl.style.display = 'block';
+  if (correct) {
+    revealEl.innerHTML = '<strong>✓ Right.</strong> At $\\varepsilon = 0$, $d$ jumps from $+1$ to $-1$ at $p = 0.5$ without ever taking the value $0$ — the market-maker has no price to quote that the trader will accept. As soon as $\\varepsilon &gt; 0$, $d$ becomes a continuous function from a positive value at $p = 0$ to a negative value at $p = 1$; the IVT guarantees a zero, and that zero is the unique market-clearing price (here, exactly $0.5$). This is precisely the rescue Garrabrant et al. invoke informally in §3.4 and formalize in §5.2.';
+  } else if (currentPrediction === 'always-half') {
+    revealEl.innerHTML = '<strong>✗ Not quite.</strong> Move the slider to $\\varepsilon = 0$ and look at the plot — at $p = 0.5$ the discontinuous demand jumps from $+1$ to $-1$ without ever <em>being</em> $0$. A clearing price requires $d(p^\\star) = 0$, not just a discontinuity at $p^\\star$. The IVT only delivers a zero when the function is continuous; the step function is not.';
+  } else {
+    revealEl.innerHTML = '<strong>✗ Not quite.</strong> The whole point of restricting traders to continuous strategies is that the market <em>does</em> clear for $\\chi$ once we make this restriction — at exactly $p = 0.5$. The paradox is only a paradox if we let traders be discontinuous. Try the slider for any $\\varepsilon &gt; 0$.';
+  }
+  renderMath();
+}
+
+function renderPlot(eps) {
+  svg.selectAll('*').remove();
+
+  const x = d3.scaleLinear().domain([0, 1]).range([PAD_L, PLOT_W - PAD_R]);
+  const y = d3.scaleLinear().domain([-1.15, 1.15]).range([PLOT_H - PAD_B, PAD_T]);
+
+  // axes
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${y(0)})`)
+     .call(d3.axisBottom(x).ticks(6));
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(${PAD_L}, 0)`)
+     .call(d3.axisLeft(y).ticks(5));
+
+  svg.append('text').attr('class', 'axis-label').attr('x', PLOT_W - PAD_R - 4).attr('y', y(0) - 6)
+     .attr('text-anchor', 'end').text('price p of χ');
+  svg.append('text').attr('class', 'axis-label').attr('x', -PLOT_H / 2).attr('y', 14)
+     .attr('transform', 'rotate(-90)').attr('text-anchor', 'middle').text('trader net demand d(p)');
+
+  // gridlines at p=0.5 (vertical) and d=0 (horizontal already at axis)
+  svg.append('line')
+     .attr('x1', x(0.5)).attr('x2', x(0.5))
+     .attr('y1', PAD_T).attr('y2', PLOT_H - PAD_B)
+     .attr('stroke', '#bcd0e6').attr('stroke-dasharray', '3 3');
+  svg.append('text').attr('x', x(0.5) + 4).attr('y', PAD_T + 12)
+     .attr('font-size', 11).attr('fill', 'var(--muted)')
+     .text('threshold p = 0.5');
+
+  // Demand curve
+  if (eps <= 0) {
+    // Two horizontal segments with an open dot at p=0.5 from above and a closed dot from below
+    const left = d3.line()([[x(0), y(+1)], [x(0.5), y(+1)]]);
+    const right = d3.line()([[x(0.5), y(-1)], [x(1), y(-1)]]);
+    svg.append('path').attr('d', left).attr('stroke', 'var(--accent)').attr('stroke-width', 2.4).attr('fill', 'none');
+    svg.append('path').attr('d', right).attr('stroke', 'var(--accent)').attr('stroke-width', 2.4).attr('fill', 'none');
+    // Visualise the jump: open circle at the +1 side, filled at -1
+    svg.append('circle').attr('cx', x(0.5)).attr('cy', y(+1)).attr('r', 4)
+       .attr('fill', '#fff').attr('stroke', 'var(--accent)').attr('stroke-width', 2);
+    svg.append('circle').attr('cx', x(0.5)).attr('cy', y(-1)).attr('r', 4)
+       .attr('fill', 'var(--accent)');
+    // Annotate the gap
+    svg.append('text').attr('x', x(0.5) + 8).attr('y', y(0) - 6)
+       .attr('font-size', 11).attr('fill', 'var(--bad)')
+       .text('jump: d skips 0');
+  } else {
+    const ps = d3.range(0, 1.001, 0.005);
+    const series = ps.map(p => ({ p, d: demand(p, eps) }));
+    const line = d3.line().x(d => x(d.p)).y(d => y(d.d));
+    svg.append('path').datum(series)
+       .attr('fill', 'none').attr('stroke', 'var(--accent)').attr('stroke-width', 2.4)
+       .attr('d', line);
+    // Mark the zero-crossing
+    svg.append('circle').attr('cx', x(0.5)).attr('cy', y(0)).attr('r', 5)
+       .attr('fill', 'var(--good)').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    svg.append('text').attr('x', x(0.5) + 8).attr('y', y(0) - 8)
+       .attr('font-size', 11).attr('fill', 'var(--good)').attr('font-weight', 600)
+       .text(`clearing price p★ = 0.500`);
+  }
+
+  // Endpoint labels
+  svg.append('text').attr('x', x(0) + 4).attr('y', y(+1) - 4)
+     .attr('font-size', 11).attr('fill', 'var(--accent)').text('buy (d = +1)');
+  svg.append('text').attr('x', x(1) - 4).attr('y', y(-1) + 14)
+     .attr('text-anchor', 'end').attr('font-size', 11).attr('fill', 'var(--accent)').text('sell (d = −1)');
+}
+
+function renderMath() {
+  if (!window.renderMathInElement) return;
+  renderMathInElement(document.body, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '\\[', right: '\\]', display: true },
+      { left: '$', right: '$', display: false },
+      { left: '\\(', right: '\\)', display: false },
+    ],
+    macros: {
+      '\\quot': '\\textsf{“}#1\\textsf{”}',
+      '\\Valuation': '\\mathbf{V}',
+    },
+    throwOnError: false,
+    strict: 'ignore',
+  });
+}
+
+slider.addEventListener('input', update);
+renderPredictions();
+update();
+</script>
+
+</body>
+</html>
