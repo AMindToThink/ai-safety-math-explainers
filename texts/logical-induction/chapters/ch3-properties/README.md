@@ -36,7 +36,7 @@ modules in source order:
 | # | Module | Source | Status |
 |---|--------|--------|--------|
 | 1 | [`01-convergence.html`](widgets/01-convergence.html) | §4.1 Theorem 4.1.1 (Convergence) | drafted |
-| 2 | `02-limit-coherence.html` | §4.1 Theorem 4.1.2 (Limit Coherence) | proposed |
+| 2 | [`02-limit-coherence.html`](widgets/02-limit-coherence.html) | §4.1 Theorem 4.1.2 (Limit Coherence) | drafted |
 | 3 | `03-provability-induction.html` | §4.2 Theorem 4.2.1 (Provability Induction) | proposed |
 | 4 | `04-pi-statistical.html` | §4.3 Statistical-pattern learning | proposed |
 | 5 | `05-calibration-cluster.html` | §4.4 Calibration + correlated clusters | proposed |

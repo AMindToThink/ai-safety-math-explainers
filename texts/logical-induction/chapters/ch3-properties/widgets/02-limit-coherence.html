@@ -1,0 +1,328 @@
+<!--
+  Widget: li-ch3-limit-coherence (module 2 of the Logical Induction
+          Ch 3 batch, "Properties of Logical Inductors").
+  Source: Garrabrant et al. (2016) §4.1 Theorem 4.1.2 "Limit Coherence"
+          (arXiv:1609.03543v3, p. 30). Three Gaifman conditions:
+            (a) T |- phi   =>  P_inf(phi) = 1
+            (b) T |- ¬phi  =>  P_inf(phi) = 0
+            (c) T |- ¬(phi /\ psi)  =>  P_inf(phi v psi) = P_inf(phi) + P_inf(psi)
+          Each is enforced by a buy-low / sell-high / arbitrage trader
+          that earns ~epsilon every day the violation persists.
+  Toy system: the same 3-prime setup used for ch2-deductive-process,
+              with three configurable "violation scenarios", one per
+              Gaifman condition. Reader picks the violation, watches
+              the dedicated trader earn unbounded profit.
+
+  Standalone: open this .html directly in a browser. Uses D3 v7 and
+              KaTeX from CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Logical Induction · Ch 3 · Limit coherence: three exploits</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 920px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.4rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: #f4f6f8; border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .panel-note { color: var(--muted); font-size: 0.92rem; margin-top: 0.4rem; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(43, 108, 176, 0.35); }
+  a:hover { background: rgba(43, 108, 176, 0.08); border-bottom-color: var(--accent); }
+  .sources { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.9rem; }
+  .sources .label { color: var(--muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 600; }
+  .sources ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid #e5eaf0; font-size: 0.9rem; }
+  blockquote.quote { border-left: 3px solid var(--accent); margin: 0.8rem 0; padding: 0.4rem 0.9rem; background: #fafbfc; font-size: 0.94rem; }
+  svg.plot { background: #fff; border: 1px solid #d9e0e7; border-radius: 4px; }
+  .axis line, .axis path { stroke: #98a4b3; }
+  .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 12px; font-style: italic; }
+  .scenario-tabs { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.6rem 0; }
+  .scenario-tabs button { background: #fff; border: 1px solid #c9d3df; color: var(--ink); border-radius: 4px; padding: 0.4rem 0.85rem; cursor: pointer; font-size: 0.88rem; }
+  .scenario-tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .layout { display: grid; grid-template-columns: 1.1fr 1fr; gap: 1.2rem; align-items: start; }
+  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+  .stat-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.4rem 0; }
+  .stat-pill { padding: 0.18rem 0.55rem; border-radius: 12px; background: #eef3f8; color: var(--accent); font-size: 0.85rem; font-weight: 600; }
+  .stat-pill.good { background: #ecfdf3; color: var(--good); }
+  .stat-pill.bad { background: #fdecec; color: var(--bad); }
+  .controls { display: flex; gap: 0.7rem; flex-wrap: wrap; align-items: center; margin: 0.4rem 0; }
+  .controls label { font-size: 0.92rem; color: var(--muted); }
+  input[type=range] { width: 200px; }
+  .panel { background: #fff; border: 1px solid #e5eaf0; border-radius: 4px; padding: 0.7rem 0.95rem; }
+  .gaifman-list li { margin: 0.4rem 0; }
+</style>
+</head>
+<body>
+
+<h1>Limit coherence: three exploits, three theorems</h1>
+<p class="subtitle">Logical Induction companion · widget 2 of the Ch 3 batch on <a href="https://arxiv.org/abs/1609.03543">Garrabrant et&nbsp;al. (2016) §4.1</a></p>
+
+<div class="sources">
+  <span class="label">Sources for this widget</span>
+  <ul>
+    <li><a href="https://arxiv.org/pdf/1609.03543v3#page=29">Garrabrant et&nbsp;al. (2016) §4.1 Theorem 4.1.2 "Limit Coherence"</a> — the three Gaifman conditions, plus the proof sketch building one exploiting trader per condition.</li>
+    <li><a href="https://www.jstor.org/stable/3611333">Gaifman (1964), "Concerning measures in first order calculi"</a> — the source of the three coherence conditions.</li>
+    <li>Companion: <a href="01-convergence.html">li-ch3-convergence</a> sets up the buy-low/sell-high template these exploits all reuse.</li>
+  </ul>
+</div>
+
+<div class="lede">
+  <p style="margin: 0 0 0.5rem;"><strong>Theorem 4.1.2 (Limit Coherence).</strong> The limit $\mathbb{P}_\infty$ of a logical inductor over $\mathcal{T}$ defines a coherent probability measure on the consistent-completion worlds of $\mathcal{T}$.</p>
+  <p style="margin: 0;">Per Gaifman (1964), to be a coherent probability measure $\mathbb{P}_\infty$ must satisfy three conditions. <strong>Each fails $\Rightarrow$ a specific trader exploits.</strong></p>
+  <ul class="gaifman-list" style="margin: 0.4rem 0 0;">
+    <li><strong>(a)</strong> If $\mathcal{T} \vdash \varphi$, then $\mathbb{P}_\infty(\varphi) = 1$.</li>
+    <li><strong>(b)</strong> If $\mathcal{T} \vdash \lnot \varphi$, then $\mathbb{P}_\infty(\varphi) = 0$.</li>
+    <li><strong>(c)</strong> If $\mathcal{T} \vdash \lnot(\varphi \land \psi)$, then $\mathbb{P}_\infty(\varphi \lor \psi) = \mathbb{P}_\infty(\varphi) + \mathbb{P}_\infty(\psi)$.</li>
+  </ul>
+</div>
+
+<h2>Pick a violation scenario</h2>
+<div class="scenario-tabs" id="scenario-tabs"></div>
+<div class="panel" id="scenario-summary"></div>
+
+<h2 style="margin-top: 0.8rem;">Tune the violation amplitude</h2>
+<div class="controls">
+  <label for="eps-slider">$\varepsilon$ =</label>
+  <input id="eps-slider" type="range" min="0.05" max="0.4" step="0.01" value="0.2">
+  <span id="eps-display" style="font-weight:600;color:var(--accent);"></span>
+</div>
+
+<div class="layout">
+  <div>
+    <svg class="plot" id="price-plot" viewBox="0 0 540 220"></svg>
+    <p class="panel-note" style="text-align:center;">Market prices for the relevant sentence(s), days 1..100. The dashed orange line marks the day $\bar{D}$ propositionally proves the relevant theorem; from then on, the trader earns $\approx \varepsilon$ per day.</p>
+
+    <svg class="plot" id="worth-plot" viewBox="0 0 540 220" style="margin-top: 0.5rem;"></svg>
+    <p class="panel-note" style="text-align:center;">Trader's realised cash (lower bound on plausible net worth across all p.c. worlds).</p>
+  </div>
+  <div>
+    <div class="stat-row" id="stat-row"></div>
+    <h2 style="margin-top:0.2rem;">What this proves</h2>
+    <div class="panel" id="conclusion"></div>
+  </div>
+</div>
+
+<h2>Why the three together suffice</h2>
+<p>Gaifman (1964) showed that any function on sentences satisfying these three conditions extends to a probability measure on the consistent-completion worlds of $\mathcal{T}$. So:</p>
+<ul>
+  <li>$\mathbb{P}_\infty$ assigns probability 1 to provable sentences ((a)).</li>
+  <li>$\mathbb{P}_\infty$ assigns probability 0 to refutable sentences ((b)).</li>
+  <li>$\mathbb{P}_\infty$ is finitely additive on disjoint events ((c)).</li>
+</ul>
+<p>The limit beliefs of an LI form a probability distribution over the ways $\mathcal{T}$ could be completed — exactly what classical Bayesianism demands for empirical uncertainty, but extended to logical uncertainty.</p>
+
+<blockquote class="quote">"$\mathbb{P}_\infty$ is coherent, i.e., it gives rise to an internally consistent probability measure $\overline{\mathbb{P}}$ on the set $\mathrm{C}(\mathcal{T})$ of all worlds consistent with $\mathcal{T}$." — <a href="https://arxiv.org/pdf/1609.03543v3#page=29">Garrabrant et&nbsp;al. (2016), §4.1 Theorem 4.1.2</a></blockquote>
+
+<p class="footnote">
+  <strong>Three exploits, one template.</strong> All three traders are buy-low/sell-high variants. (a) buys $\varphi$ at $1 - \varepsilon$ once $\bar{D}$ proves it (worth $1$ in every remaining p.c. world). (b) sells $\varphi$ at $\varepsilon$ once $\bar{D}$ proves $\lnot\varphi$ (worth $0$ in every remaining world). (c) executes the three-leg arbitrage: sell $\varphi \lor \psi$ at $\mathbb{P}_\infty(\varphi) + \mathbb{P}_\infty(\psi) - \varepsilon$, buy $\varphi$ and $\psi$ at their stated prices, then wait for $\bar{D}$ to prove $\lnot(\varphi \land \psi)$. Once that arrives, the portfolio's value is $-(\varphi \lor \psi) + \varphi + \psi = 0$ in every remaining p.c. world (because $\varphi \land \psi$ is excluded), so the trader pockets the $\varepsilon$ price gap. Same template, same conclusion: violation of any Gaifman condition is exploitable, so an LI's limit must satisfy all three. The full proof handles continuity (the actual traders ramp through prices rather than using strict thresholds) and timing of the "$\bar{D}$ proves" event.
+</p>
+
+<nav class="nav">
+  <a href="01-convergence.html">← Module 1: convergence</a>
+  <a href="../README.md">Ch 3 README →</a>
+</nav>
+
+<script>
+const N_DAYS = 100;
+const D_PROVES_DAY = 30;  // The day D propositionally proves the relevant theorem.
+
+const SCENARIOS = [
+  {
+    id: 'a',
+    name: '(a) T ⊢ φ but P_∞(φ) = 1 − ε',
+    summary: 'The market under-prices a provable sentence. Once $\\bar{D}$ propositionally proves $\\varphi$, every remaining p.c. world values $\\varphi$ at $1$ — so $\\varphi$-shares trading at $1 - \\varepsilon$ are a free $\\varepsilon$ per share.',
+    initial: 'P_n(φ) ≈ 1 − ε',
+    afterProof: 'Trader buys 1 share/day at price 1−ε; each share is worth $1 in every remaining p.c. world; net profit ≈ ε per day.',
+    conclusion: 'A trader earns $\\varepsilon$/day, unboundedly. So no LI can have $\\mathbb{P}_\\infty(\\varphi) &lt; 1$ when $\\mathcal{T} \\vdash \\varphi$.',
+    pricesFor: (eps, n) => ({ phi: 1 - eps }),
+    traderProfit: (eps, n) => n >= D_PROVES_DAY ? eps : 0,
+  },
+  {
+    id: 'b',
+    name: '(b) T ⊢ ¬φ but P_∞(φ) = ε',
+    summary: 'The market over-prices a refutable sentence. Once $\\bar{D}$ propositionally proves $\\lnot\\varphi$, every remaining p.c. world values $\\varphi$ at $0$ — so $\\varphi$-shares trading at $\\varepsilon$ are a free $\\varepsilon$ per (sold) share.',
+    initial: 'P_n(φ) ≈ ε',
+    afterProof: 'Trader sells 1 share/day at price ε (i.e., shorts at ε); each share is worth $0 in every remaining p.c. world; net profit ≈ ε per day.',
+    conclusion: 'A trader earns $\\varepsilon$/day, unboundedly. So no LI can have $\\mathbb{P}_\\infty(\\varphi) &gt; 0$ when $\\mathcal{T} \\vdash \\lnot\\varphi$.',
+    pricesFor: (eps, n) => ({ phi: eps }),
+    traderProfit: (eps, n) => n >= D_PROVES_DAY ? eps : 0,
+  },
+  {
+    id: 'c',
+    name: '(c) T ⊢ ¬(φ ∧ ψ) but P_∞(φ ∨ ψ) ≠ P_∞(φ) + P_∞(ψ)',
+    summary: 'Suppose the market prices $\\varphi$ at 0.4, $\\psi$ at 0.4, and $\\varphi \\lor \\psi$ at $0.8 - \\varepsilon$. Once $\\bar{D}$ proves $\\lnot(\\varphi \\land \\psi)$, every remaining p.c. world has $W(\\varphi \\lor \\psi) = W(\\varphi) + W(\\psi)$ — so the bundle "buy $\\varphi$, buy $\\psi$, sell $\\varphi \\lor \\psi$" has value 0 in every world but earns $\\varepsilon$ at the price spread.',
+    initial: 'P(φ) = P(ψ) = 0.4; P(φ∨ψ) = 0.8 − ε',
+    afterProof: 'Trader executes 1 unit/day of the 3-leg bundle: buy φ at 0.4, buy ψ at 0.4, sell φ∨ψ at 0.8−ε. Cash in: 0.8−ε. Cash out: 0.8. Profit per day: ε.',
+    conclusion: 'A trader earns $\\varepsilon$/day, unboundedly. So no LI can have $\\mathbb{P}_\\infty(\\varphi \\lor \\psi)$ differ from $\\mathbb{P}_\\infty(\\varphi) + \\mathbb{P}_\\infty(\\psi)$ by more than zero, when $\\mathcal{T} \\vdash \\lnot(\\varphi \\land \\psi)$.',
+    pricesFor: (eps, n) => ({ phi: 0.4, psi: 0.4, phiOrPsi: 0.8 - eps }),
+    traderProfit: (eps, n) => n >= D_PROVES_DAY ? eps : 0,
+  },
+];
+
+const epsSlider = document.getElementById('eps-slider');
+const epsDisplay = document.getElementById('eps-display');
+const tabsEl = document.getElementById('scenario-tabs');
+const summaryEl = document.getElementById('scenario-summary');
+const statRowEl = document.getElementById('stat-row');
+const conclusionEl = document.getElementById('conclusion');
+const priceSvg = d3.select('#price-plot');
+const worthSvg = d3.select('#worth-plot');
+
+let activeId = SCENARIOS[0].id;
+
+function activeScenario() { return SCENARIOS.find(s => s.id === activeId); }
+
+function renderTabs() {
+  tabsEl.innerHTML = '';
+  SCENARIOS.forEach(s => {
+    const b = document.createElement('button');
+    b.textContent = s.name;
+    if (s.id === activeId) b.classList.add('active');
+    b.onclick = () => { activeId = s.id; renderAll(); };
+    tabsEl.appendChild(b);
+  });
+}
+
+function renderSummary() {
+  const s = activeScenario();
+  summaryEl.innerHTML =
+    `<div style="font-size:0.92rem;">${s.summary}</div>` +
+    `<div class="panel-note" style="margin-top: 0.5rem;"><strong>Initial state:</strong> ${s.initial}<br><strong>After day ${D_PROVES_DAY}:</strong> ${s.afterProof}</div>`;
+}
+
+const PLOT_W = 540, PRICE_H = 220, WORTH_H = 220, PAD_L = 56, PAD_R = 18, PAD_T = 18, PAD_B = 38;
+
+function simulate(eps) {
+  const s = activeScenario();
+  const seriesByKey = {};  // key -> [{n, p}]
+  let cash = 0;
+  const cashSeries = [];
+  for (let n = 1; n <= N_DAYS; n++) {
+    const prices = s.pricesFor(eps, n);
+    Object.keys(prices).forEach(k => {
+      if (!seriesByKey[k]) seriesByKey[k] = [];
+      seriesByKey[k].push({ n, p: prices[k] });
+    });
+    cash += s.traderProfit(eps, n);
+    cashSeries.push({ n, c: cash });
+  }
+  return { seriesByKey, cashSeries, finalCash: cash };
+}
+
+const COLORS = { phi: 'var(--accent)', psi: 'var(--good)', phiOrPsi: 'var(--warn)' };
+const LABELS = { phi: 'P_n(φ)', psi: 'P_n(ψ)', phiOrPsi: 'P_n(φ∨ψ)' };
+
+function renderPricePlot(sim) {
+  priceSvg.selectAll('*').remove();
+  const x = d3.scaleLinear().domain([1, N_DAYS]).range([PAD_L, PLOT_W - PAD_R]);
+  const y = d3.scaleLinear().domain([0, 1]).range([PRICE_H - PAD_B, PAD_T]);
+  priceSvg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${PRICE_H - PAD_B})`)
+     .call(d3.axisBottom(x).ticks(10));
+  priceSvg.append('g').attr('class', 'axis').attr('transform', `translate(${PAD_L}, 0)`)
+     .call(d3.axisLeft(y).ticks(5).tickFormat(d3.format('.1f')));
+  priceSvg.append('text').attr('class', 'axis-label').attr('x', PLOT_W / 2).attr('y', PRICE_H - 6)
+     .attr('text-anchor', 'middle').text('day n');
+  priceSvg.append('text').attr('class', 'axis-label').attr('x', -PRICE_H / 2).attr('y', 14)
+     .attr('transform', 'rotate(-90)').attr('text-anchor', 'middle').text('price');
+
+  // D proves marker
+  priceSvg.append('line').attr('x1', x(D_PROVES_DAY)).attr('x2', x(D_PROVES_DAY))
+     .attr('y1', PAD_T).attr('y2', PRICE_H - PAD_B)
+     .attr('stroke', 'var(--warn)').attr('stroke-dasharray', '4 3').attr('stroke-width', 1.4);
+  priceSvg.append('text').attr('x', x(D_PROVES_DAY) + 4).attr('y', PAD_T + 12)
+     .attr('font-size', 11).attr('fill', 'var(--warn)').text(`day ${D_PROVES_DAY}: D proves`);
+
+  Object.keys(sim.seriesByKey).forEach(k => {
+    const line = d3.line().x(d => x(d.n)).y(d => y(d.p));
+    priceSvg.append('path').datum(sim.seriesByKey[k])
+       .attr('fill', 'none').attr('stroke', COLORS[k]).attr('stroke-width', 1.8)
+       .attr('d', line);
+    const last = sim.seriesByKey[k][sim.seriesByKey[k].length - 1];
+    priceSvg.append('text').attr('x', x(last.n) + 4).attr('y', y(last.p) + 4)
+       .attr('font-size', 11).attr('fill', COLORS[k]).text(LABELS[k]);
+  });
+}
+
+function renderWorthPlot(sim) {
+  worthSvg.selectAll('*').remove();
+  const x = d3.scaleLinear().domain([1, N_DAYS]).range([PAD_L, PLOT_W - PAD_R]);
+  const yMax = Math.max(0.5, sim.finalCash + 0.3);
+  const y = d3.scaleLinear().domain([0, yMax]).range([WORTH_H - PAD_B, PAD_T]);
+  worthSvg.append('g').attr('class', 'axis').attr('transform', `translate(0, ${WORTH_H - PAD_B})`)
+     .call(d3.axisBottom(x).ticks(10));
+  worthSvg.append('g').attr('class', 'axis').attr('transform', `translate(${PAD_L}, 0)`)
+     .call(d3.axisLeft(y).ticks(6).tickFormat(d => '$' + d.toFixed(1)));
+  worthSvg.append('text').attr('class', 'axis-label').attr('x', PLOT_W / 2).attr('y', WORTH_H - 6)
+     .attr('text-anchor', 'middle').text('day n');
+  worthSvg.append('text').attr('class', 'axis-label').attr('x', -WORTH_H / 2).attr('y', 14)
+     .attr('transform', 'rotate(-90)').attr('text-anchor', 'middle').text('realised cash (USD)');
+
+  worthSvg.append('line').attr('x1', x(D_PROVES_DAY)).attr('x2', x(D_PROVES_DAY))
+     .attr('y1', PAD_T).attr('y2', WORTH_H - PAD_B)
+     .attr('stroke', 'var(--warn)').attr('stroke-dasharray', '4 3').attr('stroke-width', 1.4);
+
+  const stepLine = d3.line().curve(d3.curveStepAfter).x(d => x(d.n)).y(d => y(d.c));
+  worthSvg.append('path').datum(sim.cashSeries)
+     .attr('fill', 'none').attr('stroke', 'var(--good)').attr('stroke-width', 2)
+     .attr('d', stepLine);
+}
+
+function renderStats(sim, eps) {
+  const days = N_DAYS - D_PROVES_DAY + 1;
+  const expected = days * eps;
+  statRowEl.innerHTML =
+    `<span class="stat-pill">days post-proof: ${days}</span>` +
+    `<span class="stat-pill">$\\varepsilon$ per day: ${eps.toFixed(2)}</span>` +
+    `<span class="stat-pill good">final cash: $${sim.finalCash.toFixed(2)}</span>` +
+    `<span class="stat-pill">expected: $${expected.toFixed(2)}</span>`;
+}
+
+function renderConclusion() {
+  const s = activeScenario();
+  conclusionEl.innerHTML = `<div style="font-size:0.95rem;">${s.conclusion}</div>`;
+}
+
+function renderAll() {
+  const eps = +epsSlider.value;
+  epsDisplay.textContent = eps.toFixed(2);
+  renderTabs();
+  renderSummary();
+  const sim = simulate(eps);
+  renderPricePlot(sim);
+  renderWorthPlot(sim);
+  renderStats(sim, eps);
+  renderConclusion();
+  renderMath();
+}
+
+function renderMath() {
+  if (!window.renderMathInElement) return;
+  renderMathInElement(document.body, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '\\[', right: '\\]', display: true },
+      { left: '$', right: '$', display: false },
+      { left: '\\(', right: '\\)', display: false },
+    ],
+    throwOnError: false,
+    strict: 'ignore',
+  });
+}
+
+epsSlider.addEventListener('input', renderAll);
+renderAll();
+</script>
+
+</body>
+</html>
