@@ -205,7 +205,7 @@ to be refined by whichever Claude takes the chapter.
 | Ch 4 `fol.tex` (Logics and Satisfiability) | `nnv-ch4-fol-lra` | 2-variable LRA formulas drawn as half-space arrangements in the plane | SAT-or-UNSAT geometric game: drag a point onto a satisfying assignment, or declare UNSAT with the contradicting half-spaces | in progress | |
 | Ch 5 `encodings.tex` (Encodings of Neural Networks) | `nnv-ch5-encoding` | 2-2-1 ReLU net; verification arena over the 4 ReLU activation patterns | Verify-or-counterexample arena: pick a robustness query, watch the encoding split by activation pattern, site decides SAT (with counterexample) or UNSAT | in progress | |
 | Ch 6 `dp.tex` (DPLL Modulo Theories) | `nnv-ch6-dpll-t` | Three small LRA formulas (UNSAT contradiction, Albarghouthi's running example, theory-vacuous SAT) | Step-through DPLL(T) trace stepper: press Next and watch Boolean-abstract → DPLL → theory-check → learn ¬I → repeat unfold; final verdict matches the LRA truth | in progress | |
-| Ch 7 `specialized.tex` (Neural Theory Solvers — Simplex / Reluplex) | `nnv-ch7-reluplex` | Simplex tableau on 3 vars; Reluplex case-split on a 2-2-1 net | Reluplex case-splitter game: pick which ReLU to split next, watch the SAT search tree shrink/explode | not started | |
+| Ch 7 `specialized.tex` (Neural Theory Solvers — Simplex / Reluplex) | `nnv-ch7-reluplex` | Reluplex case-split tree on the 2-2-1 toy net (4 leaves) under a robustness query | Drill into each leaf to see the reduced linear network and Simplex verdict; site shows overall SAT-with-counterexample or UNSAT-after-all-leaves-closed | in progress | |
 | Ch 8 `absint.tex` (Neural Interval Abstraction) | `nnv-ch8-intervals` | 2-2-1 ReLU net under interval bounds on a 2D ε-ball input | Drag the ε-ball, watch the interval bounds propagate; predict whether the output bound certifies robustness before the site reveals | not started | |
 | Ch 9 `numerical.tex` (Neural Zonotope Abstraction) | `nnv-ch9-zonotopes` | Same 2-2-1 net; zonotope of generators visualized in 2D | Construct-the-ReLU-transformer: pick the linear lower bound for the [l,u] ReLU case-split that minimizes the upper bound's area; site grades against the optimal | not started | |
 | Ch 10 `polyhedra.tex` (Neural Polyhedron Abstraction / DeepPoly) | `nnv-ch10-deeppoly` | Same 2-2-1 net; polyhedron viewed as a system of half-spaces | Adversarial-or-certificate verification game (the headline widget): given a 2-input net + ε-ball, the reader either constructs an adversarial input *or* a CROWN-style linear bound proving robustness; site grades both | not started | |
@@ -264,13 +264,11 @@ entry should cite the location and link the critique if one exists.
 
 - **Last updated:** 2026-05-07
 - **Chapters complete:** `nnv-ch2-nn-as-dag`, `nnv-ch3-specs`,
-  `nnv-ch4-fol-lra`, `nnv-ch5-encoding` (all drafted;
-  awaiting human review).
-- **Currently being drafted:** `nnv-ch6-dpll-t` — the DPLL(T)
-  decision procedure that consumes Ch 5's encodings.
-  Active check is a step-through trace stepper that animates
-  Boolean abstraction → DPLL → theory check → learn-and-repeat
-  on three small LRA formulas.
+  `nnv-ch4-fol-lra`, `nnv-ch5-encoding`, `nnv-ch6-dpll-t`
+  (all drafted; awaiting human review).
+- **Currently being drafted:** `nnv-ch7-reluplex` — the
+  ReLU-aware specialised theory solver. Active check is a
+  case-split tree explorer on the 2-2-1 toy net.
 - **Blockers:** none.
 
 ## Cross-references

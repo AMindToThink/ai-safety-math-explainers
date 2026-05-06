@@ -1,0 +1,392 @@
+<!--
+  Widget: nnv-ch7-reluplex-case-split-tree (module 1 of nn-verification
+          Ch 7, "Neural Theory Solvers").
+  Source: Albarghouthi (2021) Ch 7, specialized.tex (arXiv:2109.10317),
+          §7.3–§7.4 — Reluplex's case-split tree.
+  Toy system: the canonical 2-2-1 ReLU net from Ch 2.
+              4 leaves, one per ReLU activation pattern.
+  Active check: case-split tree explorer. Reader sets a robustness
+                spec, presses "Solve all leaves", and watches each
+                leaf either close (LP infeasible — pattern verified
+                vacuous) or open (LP feasible — counterexample
+                returned). Overall verdict: UNSAT if all closed,
+                SAT-with-counterexample otherwise.
+
+  Standalone: open this .html directly in a browser. Uses D3 v7 and
+              KaTeX from CDN, no build step.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NN Verification · Ch 7 · Reluplex case-split tree</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --ink:#1f2933; --bg:#fdfdfa; --accent:#2b6cb0; --good:#099250; --bad:#d92d20; --muted:#52606d; --warn:#b54708; --soft:#eef3f8; --line:#d9e0e7; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 1080px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  .subtitle { color: var(--muted); margin-top: 0; font-size: 0.92rem; }
+  .lede { background: var(--soft); border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 4px; }
+  .panel { border: 1px solid var(--line); border-radius: 6px; padding: 0.9rem 1rem; background: #fff; margin-top: 1rem; }
+  .panel h3 { margin: 0 0 0.5rem 0; font-size: 0.98rem; }
+  .controls-row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin: 0.4rem 0; font-size: 0.92rem; }
+  .controls-row label { min-width: 4.5rem; color: var(--muted); }
+  input[type=number] { width: 5rem; font: inherit; padding: 0.2rem 0.4rem; border: 1px solid var(--line); border-radius: 3px; text-align: right; }
+  input[type=range] { width: 180px; }
+  button { font: inherit; padding: 0.35rem 0.7rem; border: 1px solid var(--line); border-radius: 4px; background: #fff; cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:hover { background: #1f5a92; }
+  button:hover { background: var(--soft); }
+  .verdict { padding: 0.6rem 0.85rem; border-radius: 4px; margin-top: 0.6rem; font-size: 0.95rem; font-weight: 500; }
+  .verdict.ok { background: #ecfdf3; color: var(--good); border-left: 4px solid var(--good); }
+  .verdict.bad { background: #fef3f2; color: var(--bad); border-left: 4px solid var(--bad); }
+  .verdict.idle { background: var(--soft); color: var(--muted); border-left: 4px solid var(--line); }
+
+  svg.tree { background: #fff; display: block; }
+  .tree-node circle { stroke: var(--ink); stroke-width: 1.4; cursor: pointer; }
+  .tree-node circle.leaf-closed { fill: #ecfdf3; stroke: var(--good); }
+  .tree-node circle.leaf-open { fill: #fef3f2; stroke: var(--bad); }
+  .tree-node circle.leaf-unchecked { fill: #fff; }
+  .tree-node circle.internal { fill: #fafbfc; }
+  .tree-node text.label { font-size: 12px; fill: var(--ink); }
+  .tree-node text.tag { font-size: 11px; fill: var(--muted); font-style: italic; }
+  .tree-edge { stroke: #98a4b3; stroke-width: 1.5; fill: none; }
+  .tree-edge-label { font-size: 10px; fill: var(--muted); }
+  .leaf-detail { border: 1px solid var(--line); border-radius: 4px; padding: 0.6rem 0.8rem; margin-top: 0.5rem; background: #fafbfc; font-size: 0.92rem; }
+  .leaf-detail h4 { margin: 0 0 0.3rem 0; font-size: 0.92rem; }
+  .leaf-detail.open { border-left: 4px solid var(--bad); }
+  .leaf-detail.closed { border-left: 4px solid var(--good); }
+  code { background: #f0f4f8; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.92em; }
+  .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid #e5eaf0; padding-top: 0.8rem; margin-top: 1.6rem; }
+</style>
+</head>
+<body>
+
+<h1>The Reluplex case-split tree</h1>
+<p class="subtitle">
+  NN Verification · Chapter 7 · companion to Albarghouthi (2021) §7.3–§7.4.
+</p>
+
+<div class="lede">
+  <p style="margin: 0;">
+    The 2-2-1 ReLU toy network from Ch 2 has two ReLUs, so
+    Reluplex's case-split tree has at most $2^2 = 4$ leaves —
+    exactly the four colored regions from Ch 5. On each leaf the
+    network is purely linear and the verification condition reduces
+    to a small LP that Simplex closes in a few pivots. Set a
+    robustness spec and press <em>Solve all leaves</em> to watch
+    Reluplex enumerate.
+  </p>
+</div>
+
+<div class="panel">
+  <h3>Spec</h3>
+  <div class="controls-row">
+    <label>$\vec c$:</label>
+    $\;($
+    <input id="cx1" type="number" step="0.1" value="1.0">
+    $\;,\;$
+    <input id="cx2" type="number" step="0.1" value="0.5">
+    $\;)$
+  </div>
+  <div class="controls-row">
+    <label>$\varepsilon$:</label>
+    <input id="eps" type="range" min="0.05" max="2.5" step="0.05" value="0.4">
+    <span id="eps-val">0.40</span>
+  </div>
+  <div class="controls-row">
+    <label>$M$:</label>
+    <input id="M" type="range" min="0" max="6" step="0.05" value="2.5">
+    <span id="M-val">2.50</span>
+  </div>
+  <p style="font-size: 0.86rem; color: var(--muted); margin: 0.2rem 0;">
+    Verification condition: $\|\vec x - \vec c\|_\infty \le \varepsilon \;\wedge\; \varphi_G(\vec x, y) \;\wedge\; y > M$. Reluplex closes the tree if and only if this is unsatisfiable on every leaf.
+  </p>
+  <div class="controls-row">
+    <button id="solve-btn" class="primary">Solve all leaves</button>
+    <button id="reset-btn">Reset</button>
+  </div>
+  <div id="verdict" class="verdict idle">Press <em>Solve all leaves</em>.</div>
+</div>
+
+<div class="panel">
+  <h3>Case-split tree</h3>
+  <svg id="tree" class="tree" viewBox="0 0 760 320" width="100%" height="320" aria-label="Reluplex case-split tree"></svg>
+  <p style="font-size: 0.86rem; color: var(--muted); margin: 0.3rem 0 0 0;">
+    Click a leaf to expand its details. Green = closed (LP
+    infeasible — pattern verifies vacuously). Red = open (LP
+    feasible — Reluplex returns a counterexample from this leaf).
+  </p>
+  <div id="leaf-detail-container"></div>
+</div>
+
+<div class="footnote">
+  <p>
+    Reference: Albarghouthi, <em>Introduction to Neural Network
+    Verification</em>, Ch 7 (arXiv:<a href="https://arxiv.org/abs/2109.10317">2109.10317</a>).
+    The tree shape is the limit case where Reluplex case-splits on
+    every ReLU. Real Reluplex (Katz et al., CAV 2017) only splits
+    when local pivots loop more than $\tau$ times — on this toy
+    network it would close most leaves with pivots alone, no
+    splits needed. The widget enumerates all leaves anyway because
+    that is the easiest visualisation of the full state space.
+  </p>
+  <p>
+    The per-leaf LP feasibility is computed by sampling the
+    polytope $\{$pattern constraints$\}$ $\cap$ $\varepsilon$-ball
+    $\cap$ $\{y > M\}$ on a 81×81 grid. With piecewise-linear
+    objectives the worst-case input is always a polytope vertex,
+    so the grid hits an exact violator (when one exists) up to
+    floating-point.
+  </p>
+</div>
+
+<script>
+"use strict";
+
+// --- Toy network -----------------------------------------------------------
+const relu = (x) => Math.max(0, x);
+const netY = (x1, x2) => relu(x1 + x2) + relu(x1 - x2);
+
+// Activation patterns: each pattern fixes h_1 and h_2 to active (a >= 0,
+// h = a) or inactive (a < 0, h = 0). We label patterns by signs of a_1 and a_2.
+const PATTERNS = [
+  { key: "++", h1Active: true,  h2Active: true,  reducedY: (x1, x2) => 2 * x1,        constraints: ["a_1 \\ge 0", "a_2 \\ge 0"], simplexY: "h_1 + h_2 = (x_1 + x_2) + (x_1 - x_2) = 2 x_1" },
+  { key: "+-", h1Active: true,  h2Active: false, reducedY: (x1, x2) => x1 + x2,       constraints: ["a_1 \\ge 0", "a_2 < 0"],  simplexY: "h_1 + h_2 = (x_1 + x_2) + 0 = x_1 + x_2" },
+  { key: "-+", h1Active: false, h2Active: true,  reducedY: (x1, x2) => x1 - x2,       constraints: ["a_1 < 0",  "a_2 \\ge 0"], simplexY: "h_1 + h_2 = 0 + (x_1 - x_2) = x_1 - x_2" },
+  { key: "--", h1Active: false, h2Active: false, reducedY: (x1, x2) => 0,             constraints: ["a_1 < 0",  "a_2 < 0"],  simplexY: "h_1 + h_2 = 0 + 0 = 0" }
+];
+
+function patternHolds(pat, x1, x2) {
+  const a1 = x1 + x2, a2 = x1 - x2;
+  const ok1 = pat.h1Active ? a1 >= -1e-9 : a1 < 1e-9;
+  const ok2 = pat.h2Active ? a2 >= -1e-9 : a2 < 1e-9;
+  return ok1 && ok2;
+}
+
+// --- DOM refs --------------------------------------------------------------
+const cx1El = document.getElementById('cx1');
+const cx2El = document.getElementById('cx2');
+const epsEl = document.getElementById('eps');
+const MEl = document.getElementById('M');
+const epsValEl = document.getElementById('eps-val');
+const MValEl = document.getElementById('M-val');
+const solveBtn = document.getElementById('solve-btn');
+const resetBtn = document.getElementById('reset-btn');
+const verdictEl = document.getElementById('verdict');
+const leafContainer = document.getElementById('leaf-detail-container');
+const treeSvg = d3.select('#tree');
+
+let leafResults = null;  // { "++": {kind, ...}, ... }
+let expandedLeaf = null;
+
+// --- Tree drawing ----------------------------------------------------------
+const TREE_W = 760, TREE_H = 320;
+// SVG text doesn't render KaTeX, so node/edge labels use plain Unicode (no
+// dollar signs). The math is rendered properly in the leaf detail panels.
+const NODE_POS = {
+  root: { x: 380, y: 30, label: "Reluplex root", tag: "φ + ReLU constraints" },
+  h1Active:  { x: 200, y: 130, label: "h₁ active", tag: "a₁ ≥ 0, h₁ = a₁" },
+  h1Inactive:{ x: 560, y: 130, label: "h₁ inactive", tag: "a₁ ≤ 0, h₁ = 0" },
+  "++": { x:  90, y: 245, label: "leaf (+,+)", tag: "" },
+  "+-": { x: 310, y: 245, label: "leaf (+,−)", tag: "" },
+  "-+": { x: 470, y: 245, label: "leaf (−,+)", tag: "" },
+  "--": { x: 670, y: 245, label: "leaf (−,−)", tag: "" }
+};
+
+const EDGES = [
+  { from: "root", to: "h1Active",   label: "h₁ = a₁" },
+  { from: "root", to: "h1Inactive", label: "h₁ = 0" },
+  { from: "h1Active",   to: "++", label: "h₂ = a₂" },
+  { from: "h1Active",   to: "+-", label: "h₂ = 0" },
+  { from: "h1Inactive", to: "-+", label: "h₂ = a₂" },
+  { from: "h1Inactive", to: "--", label: "h₂ = 0" }
+];
+
+function drawTree() {
+  treeSvg.selectAll('*').remove();
+  // Edges first
+  for (const e of EDGES) {
+    const a = NODE_POS[e.from], b = NODE_POS[e.to];
+    treeSvg.append('path').attr('class', 'tree-edge')
+      .attr('d', `M${a.x},${a.y + 18} Q${(a.x + b.x) / 2},${(a.y + b.y) / 2 + 6} ${b.x},${b.y - 22}`);
+    treeSvg.append('text').attr('class', 'tree-edge-label')
+      .attr('x', (a.x + b.x) / 2).attr('y', (a.y + b.y) / 2 + 4).attr('text-anchor', 'middle')
+      .text('').append('tspan').text(e.label);
+  }
+  // Nodes
+  for (const [key, pos] of Object.entries(NODE_POS)) {
+    const isLeaf = ["++","+-","-+","--"].includes(key);
+    const g = treeSvg.append('g').attr('class', 'tree-node').attr('transform', `translate(${pos.x},${pos.y})`);
+    let circleClass = 'internal';
+    if (isLeaf) {
+      if (!leafResults) circleClass = 'leaf-unchecked';
+      else if (leafResults[key].kind === "closed") circleClass = 'leaf-closed';
+      else if (leafResults[key].kind === "open") circleClass = 'leaf-open';
+      else circleClass = 'leaf-unchecked';
+    }
+    g.append('circle').attr('r', 22).attr('class', circleClass);
+    if (isLeaf) {
+      let symbol = '?';
+      if (leafResults && leafResults[key].kind === "closed") symbol = '✓';
+      else if (leafResults && leafResults[key].kind === "open") symbol = '✗';
+      g.append('text').attr('text-anchor', 'middle').attr('y', 5).attr('font-size', 16).attr('font-weight', 'bold').text(symbol);
+      g.style('cursor', 'pointer').on('click', () => { expandedLeaf = expandedLeaf === key ? null : key; renderLeafDetail(); });
+    }
+    // Label below node.
+    const labelEl = g.append('text').attr('class', 'label').attr('text-anchor', 'middle').attr('y', 38);
+    labelEl.append('tspan').text('');
+    // KaTeX-render the label. Easier: drop label as text content with KaTeX delimiters.
+    labelEl.html(pos.label);
+    // Tag below label
+    if (pos.tag) {
+      const tagEl = g.append('text').attr('class', 'tag').attr('text-anchor', 'middle').attr('y', 54);
+      tagEl.html(pos.tag);
+    }
+  }
+  // KaTeX-render the SVG text — KaTeX doesn't render in <text> elements,
+  // so we approximate by leaving raw LaTeX source. Browsers display the LaTeX
+  // markup as-is in the SVG (acceptable for a small tree label set).
+}
+
+// --- Solver ----------------------------------------------------------------
+function getSpec() {
+  return {
+    c1: parseFloat(cx1El.value),
+    c2: parseFloat(cx2El.value),
+    eps: parseFloat(epsEl.value),
+    M: parseFloat(MEl.value)
+  };
+}
+
+function solveLeaf(pat, spec) {
+  // Sample polytope ∩ eps-ball; check whether reduced y exceeds M.
+  const N = 81;
+  const xs = [];
+  for (let i = 0; i < N; i++) xs.push(spec.c1 - spec.eps + (2 * spec.eps * i) / (N - 1));
+  const ys = [];
+  for (let i = 0; i < N; i++) ys.push(spec.c2 - spec.eps + (2 * spec.eps * i) / (N - 1));
+  let any = false;
+  let counter = null;
+  for (const x1 of xs) {
+    for (const x2 of ys) {
+      if (!patternHolds(pat, x1, x2)) continue;
+      any = true;
+      const y = pat.reducedY(x1, x2);
+      if (y > spec.M + 1e-9) {
+        counter = { x1, x2, y };
+        break;
+      }
+    }
+    if (counter) break;
+  }
+  if (!any) return { kind: "closed", reason: "polytope ∩ ε-ball is empty" };
+  if (counter) return { kind: "open", counter };
+  // Compute max y in the box for diagnostics
+  let maxY = -Infinity, witX = null;
+  for (const x1 of xs) for (const x2 of ys) {
+    if (!patternHolds(pat, x1, x2)) continue;
+    const y = pat.reducedY(x1, x2);
+    if (y > maxY) { maxY = y; witX = { x1, x2 }; }
+  }
+  return { kind: "closed", reason: `max y on this leaf is ${maxY.toFixed(3)} at (${witX.x1.toFixed(2)}, ${witX.x2.toFixed(2)}); $\\le M = ${spec.M.toFixed(2)}$` };
+}
+
+function solveAll() {
+  const spec = getSpec();
+  const results = {};
+  for (const pat of PATTERNS) results[pat.key] = solveLeaf(pat, spec);
+  return results;
+}
+
+// --- Leaf detail render ----------------------------------------------------
+function renderLeafDetail() {
+  if (!expandedLeaf || !leafResults) {
+    leafContainer.innerHTML = '';
+    drawTree();
+    return;
+  }
+  const pat = PATTERNS.find(p => p.key === expandedLeaf);
+  const r = leafResults[expandedLeaf];
+  const div = document.createElement('div');
+  div.className = `leaf-detail ${r.kind}`;
+  div.innerHTML = `<h4>Leaf $(${pat.key.replace(/\+/g, '+').replace(/-/g, '-')})$ — $h_1$ ${pat.h1Active ? "active" : "inactive"}, $h_2$ ${pat.h2Active ? "active" : "inactive"}</h4>
+    <p style="margin: 0.3rem 0;">
+      <strong>Pattern constraints:</strong> ${pat.constraints.map(c => `$${c}$`).join(' $\\wedge$ ')}.<br>
+      <strong>Reduced linear network:</strong> $${pat.simplexY}$.
+    </p>
+    <p style="margin: 0.3rem 0;">
+      <strong>LP verdict:</strong> ${r.kind === "closed"
+        ? `<span style="color: var(--good);">CLOSED</span> — ${r.reason}.`
+        : `<span style="color: var(--bad);">OPEN</span> — counterexample at $\\vec x = (${r.counter.x1.toFixed(2)}, ${r.counter.x2.toFixed(2)})$ with $y = ${r.counter.y.toFixed(3)}$.`}
+    </p>`;
+  leafContainer.innerHTML = '';
+  leafContainer.appendChild(div);
+  if (window.renderMathInElement) renderMathInElement(div);
+  drawTree();
+}
+
+// --- Wire it up ------------------------------------------------------------
+solveBtn.addEventListener('click', () => {
+  leafResults = solveAll();
+  expandedLeaf = null;
+  // Compute overall verdict
+  const openLeaves = Object.entries(leafResults).filter(([_, r]) => r.kind === "open");
+  if (openLeaves.length === 0) {
+    verdictEl.className = 'verdict ok';
+    verdictEl.innerHTML = `Spec <strong>verified</strong>. All four leaves close — Reluplex returns UNSAT for the negated VC, so the property holds.`;
+  } else {
+    const [pat, r] = openLeaves[0];
+    verdictEl.className = 'verdict bad';
+    verdictEl.innerHTML = `Spec <strong>fails</strong>. Leaf $(${pat})$ is open — Reluplex returns the counterexample $\\vec x = (${r.counter.x1.toFixed(2)}, ${r.counter.x2.toFixed(2)})$ with $y = ${r.counter.y.toFixed(3)} > M = ${getSpec().M}$. (${openLeaves.length} of 4 leaves open.)`;
+  }
+  if (window.renderMathInElement) renderMathInElement(verdictEl);
+  drawTree();
+  renderLeafDetail();
+});
+
+resetBtn.addEventListener('click', () => {
+  cx1El.value = '1.0'; cx2El.value = '0.5';
+  epsEl.value = '0.4'; MEl.value = '2.5';
+  epsValEl.textContent = '0.40'; MValEl.textContent = '2.50';
+  leafResults = null;
+  expandedLeaf = null;
+  verdictEl.className = 'verdict idle';
+  verdictEl.textContent = 'Press Solve all leaves.';
+  drawTree();
+  leafContainer.innerHTML = '';
+});
+
+function onSpecChange() {
+  epsValEl.textContent = parseFloat(epsEl.value).toFixed(2);
+  MValEl.textContent = parseFloat(MEl.value).toFixed(2);
+  leafResults = null;
+  expandedLeaf = null;
+  verdictEl.className = 'verdict idle';
+  verdictEl.textContent = 'Spec changed — press Solve all leaves.';
+  drawTree();
+  leafContainer.innerHTML = '';
+}
+[cx1El, cx2El, epsEl, MEl].forEach(el => el.addEventListener('input', onSpecChange));
+
+drawTree();
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.renderMathInElement) {
+    renderMathInElement(document.body, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "$", right: "$", display: false }
+      ],
+      throwOnError: false
+    });
+  }
+});
+</script>
+
+</body>
+</html>

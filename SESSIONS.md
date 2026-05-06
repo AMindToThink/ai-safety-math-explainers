@@ -853,3 +853,42 @@ per session, newest at the bottom. See
   feedback. Eight widgets in one continuous run is also probably
   the right cap — diminishing returns past this point without
   the partner-side review loop closing.
+
+## 2026-05-07 01:30 (continuing — nnv-ch7-reluplex)
+
+- **Worked on:** Built `nnv-ch7-reluplex`, the sixth
+  nn-verification chapter. Closes Part II — Simplex + Reluplex
+  as the ReLU-aware specialised theory solver inside DPLL(T).
+- **What got done:**
+  1. Read `specialized.tex` in full. Pulled out the central
+     idea: hoisting ReLU disjunctions out of the SAT layer and
+     into the theory solver lets local Simplex pivots fix most
+     ReLU violations without splitting; only when a ReLU has been
+     visited > $\tau$ times does Reluplex finally case-split it.
+  2. Flipped row + Status block (Ch 6 now drafted; Ch 7 in
+     progress).
+  3. Wrote `README.md` with the Reluplex-as-Simplex-extension
+     framing and the explicit pointer to α,β-CROWN as the
+     spiritual descendent (cheap bound-tightening + occasional
+     case-split).
+  4. Built `01-reluplex-case-split-tree.html`. The Reluplex
+     case-split tree on the toy net materialised as a 3-level
+     binary tree (root → split on $h_1$ → split on $h_2$ → 4
+     leaves). Shared spec controls with Ch 5's widget. Per-leaf
+     Simplex closing computed by 81×81 grid sampling of the
+     leaf's polytope $\cap$ $\varepsilon$-ball $\cap$
+     $\{y > M\}$. Click a leaf to expand its detail panel
+     (pattern constraints, reduced linear network, LP verdict).
+  5. Smoke + interactive grader test PASS for default-FAIL,
+     M=4.5-HOLDS, leaf-click-expands-detail.
+- **Mid-build polish:** initially used LaTeX delimiters in the
+  SVG node/edge labels — KaTeX doesn't render inside SVG `<text>`
+  so the labels showed raw `$h_1$` source. Fixed by switching
+  the tree labels to Unicode (h₁, h₂, a₁, a₂, ≥, ≤). The leaf
+  detail panel still uses real KaTeX since it's HTML.
+- **What's next:** Part III opens with `nnv-ch8-intervals` —
+  interval abstract domain. Active check is a draggable ε-ball
+  on the toy net's input plane with live interval-bound
+  propagation through every node. This is the start of the
+  abstraction-based half of the book.
+- **Blockers:** none.
