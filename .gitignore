@@ -19,3 +19,15 @@ node_modules/
 
 # Smoke-test screenshots produced by scripts/widget-smoke-test.py
 *.smoke.png
+
+# Lean game build artifacts
+.lake/
+lake-manifest.json
+.i18n/
+
+# lean4game server (cloned alongside the games at repo root for `npm start`)
+/lean4game/
+
+# Symlinks created so lean4game can discover local games as siblings
+/logical-induction-game
+/tensor-programs-game

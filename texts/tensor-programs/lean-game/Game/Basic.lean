@@ -27,7 +27,7 @@ inductive TP : Type
   | MatMul   : String → TP → TP
   | LinComb  : List Int → List TP → TP
   | Nonlin   : String → List TP → TP
-  deriving DecidableEq, Repr
+  deriving Repr
 
 namespace TP
 
@@ -40,10 +40,11 @@ def applyNonlin (f : String) (t : TP) : TP := Nonlin f [t]
 def addPair (a b : TP) : TP := LinComb [1, 1] [a, b]
 
 /-- `oneLayerForward W b x` is the TP for a single MLP layer
-    `relu(W x + b)`. This is the toy system the game and the chapters
-    return to repeatedly. -/
-def oneLayerForward (W b x : TP) : TP :=
-  applyNonlin "relu" (addPair (MatMul W x) b)
+    `relu(W x + b)`. `W` is the *name* of the random Gaussian matrix
+    (a `String`); `b` and `x` are sub-TPs (typically `Var "b"` and
+    `Var "x"`). -/
+def oneLayerForward (W b x : String) : TP :=
+  applyNonlin "relu" (addPair (MatMul W (Var x)) (Var b))
 
 end TP
 

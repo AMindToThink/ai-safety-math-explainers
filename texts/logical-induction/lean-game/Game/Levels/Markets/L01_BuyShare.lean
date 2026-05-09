@@ -2,15 +2,15 @@ import Game.Metadata
 
 namespace LogicalInduction
 
-/-- A `World` for a single sentence is just its truth value (a `Bool`). -/
-abbrev World := Bool
+/-- A `LIWorld` for a single sentence is just its truth value (a `Bool`). -/
+abbrev LIWorld := Bool
 
 /-- Payout of one share of a sentence in a given world: 100¢ if true, 0¢ if false. -/
-def payout (W : World) : Int := if W then 100 else 0
+def payout (W : LIWorld) : Int := if W then 100 else 0
 
 /-- Net value (in cents) of buying one share at price `p` in world `W`.
     Cash flow is `-p`; share is worth `payout W`. So net = payout W - p. -/
-def buyValue (W : World) (p : Int) : Int := payout W - p
+def buyValue (W : LIWorld) (p : Int) : Int := payout W - p
 
 end LogicalInduction
 
@@ -51,5 +51,5 @@ each day you guarantee yourself another 10¢. We'll formalise this in
 World 2.
 "
 
-NewDefinition LogicalInduction.World LogicalInduction.payout LogicalInduction.buyValue
+NewDefinition LogicalInduction.LIWorld LogicalInduction.payout LogicalInduction.buyValue
 NewTactic decide

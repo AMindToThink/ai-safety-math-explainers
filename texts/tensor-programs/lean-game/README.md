@@ -9,26 +9,63 @@ Companion to the **Tensor Programs** explainer in `texts/tensor-programs/`.
 
 ## Status
 
-**Bootstrap scaffold (autonomous session 2026-05-09).** The lakefile,
-toolchain pin, the `TP` inductive type in `Game/Basic.lean`, and two
-worlds with four levels between them are in place. **The build has not
-been verified in this session** because the autonomous sandbox does
-not have `elan` installed and toolchain installation was outside the
-session's authorization scope. The next session (or anyone with `elan`
-on their local machine) should run `lake update -R && lake build` to
-confirm everything compiles.
+**Playable locally** as of 2026-05-09. `lake build` succeeds against
+`leanprover/lean4:v4.23.0` and the `MakeGame` step writes the
+`.lake/gamedata/` JSON the lean4game server reads. Four levels across
+two worlds (World 2 currently has one stub level — see "Future worlds"
+below for the queued additions).
 
-If the build fails, common fixes:
+## Quick start (everything from scratch)
 
-- The `lean-toolchain` pin is `leanprover/lean4:v4.23.0`, matching the
-  GameSkeleton template at the time of writing. If GameServer has
-  moved on, bump this to whatever the current
-  [GameSkeleton's `lean-toolchain`](https://github.com/hhu-adam/GameSkeleton)
-  says.
-- The lakefile is the verbatim template from
-  [`hhu-adam/GameSkeleton`](https://github.com/hhu-adam/GameSkeleton/blob/main/lakefile.lean).
-- All current levels close by `rfl`. If a future level fails to
-  elaborate via `decide`, swap to `native_decide`.
+For the full setup procedure (installing `elan`, cloning lean4game,
+patching it to follow symlinks, and the Python-3.12 `npm install`
+gotcha) see
+[`texts/logical-induction/lean-game/README.md`](../../logical-induction/lean-game/README.md#quick-start-everything-from-scratch).
+The exact same setup serves both games — lean4game discovers any
+sibling directory of itself with a `.lake/gamedata/game.json`, so once
+you have the server running for the logical-induction game, the
+tensor-programs game appears next to it.
+
+The minimum-effort version, run from the repo root
+(`ai-safety-math-explainers/`):
+
+```bash
+# 1. elan + Lean toolchain
+curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+  | sh -s -- -y --default-toolchain none --no-modify-path
+export PATH="$HOME/.elan/bin:$PATH"
+
+# 2. Build this game
+cd texts/tensor-programs/lean-game
+lake update -R
+lake build                               # expect: "Build completed successfully (52 jobs)."
+cd -
+
+# 3. lean4game server, sibling-symlink, patch, npm install (one-time)
+git clone https://github.com/leanprover-community/lean4game.git
+ln -sfn texts/tensor-programs/lean-game tensor-programs-game
+# Patch lean4game/relay/src/index.ts: see logical-induction README §5
+uv venv --python 3.11 /tmp/py311
+PATH="/tmp/py311/bin:$PATH" PYTHON=/tmp/py311/bin/python \
+  npm --prefix lean4game install --python=/tmp/py311/bin/python
+
+# 4. Run
+cd lean4game
+PATH="$HOME/.elan/bin:/tmp/py311/bin:$PATH" npm start
+```
+
+Open <http://localhost:3000/#/g/local/tensor-programs-game>.
+
+## Iterating on the game
+
+After editing any `.lean` file under `Game/`:
+
+```bash
+cd texts/tensor-programs/lean-game
+lake build
+```
+
+Then refresh the browser tab. `npm start` does not need to restart.
 
 ## Design rationale (read this before adding levels)
 
@@ -48,6 +85,26 @@ Theorem says about each TP term the learner constructs.
 This mirrors the project's pattern: Lean game for the symbolic /
 construction layer, browser widgets for the quantitative layer (coord
 checks, abc-cube exploration, μTransfer at three widths).
+
+## Common build failures
+
+- **`None of the deriving handlers for class 'DecidableEq' applied to 'TP'`** —
+  Lean's auto-derivation can't handle `DecidableEq` on inductive
+  types with nested `List Self` constructors (here, `LinComb` and
+  `Nonlin` both take `List TP`). The fix in `Game/Basic.lean` is to
+  drop `DecidableEq` from `deriving` (we keep `Repr`); levels close
+  by `rfl` regardless. If a future level needs decidable equality
+  on `TP`, write the instance manually.
+- **`Application type mismatch: expected String got TP` on `MatMul`** —
+  `MatMul` is `String → TP → TP` (the matrix is named, like an input
+  declaration in TP IV §2.1; the operand is a sub-TP). On 2026-05-09
+  we changed `oneLayerForward` to `(W b x : String) → TP` accordingly,
+  so callers can write `oneLayerForward "W" "b" "x"`.
+- **GameServer compatibility drift.** The `lean-toolchain` pin is
+  `leanprover/lean4:v4.23.0`. If GameServer has moved on, bump it to
+  whatever the current
+  [GameSkeleton's `lean-toolchain`](https://github.com/hhu-adam/GameSkeleton)
+  says.
 
 ## What's here
 
@@ -89,24 +146,6 @@ algebraic / rewrite-rule content goes — the next session should add:
 - A level proving `simplify` is idempotent.
 - A level building the *backward pass* of one MLP layer as a TP.
 
-## Building locally
-
-You'll need [`elan`](https://github.com/leanprover/elan) to install
-the right Lean toolchain automatically. From this directory:
-
-```bash
-lake update -R     # fetch GameServer at v4.23.0
-lake build         # compile all worlds; warnings are OK
-```
-
-The `lake update -R` clears any local-game-server overrides; pass
-`-Klean4game.local` instead if you have a `lean4game/` checkout
-sitting next to this directory.
-
-To run the game in a browser, follow
-[`lean4game/doc/DOCUMENTATION.md`](https://github.com/leanprover-community/lean4game/blob/main/doc/DOCUMENTATION.md)
-and point it at this directory.
-
 ## Future worlds (not in this scaffold)
 
 Per `texts/tensor-programs/NOTES.md`, queued worlds:
@@ -128,5 +167,4 @@ Add new worlds by creating `Game/Levels/<World>.lean` and a
 
 Per `CONTRIBUTING.md` ("Lean Game Server games"), once the game is
 ready for the public server at `adam.math.hhu.de` it should move to
-its own standalone GitHub repo. We're nowhere near that yet — this
-scaffold is "compiles in principle" not "ready for players".
+its own standalone GitHub repo.

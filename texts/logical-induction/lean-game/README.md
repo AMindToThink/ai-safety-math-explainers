@@ -10,27 +10,151 @@ game's gameplay.
 
 ## Status
 
-**Bootstrap scaffold (autonomous session 2026-05-05).** The lakefile,
-toolchain pin, world structure, and two worlds with five levels
-between them are in place. **The build has not been verified in
-this session** because the autonomous sandbox does not have `elan`
-installed and installing toolchains was outside the session's
-authorization scope. The next session (or anyone with `elan` on
-their local machine) should run `lake update -R && lake build` to
-confirm everything compiles.
+**Playable locally** as of 2026-05-09. `lake build` succeeds against
+`leanprover/lean4:v4.23.0` and the `MakeGame` step writes the
+`.lake/gamedata/` JSON the lean4game server reads. Five levels across
+two worlds.
 
-If the build fails, common fixes:
+The game has not been published to `adam.math.hhu.de` yet — that
+requires moving it to its own GitHub repo per `CONTRIBUTING.md`.
+For now it runs in a local lean4game instance (instructions below).
 
-- The `lean-toolchain` pin is `leanprover/lean4:v4.23.0`, matching
-  the GameSkeleton template at the time of writing. If GameServer
-  has moved on, bump this to whatever version the current
-  GameSkeleton's `lean-toolchain` says.
-- The lakefile is the verbatim template from
-  [`hhu-adam/GameSkeleton`](https://github.com/hhu-adam/GameSkeleton/blob/main/lakefile.lean);
-  cross-check against that repo if `lake update` complains.
-- `decide`-based proofs may need `Decidable.decide` or `native_decide`
-  on some toolchains. If a level fails to elaborate, swap `decide`
-  for `native_decide` as the first remediation.
+## Quick start (everything from scratch)
+
+These steps were verified end-to-end on 2026-05-09 on Linux aarch64.
+Run them from the repo root (`ai-safety-math-explainers/`).
+
+### 1. Install `elan` (Lean toolchain manager)
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+  | sh -s -- -y --default-toolchain none --no-modify-path
+export PATH="$HOME/.elan/bin:$PATH"   # add to ~/.bashrc / ~/.zshrc to make permanent
+```
+
+`elan` will install `leanprover/lean4:v4.23.0` (the version pinned in
+`lean-toolchain`) on first `lake` invocation.
+
+### 2. Build the game
+
+```bash
+cd texts/logical-induction/lean-game
+lake update -R       # fetch GameServer + transitive deps
+lake build           # ~1 minute on a warm cache; writes .lake/gamedata/
+```
+
+If the build prints info-level messages about "Missing Definition
+Documentation" / "Missing Tactic Documentation" — that's expected
+and harmless. Look for **`Build completed successfully (52 jobs).`**
+
+### 3. Set up the lean4game browser server
+
+The lean4game server is a sibling of each game on disk; it discovers
+games by scanning its parent directory. Clone it at the repo root and
+make a sibling symlink to this game folder:
+
+```bash
+cd <repo-root>                                    # ai-safety-math-explainers/
+git clone https://github.com/leanprover-community/lean4game.git
+ln -sfn texts/logical-induction/lean-game logical-induction-game
+```
+
+After this, the directory layout that lean4game expects is:
+
+```
+ai-safety-math-explainers/
+├── lean4game/                       # the server
+├── logical-induction-game -> texts/logical-induction/lean-game
+└── tensor-programs-game   -> texts/tensor-programs/lean-game   (if using both)
+```
+
+(Both the `lean4game/` clone and the symlinks are in `.gitignore`.)
+
+### 4. Install Node dependencies
+
+You need Node ≥18 (tested on 22.22.2) and `npm`. **Python 3.12 will
+break `npm install`** because one transitive dep (`@parcel/watcher`)
+builds via `node-gyp`, which still imports the removed `distutils`
+module. Use Python ≤3.11:
+
+```bash
+# Easiest: a Python 3.11 throwaway via uv
+uv venv --python 3.11 /tmp/py311
+PATH="/tmp/py311/bin:$PATH" PYTHON=/tmp/py311/bin/python \
+  npm --prefix lean4game install --python=/tmp/py311/bin/python
+```
+
+Without `uv`, install Python 3.11 some other way (pyenv, system
+package manager, etc.) and point `PYTHON` at it before `npm install`.
+
+### 5. Patch lean4game to follow symlinks (one-time)
+
+Out of the box, lean4game's local-game discovery in
+`relay/src/index.ts` skips entries whose `isDirectory()` is false —
+which includes symlinks. Apply this one-line patch so the symlinks
+made in step 3 are seen:
+
+```diff
+- if (!entry.isDirectory()) continue;
++ if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+```
+
+(Or just clone the games as real sibling directories instead of
+symlinking. The symlink approach lets the game source live under
+`texts/`, which is where the rest of the explainer lives.)
+
+If you skip the patch, your game will still load when you visit its
+URL directly (`/#/g/local/logical-induction-game`), but it won't
+appear on the lean4game landing page's local-games list.
+
+### 6. Start the server
+
+```bash
+cd lean4game
+PATH="$HOME/.elan/bin:/tmp/py311/bin:$PATH" npm start
+```
+
+`npm start` runs three concurrent processes (build:server, relay,
+client). Wait until you see `Server listening on 8080` and Vite's
+`ready in …ms`. Then open:
+
+- Landing page: <http://localhost:3000/>
+- Direct link to this game: <http://localhost:3000/#/g/local/logical-induction-game>
+
+Both work; the direct link is more reliable if you skipped the
+symlink-discovery patch in step 5.
+
+## Iterating on the game
+
+After editing any `.lean` file under `Game/`:
+
+```bash
+cd texts/logical-induction/lean-game
+lake build
+```
+
+Then refresh your browser. The `npm start` process does **not** need
+to restart — only `lake build` does, because the relay re-reads the
+JSON from `.lake/gamedata/` each time it spawns a Lean session.
+
+## Common build failures
+
+- **`unexpected token 'World'`** — usually means a level `open`s a
+  namespace whose contents shadow GameServer's `World` macro keyword.
+  Rename the offending identifier (we did this for `World → LIWorld`
+  in `Markets/L01_BuyShare.lean` on 2026-05-09).
+- **`unexpected token 'show'; expected command` on `NewTactic …`** —
+  some Lean keywords (notably `show`) can't be listed verbatim on a
+  `NewTactic` line. Drop them or wrap them differently.
+- **`'show' tactic failed, pattern is not definitionally equal`** —
+  the `show` tactic only succeeds when the printed pattern matches
+  the goal up to definitional equality. If `Int`/`Nat` coercions are
+  fighting you, replace `show …; …` with `simp [defs]; omega`.
+- **GameServer compatibility drift.** The `lean-toolchain` pin is
+  `leanprover/lean4:v4.23.0`. If GameServer has moved on, bump it to
+  whatever version the current
+  [GameSkeleton's `lean-toolchain`](https://github.com/hhu-adam/GameSkeleton/blob/main/lean-toolchain)
+  says.
 
 ## What's here
 
@@ -69,24 +193,6 @@ Together L1 and L2 of World 2 deliver the two halves of
 *bounded below + unbounded above = exploitation*. The market in
 the game is therefore not a logical inductor.
 
-## Building locally
-
-You'll need [`elan`](https://github.com/leanprover/elan) to install
-the right Lean toolchain automatically. From this directory:
-
-```bash
-lake update -R     # fetch GameServer at v4.23.0
-lake build         # compile all worlds; should print warnings only if a
-                   #   level uses an undefined lemma
-```
-
-The `lake update -R` clears any local-game-server overrides; pass
-`-Klean4game.local` instead if you have a `lean4game/` checkout
-sitting next to this directory.
-
-To run the game in a browser, follow [`lean4game/doc/DOCUMENTATION.md`](https://github.com/leanprover-community/lean4game/blob/main/doc/DOCUMENTATION.md)
-and point it at this directory.
-
 ## Future levels (not in this scaffold)
 
 Per `texts/logical-induction/NOTES.md`, the queued worlds are:
@@ -105,5 +211,4 @@ Add new worlds by creating `Game/Levels/<World>.lean` and a
 
 Per `CONTRIBUTING.md` ("Lean Game Server games"), once the game is
 ready for the public server at `adam.math.hhu.de` it should move
-to its own standalone GitHub repo. We're nowhere near that yet —
-this scaffold is "compiles in principle" not "ready for players".
+to its own standalone GitHub repo.

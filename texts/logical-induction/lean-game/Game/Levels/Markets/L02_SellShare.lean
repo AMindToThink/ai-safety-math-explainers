@@ -5,7 +5,7 @@ namespace LogicalInduction
 
 /-- Net value of selling one share at price `p` in world `W`: collect `p`,
     owe `payout W`. So net = p - payout W. -/
-def sellValue (W : World) (p : Int) : Int := p - payout W
+def sellValue (W : LIWorld) (p : Int) : Int := p - payout W
 
 end LogicalInduction
 

@@ -8,7 +8,7 @@ namespace LogicalInduction
     `p_phi` and sells one share of `psi` at price `p_psi`, evaluated in the
     world `(W_phi, W_psi)`. -/
 def portfolioValue
-    (W_phi W_psi : World) (p_phi p_psi : Int) : Int :=
+    (W_phi W_psi : LIWorld) (p_phi p_psi : Int) : Int :=
   buyValue W_phi p_phi + sellValue W_psi p_psi
 
 end LogicalInduction
