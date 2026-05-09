@@ -1,0 +1,32 @@
+diff --git a/relay/src/index.ts b/relay/src/index.ts
+index 3f27cc0..c535e8f 100644
+--- a/relay/src/index.ts
++++ b/relay/src/index.ts
+@@ -142,7 +142,7 @@ const server = app
+         });
+ 
+         for (const entry of entries) {
+-          if (!entry.isDirectory()) continue;
++          if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+           const gameJsonPath = path.join(BASE_DIR, entry.name, ".lake", "gamedata", "game.json");
+           let gameJson : any;
+           try {
+diff --git a/relay/src/websocket.ts b/relay/src/websocket.ts
+index 2a02aaf..639ac22 100644
+--- a/relay/src/websocket.ts
++++ b/relay/src/websocket.ts
+@@ -77,6 +77,14 @@ export class GameSessionsObserver {
+   startObservedGame(ws: WebSocket, req: IncomingMessage) {
+     const ip = anonymize(req.headers['x-forwarded-for'] as string || req.socket.remoteAddress);
+     let gameSession: GameSession = this.gameManager.startGame(req, ip)
++    // `startGame` returns `undefined` for malformed URLs or when no Lean
++    // process could be started. Without this guard the relay null-derefs
++    // on the next line and nodemon (which only watches *.mjs) does not
++    // restart it, killing the entire instance for one bad probe.
++    if (!gameSession) {
++      try { ws.close(1008, "Invalid game URL"); } catch (_) { }
++      return;
++    }
+     let ps = gameSession.process
+     let game = gameSession.game
+     let gameDir = gameSession.gameDir

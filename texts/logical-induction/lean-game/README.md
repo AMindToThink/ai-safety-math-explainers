@@ -87,24 +87,36 @@ PATH="/tmp/py311/bin:$PATH" PYTHON=/tmp/py311/bin/python \
 Without `uv`, install Python 3.11 some other way (pyenv, system
 package manager, etc.) and point `PYTHON` at it before `npm install`.
 
-### 5. Patch lean4game to follow symlinks (one-time)
+### 5. Apply the local lean4game patches (one-time)
 
-Out of the box, lean4game's local-game discovery in
-`relay/src/index.ts` skips entries whose `isDirectory()` is false —
-which includes symlinks. Apply this one-line patch so the symlinks
-made in step 3 are seen:
+Two upstream issues need patching for a smooth local setup. Both are
+captured in `scripts/lean4game-local-fixes.patch` — apply with:
 
-```diff
-- if (!entry.isDirectory()) continue;
-+ if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+```bash
+( cd lean4game && git apply ../scripts/lean4game-local-fixes.patch )
 ```
 
-(Or just clone the games as real sibling directories instead of
-symlinking. The symlink approach lets the game source live under
-`texts/`, which is where the rest of the explainer lives.)
+What the patch does:
 
-If you skip the patch, your game will still load when you visit its
-URL directly (`/#/g/local/logical-induction-game`), but it won't
+1. **`relay/src/index.ts`** — local-game discovery iterates entries
+   whose `isDirectory()` is true and skips everything else, including
+   symlinks. The patch adds `|| entry.isSymbolicLink()` so the sibling
+   symlinks created in step 3 show up on the landing page. (If you'd
+   rather clone the games as real sibling directories, you can skip
+   this hunk.)
+2. **`relay/src/websocket.ts`** — `startObservedGame` null-derefs on
+   `gameSession.process` when `startGame` returns `undefined` (which
+   it does for malformed WebSocket URLs). One stray probe — e.g. from
+   a security scanner or a typo'd URL — takes the whole relay down,
+   and nodemon doesn't restart it because it only watches `*.mjs`.
+   The patch closes the socket cleanly with code 1008 and returns
+   early, so the relay keeps serving everyone else.
+
+Both fixes are good upstream-PR candidates for
+[`leanprover-community/lean4game`](https://github.com/leanprover-community/lean4game).
+
+If you skip the symlink patch, your game still loads when you visit
+its URL directly (`/#/g/local/logical-induction-game`), but it won't
 appear on the lean4game landing page's local-games list.
 
 ### 6. Start the server
