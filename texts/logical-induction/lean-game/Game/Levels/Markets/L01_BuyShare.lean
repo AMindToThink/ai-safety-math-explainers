@@ -53,3 +53,9 @@ World 2.
 
 NewDefinition LogicalInduction.LIWorld LogicalInduction.payout LogicalInduction.buyValue
 NewTactic decide
+-- Restrict the inventory so the player has to engage with `decide` (the
+-- tactic this level introduces) instead of closing by `rfl`. Both close
+-- this goal — `buyValue true 90` reduces to the literal `10` either way
+-- — but we want the level to teach decidable computation, not
+-- definitional unfolding.
+OnlyTactic decide
